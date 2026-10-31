@@ -1,5 +1,7 @@
 import { ZOOM_MAX, ZOOM_MIN } from '../shared/constants';
 
+
+
 export interface Rect {
   minX: number;
   minY: number;
@@ -32,9 +34,36 @@ export class Camera {
   private anchor: { sx: number; sy: number; wx: number; wy: number } | null = null;
   private bounds: Rect | null = null;
 
+  /** Map width in world px; it sets how far you can zoom out. */
+  private fitWidth = 0;
+
   setScreenSize(w: number, h: number) {
+    if (w === this.screenW && h === this.screenH) return;
     this.screenW = w;
     this.screenH = h;
+    this.targetZoom = this.clampZoom(this.targetZoom);
+    this.zoom = this.clampZoom(this.zoom);
+  }
+
+  /** Set the map's width in world px (it limits how far you can zoom out). */
+  setFitWidth(worldWidth: number) {
+    this.fitWidth = worldWidth;
+    this.targetZoom = this.clampZoom(this.targetZoom);
+    this.zoom = this.clampZoom(this.zoom);
+  }
+
+  /**
+   * Smallest zoom: the whole screen still fits inside the map's diamond (2:1), so zoomed all
+   * the way out over the middle you see only map, never the dark around it. A w×h rectangle
+   * fits in a diamond W wide and W/2 tall when w/W + 2h/W ≤ 1.
+   */
+  get minZoom(): number {
+    if (this.fitWidth <= 0) return ZOOM_MIN;
+    return Math.min(1, Math.max(ZOOM_MIN, (this.screenW + 2 * this.screenH) / this.fitWidth));
+  }
+
+  private clampZoom(z: number): number {
+    return clamp(z, this.minZoom, ZOOM_MAX);
   }
 
   setBounds(bounds: Rect) {
@@ -44,7 +73,7 @@ export class Camera {
   jumpTo(x: number, y: number, zoom = this.zoom) {
     this.x = this.targetX = x;
     this.y = this.targetY = y;
-    this.zoom = this.targetZoom = clampZoom(zoom);
+    this.zoom = this.targetZoom = this.clampZoom(zoom);
     this.anchor = null;
     this.clamp();
   }
@@ -88,7 +117,7 @@ export class Camera {
   /** Multiply zoom by `factor`, keeping the world point under (sx, sy) fixed. */
   zoomAt(factor: number, sx: number, sy: number) {
     const w = this.screenToWorld(sx, sy);
-    this.targetZoom = clampZoom(this.targetZoom * factor);
+    this.targetZoom = this.clampZoom(this.targetZoom * factor);
     this.anchor = { sx, sy, wx: w.x, wy: w.y };
     this.targetX = w.x - (sx - this.screenW / 2) / this.targetZoom;
     this.targetY = w.y - (sy - this.screenH / 2) / this.targetZoom;
@@ -147,6 +176,4 @@ function clamp(v: number, lo: number, hi: number) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-function clampZoom(z: number) {
-  return clamp(z, ZOOM_MIN, ZOOM_MAX);
-}
+

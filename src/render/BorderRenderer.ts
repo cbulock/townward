@@ -12,20 +12,18 @@ import type { Rect } from './Camera';
 import { flushUVs, QuadBatch, setQuadTexture, type QuadSlot, type Rgba, type Vec } from './ground/TileMesh';
 import { tileToWorld } from './iso';
 import { computeDualCell, isWaterTerrain } from './transitions';
-import { cellQuadPoints, tileQuadPoints, tileShade } from './view/lift';
+import { cellQuadPoints, tileQuadPoints } from './view/lift';
 import { GROUND_BASE, hexToRgb } from './atlas/palette';
 import { ViewTransform } from './view/ViewTransform';
 import { ViewWorld } from './view/ViewWorld';
 
 /** Fog starts this share of the way across the ring and is total at the outer edge. */
-const FOG_START = 0.3;
-const FOG_END = 0.92;
-/** Tree sprites only this close to the map; further out forests are tinted ground. */
-const TREE_SPRITE_RANGE = 10;
+const FOG_START = 0.12;
+const FOG_END = 0.7;
+/** Tree sprites this far out; beyond it the fog has mostly swallowed the land anyway. */
+const TREE_SPRITE_RANGE = 20;
 const CELL_GROW = 1.5;
 const WATER_FRAME_TIME = 0.16;
-/** Forest tint multiplied into ground beyond the tree sprites. */
-const FOREST: readonly [number, number, number] = [0.42, 0.62, 0.36];
 /** The fog colour (matches TileMesh's FOG and --bg-app), 0..1 per channel. */
 const FOG_BG: readonly [number, number, number] = [0.051, 0.067, 0.09];
 
@@ -150,10 +148,8 @@ export class BorderRenderer {
         if (fog >= 0.995) continue;
         const k = v.index(x, y);
         const [r, gg, b] = hexToRgb(GROUND_BASE[v.terrain[k] as TerrainId]);
-        const shade = tileShade(v, x, y);
-        const forest = this.outside(x, y) > TREE_SPRITE_RANGE && v.tree[k] > 0 ? 0.35 + v.tree[k] * 0.2 : 0;
-        const ch = (c: number, f: number, bg: number) => Math.round((c * shade * (1 - forest + forest * f)) * (1 - fog) + bg * 255 * fog);
-        const color = (ch(r, FOREST[0], FOG_BG[0]) << 16) | (ch(gg, FOREST[1], FOG_BG[1]) << 8) | ch(b, FOREST[2], FOG_BG[2]);
+        const ch = (c: number, bg: number) => Math.round(c * (1 - fog) + bg * 255 * fog);
+        const color = (ch(r, FOG_BG[0]) << 16) | (ch(gg, FOG_BG[1]) << 8) | ch(b, FOG_BG[2]);
         const q = tileQuadPoints(v, x, y).map((p) => ({ x: p.x - this.shift.x, y: p.y - this.shift.y }));
         g.poly([q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y, q[3].x, q[3].y]).fill(Math.min(0xffffff, color));
       }
@@ -181,20 +177,8 @@ export class BorderRenderer {
       [i, j],
       [i - 1, j],
     ];
-    const tileColor = ([x, y]: [number, number]): Rgba => {
-      const shade = tileShade(v, x, y);
-      const cx = Math.min(v.width - 1, Math.max(0, x));
-      const cy = Math.min(v.height - 1, Math.max(0, y));
-      const k = v.index(cx, cy);
-      // Beyond the tree sprites, forest shows as darker green ground.
-      const forest = this.outside(x, y) > TREE_SPRITE_RANGE && v.tree[k] > 0 ? 0.35 + v.tree[k] * 0.2 : 0;
-      const f = (c: number) => shade * (1 - forest + forest * c);
-      return [f(FOREST[0]), f(FOREST[1]), f(FOREST[2]), 1];
-    };
-    const corner = tiles.map(tileColor);
-    const avg = (c: 0 | 1 | 2 | 3) => (corner[0][c] + corner[1][c] + corner[2][c] + corner[3][c]) / 4;
-    const centre: Rgba = [avg(0), avg(1), avg(2), avg(3)];
-    const colors = [...corner, centre];
+    const white: Rgba = [1, 1, 1, 1];
+    const colors = [white, white, white, white, white];
     const fogs = [...tiles.map(([x, y]) => this.fogAt(x, y)), this.fogAt(i, j)];
     const add = (texture: Texture, into: QuadBatch, onSlot?: (s: QuadSlot) => void) =>
       into.add({ texture, points, colors, fog: fogs, grow: CELL_GROW }, onSlot);

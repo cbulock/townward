@@ -58,9 +58,9 @@ const TOOLS: readonly ToolDef[] = [
   {
     id: 'build',
     group: 'edit',
-    label: 'Build',
+    label: 'Civic',
     key: 'E',
-    hint: 'Place parks and civic buildings',
+    hint: 'Place parks and the town hall. Homes, shops and industry grow on zones (1–3)',
     icon: (
       <g {...stroke}>
         <path d="M3 11l7-6 7 6" />
@@ -76,7 +76,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'zone',
     label: 'Homes',
     key: '1',
-    hint: `Drag to zone residential · $${BALANCE.zoneCost}/tile · grows near roads`,
+    hint: `Drag to zone homes · $${BALANCE.zoneCost}/tile · houses grow within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('R'),
     tone: 'tone-r',
   },
@@ -85,7 +85,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'zone',
     label: 'Shops',
     key: '2',
-    hint: `Drag to zone commercial · $${BALANCE.zoneCost}/tile · grows near roads`,
+    hint: `Drag to zone shops · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('C'),
     tone: 'tone-c',
   },
@@ -94,7 +94,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'zone',
     label: 'Industry',
     key: '3',
-    hint: `Drag to zone industrial · $${BALANCE.zoneCost}/tile · grows near roads`,
+    hint: `Drag to zone industry · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('I'),
     tone: 'tone-i',
   },

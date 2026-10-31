@@ -59,13 +59,3 @@ export function cellQuadPoints(ground: World, i: number, j: number): Vec[] {
     at(i, j, cornerHeight(ground, i, j)),
   ];
 }
-
-/**
- * Hill light at a view tile's centre: slopes facing the camera's lower-left are lit,
- * lower-right shaded (same light as the buildings).
- */
-export function tileShade(ground: World, vx: number, vy: number): number {
-  const dx = levelAt(ground, vx + 1, vy) - levelAt(ground, vx - 1, vy);
-  const dy = levelAt(ground, vx, vy + 1) - levelAt(ground, vx, vy - 1);
-  return Math.min(1.22, Math.max(0.72, 1 - 0.1 * dy + 0.1 * dx));
-}

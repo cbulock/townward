@@ -36,7 +36,20 @@ export function BuildingPicker() {
 
   return (
     <div className="panel building-picker" role="dialog" aria-label="Choose a building">
-      <p className="picker-note">Homes, shops and industry grow on zones (keys 1–3).</p>
+      <div className="picker-note">
+        <span>Looking for houses? Homes, shops and industry grow on zones next to roads.</span>
+        <span className="picker-zone-links">
+          <button type="button" className="zone-link tone-r" onClick={() => game?.setTool('zone-r')}>
+            Zone homes <kbd>1</kbd>
+          </button>
+          <button type="button" className="zone-link tone-c" onClick={() => game?.setTool('zone-c')}>
+            Shops <kbd>2</kbd>
+          </button>
+          <button type="button" className="zone-link tone-i" onClick={() => game?.setTool('zone-i')}>
+            Industry <kbd>3</kbd>
+          </button>
+        </span>
+      </div>
       <div className="picker-grid">
         {PLACEABLE_IDS.map((id) => {
           const d = BUILDINGS[id];

@@ -6,6 +6,8 @@ import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
 import { isZoned, ZoneType, type ZoneTypeId } from '../sim/zones';
+import { findEntrance } from '../sim/population';
+import { BALANCE } from '../shared/balance';
 import { planTerraform, type TerraformOp, type TerraformPlan } from '../sim/terraform';
 import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
@@ -64,6 +66,18 @@ export type ToolPlan =
 const TINT_VALID = 0x8ff7ec;
 const TINT_INVALID = 0xff5a5a;
 const TINT_CLEAR = 0xff9a4d;
+const TINT_NO_ROAD = 0xffb547;
+
+/** A land road is within reach of this tile (zones only grow there). */
+export function nearRoad(world: World, x: number, y: number): boolean {
+  return findEntrance(world, x, y, 1, 1, BALANCE.roadAccessRange) !== -1;
+}
+
+/** How many of a zone plan's tiles no road reaches (0 for dezoning). */
+export function strandedZoneTiles(world: World, p: ToolPlan): number {
+  if (p.kind !== 'zone' || !isZoned(p.zone)) return 0;
+  return p.plan.tiles.filter((t) => t.valid && !nearRoad(world, t.x, t.y)).length;
+}
 
 /**
  * What the active tool would do for the current drag (or the hovered tile, before a drag starts).
@@ -127,13 +141,17 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
 
   if (p.kind === 'zone') {
     const tint = isZoned(p.zone) ? ZONE_TINT[p.zone] : TINT_CLEAR;
-    return p.plan.tiles.map((t) => ({
-      x: t.x,
-      y: t.y,
-      texture: tex.zoneLot,
-      tint: t.valid ? tint : 0xffffff,
-      alpha: t.valid ? 0.85 : 0.25,
-    }));
+    return p.plan.tiles.map((t) => {
+      // Zone tiles no road reaches won't grow: show them amber so it's clear before you let go.
+      const stranded = t.valid && isZoned(p.zone) && !nearRoad(world, t.x, t.y);
+      return {
+        x: t.x,
+        y: t.y,
+        texture: tex.zoneLot,
+        tint: !t.valid ? 0xffffff : stranded ? TINT_NO_ROAD : tint,
+        alpha: !t.valid ? 0.25 : stranded ? 0.7 : 0.85,
+      };
+    });
   }
 
   if (p.kind === 'clear') {

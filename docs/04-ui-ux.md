@@ -84,7 +84,7 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 | Action | Mouse / Trackpad | Keyboard |
 |---|---|---|
 | Pan | Right/middle drag, two-finger drag, screen edge | WASD / arrows |
-| Zoom | Wheel / pinch (anchored at cursor) | `+` / `-` |
+| Zoom | Wheel / pinch (anchored at cursor); zoom-out stops once the screen fills with map | `+` / `-` |
 | Use tool | Left click / drag | — |
 | Cancel tool / drag | Right click | `Esc` |
 | Road / Zone R/C/I / Dezone / Bulldoze | — | `R` / `1` `2` `3` / `4` / `B` |

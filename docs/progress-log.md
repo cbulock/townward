@@ -15,6 +15,9 @@ Newest first. One entry per work session.
 - **Borderlands** (D-045): an extended render-only world with rivers and sea carried on, hills rising to rocky mountains, fog, a fogged underlay (no lattice when zoomed out) and a dashed border line. The soil slab is gone.
 - Tests: 109 total (7 new: elevation, terraform, borderlands).
 - Verified in headless Chromium: hills on every preset; terraform preview cost, a road over a raised hill, a lowered dip; borderlands on Forested and Coastal; a town growing on hills; rotation. No console errors.
+- Follow-up (user feedback): the mountain ring looked smudgy, so it's simplified to low land fading into fog (D-046).
+- Follow-up (user feedback): hill shading removed, since it showed as dark patches; the furthest zoom-out now keeps the screen inside the map (0.4× for 128×128 on a 1440×900 view) (D-047).
+- Follow-up (user feedback): homes UX (D-048). Build is renamed Civic with zone shortcuts; zone tiles out of road reach are amber in the preview and grey once zoned; cost-label note and toast.
 - Gotcha: the module-level shader cache must be released per atlas, not globally. React's dev double-mount destroys the first game while the second is already running, and a global release broke the second game's meshes ("Mesh shader has no glProgram").
 
 ## 2026-10-31: Finishing the open items (Phases 5, 4c extras, 2b)

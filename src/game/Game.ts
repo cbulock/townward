@@ -12,7 +12,8 @@ import { growDay, zoneDemand } from '../sim/growth';
 import { applyTerraform } from '../sim/terraform';
 import { mulberry32, subSeed } from '../shared/rng';
 import { isPlaceable, type BuildingInstance } from '../sim/buildings/catalog';
-import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/population';
+import { cityStats, collectBudget, findEntrance, simulateDay, updateRoadAccess } from '../sim/population';
+import { ZoneType } from '../sim/zones';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Traffic } from '../sim/traffic';
 import { Decor } from '../sim/terrain/types';
@@ -25,7 +26,7 @@ import type { Point, ViewTransform } from '../render/view/ViewTransform';
 import { EventBus, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { isZoneTool, planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
+import { isZoneTool, planTool, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
   /** Preset, seed, size and sliders (see sim/terrain/presets.ts). */
@@ -239,16 +240,32 @@ export class Game {
       this.notify('error', "Can't build there: needs clear, flat land with no roads or water");
     } else if (result.ok && result.changed) {
       const c = result.changed;
-      const rect = { x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 };
+      // Roads change which zoned lots can grow up to roadAccessRange tiles away; refresh that far.
+      const g = p.kind === 'road' || p.kind === 'clear' ? BALANCE.roadAccessRange : 0;
+      const rect = { x: c.minX - g, y: c.minY - g, w: c.maxX - c.minX + 1 + 2 * g, h: c.maxY - c.minY + 1 + 2 * g };
       if (p.kind === 'terraform') this.renderer.refreshTerrain(rect);
       else this.renderer.refreshWorld(rect);
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
+      if (p.kind === 'zone' && p.zone !== ZoneType.None) this.warnUnreachableZones(result.tiles ?? []);
       this.afterWorldChange(p.kind === 'road' || p.kind === 'clear');
     } else if (result.reason === 'insufficient-funds') {
       this.sound.play('error');
       this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
     }
+  }
+
+  /** Zones only grow within reach of a road; say so when some of the new zone can't. */
+  private warnUnreachableZones(tiles: readonly PlannedTile[]) {
+    const far = tiles.filter((t) => findEntrance(this.world, t.x, t.y, 1, 1, BALANCE.roadAccessRange) === -1).length;
+    if (far === 0) return;
+    const all = far === tiles.length;
+    this.notify(
+      'info',
+      all
+        ? `No road nearby: zones grow only within ${BALANCE.roadAccessRange} tiles of a road (R)`
+        : `${far} of ${tiles.length} zoned tiles are over ${BALANCE.roadAccessRange} tiles from a road and won't grow`,
+    );
   }
 
   /** Roads or buildings changed: recheck road access, warning badges, routes and the info panel. */
@@ -575,7 +592,14 @@ export class Game {
       cost: p.plan.cost,
       count: p.plan.count,
       affordable: p.plan.cost <= this.city.funds,
+      note: this.previewNote(p),
     });
+  }
+
+  private previewNote(p: ToolPlan): string | null {
+    const stranded = strandedZoneTiles(this.world, p);
+    if (stranded === 0) return null;
+    return stranded === p.plan.count ? 'needs a road nearby to grow' : `${stranded} tile${stranded === 1 ? '' : 's'} need a road nearby`;
   }
 
   private notify(kind: 'error' | 'info', message: string) {

@@ -18,11 +18,9 @@ Status: **Implemented** (Phase 6).
 
 - **Ground as meshes.** Each chunk's ground is one merged mesh per atlas page instead of thousands of sprites.
   - Every dual cell is a quad over its padded frame diamond. The UVs come from the same atlas frames as before, and the positions are raised by the corner heights.
-  - A small custom shader adds per-vertex **shade** (hill lighting) and **fog** (for the borderlands).
+  - A small custom shader adds a per-vertex **colour** (zone tint, alpha) and **fog** (for the borderlands).
   - Water quads keep their animation by rewriting their UVs every 0.16 s, in visible chunks only.
-- **Hill lighting:**
-  - Slopes facing the camera's lower-left are lit; slopes facing lower-right are shaded, the same light as the buildings.
-  - Formula: `1 − 0.07·∂h/∂y + 0.07·∂h/∂x` in view space, clamped to 0.78–1.18.
+- **No hill lighting.** A first version shaded slopes by facing, but on gentle hills it read as random dark patches, so it was removed (D-047). Ground keeps its plain painted colours; hills show through the lift of objects, roads and edges.
 - **Tile-shaped layers** (roads, bridges' approaches, zone lots, the grid) use the same tile-quad mesh, bent to the 4 tile-corner heights. A corner's height is the average of the 4 tiles around it.
 - **Objects:**
   - Trees, decorations and buildings are lifted by their tile's height.
@@ -31,7 +29,7 @@ Status: **Implemented** (Phase 6).
   - Hover and previews become small bent meshes.
 - **Bridges:** the deck sits at the higher of its two end tiles. Over water the ends are at level 0 or 1.
 - **Map edge:** the soil slab follows the edge heights.
-- **Minimap:** hill-shaded by height.
+- **Minimap:** plain colours (no hill shading).
 
 ## Picking
 
@@ -73,13 +71,11 @@ A screen point maps to a tile by fixed-point iteration: start at h = 0, project 
 
 ## Borderlands (render-only)
 
-- **Ring:** a band of decorative land, 40 tiles wide at 128×128 (scales with map size), drawn all round the map. It isn't part of the sim and nothing can be built there.
-- **Generated from the map's edges:**
-  - Rivers and sea that touch the edge continue outward. Edge terrain blends into noise terrain.
-  - Height rises with distance from the map into forested hills and then mountains (bare rock on the peaks). It still follows the 1-level-per-tile rule, so it never hides the map.
+- **Ring:** a band of decorative land, 40 tiles wide at 128×128 (scales with map size, at most 48), drawn all round the map. It isn't part of the sim and nothing can be built there.
+- **Kept simple** (first version revised 2026-10-31): the ring started as hills and mountains. On screen the steep slopes squashed and stretched the textures, and the hill light turned them into big smudges, so it's now a gentle continuation instead:
+  - rivers and sea that touch the edge carry on outward;
+  - the edge's height fades out over 8 tiles into low rolling ground (at most 2 levels);
+  - forests come from noise; tree sprites reach 14 tiles out.
   - The same seed always gives the same ring.
-- **Drawing:**
-  - The ground uses the same mesh path, with fog that grows with distance: colours desaturate and fade into the background.
-  - Tree sprites are drawn only in the inner 10 tiles. Further out, forest shows as dark-green tinted ground, which keeps the sprite count low.
-  - A faint dashed line marks the map border.
-- **Camera:** you can pan up to a quarter of the ring past the edge, and zoom out until the ring fills the screen.
+- **Drawing:** the same mesh path as the map, with fog from 12% to 70% of the ring, fading into the background. A fogged underlay stops the dark background showing through as a lattice when zoomed out. A faint dashed line marks the map border.
+- **Camera:** you can pan up to a quarter of the ring past the edge. Zooming out stops where the screen still fits inside the map's diamond, so zoomed out over the middle you see only map (D-047).

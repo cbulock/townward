@@ -85,6 +85,12 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
   - Placing a building with the Build tool clears the zone under its footprint. Placed buildings never grow or level up.
   - Clear (bulldoze) removes a grown building but keeps the zone, so the lot grows back later.
 
+## Zoning Feedback (UX)
+
+- **The Build tool is now "Civic"** (it only places parks and the town hall, D-042). Its panel says where houses come from and has one-click **Zone homes / Shops / Industry** buttons.
+- **While dragging a zone,** tiles that no road reaches (more than 3 tiles from a road) preview in **amber**, and the cost label adds "N tiles need a road nearby".
+- **After zoning,** a toast says how many tiles won't grow. Those lots stay **grey** until a road comes within reach, then turn their zone colour. Building or clearing a road refreshes lots up to 3 tiles away.
+
 ## Growth (Phase 4b, `sim/growth.ts`, once per day)
 
 1. **Construction:** every site under construction counts down 1 day. The sequence is foundation, then scaffold, then the finished building, which pops in. A site takes **4 days** (`BALANCE.constructionDays`). Buildings under construction have no residents or jobs.

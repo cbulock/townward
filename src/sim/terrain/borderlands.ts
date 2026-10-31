@@ -9,9 +9,9 @@ import { Terrain } from './types';
  * nothing in the sim reads it. Returns an extended world (map size + 2·ring on each axis)
  * whose middle is a copy of the map, so the seam matches exactly. Around it:
  *   - rivers and sea that touch the edge carry on outward (with a gentle wobble);
- *   - land rises with distance into hills and mountains, rocky on the peaks;
+ *   - land eases down from the edge's height into low rolling ground (kept simple and gentle:
+ *     steep slopes stretched the textures and the hill light into smudges);
  *   - forests from noise, sand along the continued water.
- * Heights follow the 1-level-per-tile rule, so the ring never hides the map.
  */
 
 const SALT = { wobble: 50, mountains: 51, forest: 52, dry: 53 } as const;
@@ -67,7 +67,7 @@ export function generateBorderlands(map: World, ring: number): World {
     }
   }
 
-  // Heights: rise away from the map into hills, then mountains where the noise says so.
+  // Heights: the edge's level fades out over a few tiles, plus a low roll (at most 2 levels).
   for (let i = 0; i < n * n; i++) {
     const d = out[i];
     if (d === 0) continue;
@@ -77,8 +77,9 @@ export function generateBorderlands(map: World, ring: number): World {
     }
     const ex = i % n;
     const ey = (i - ex) / n;
-    const m = clamp(0.55 + 0.9 * fbm(mountains, ex * 0.03, ey * 0.03, 4), 0.15, 1.6);
-    ext.elevation[i] = Math.min(255, Math.round(edgeLevel[i] + Math.pow(d / ring, 1.25) * ring * 1.1 * m));
+    const fade = Math.max(0, 1 - d / 8);
+    const roll = clamp(1 + 1.5 * fbm(mountains, ex * 0.04, ey * 0.04, 3), 0, 2);
+    ext.elevation[i] = Math.round(Math.max(edgeLevel[i] * fade, roll));
   }
   smoothRing(ext, out);
 
@@ -94,19 +95,12 @@ export function generateBorderlands(map: World, ring: number): World {
       ext.terrain[i] = distToLand[i] >= 3 ? Terrain.DeepWater : Terrain.ShallowWater;
       continue;
     }
-    const h = ext.elevation[i];
-    const rocky = h + 4 * fbm(mountains, ex * 0.08 + 40, ey * 0.08, 2);
-    if (rocky > 20) {
-      ext.terrain[i] = Terrain.Rock;
-      continue;
-    }
     if (distToWater[i] === 1) {
       ext.terrain[i] = Terrain.Sand;
       continue;
     }
     ext.terrain[i] = fbm(dry, ex * 0.03, ey * 0.03, 3) > 0.3 ? Terrain.DryGrass : Terrain.Grass;
-    // Forest thins out toward the high slopes.
-    const f = fbm(forest, ex * 0.04, ey * 0.04, 3) + 0.15 - h * 0.012;
+    const f = fbm(forest, ex * 0.04, ey * 0.04, 3) + 0.1;
     ext.tree[i] = f > 0.3 ? 3 : f > 0.18 ? 2 : f > 0.08 ? 1 : 0;
   }
   return ext;

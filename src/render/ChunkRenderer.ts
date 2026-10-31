@@ -2,8 +2,10 @@ import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { CHUNK_SIZE, HALF_H, HALF_W, HEIGHT_STEP, MAX_LEVEL, TILE_H } from '../shared/constants';
 import { BridgeAxis, roadMask, RoadType, type BuildableRoad } from '../sim/roads';
 import { cornerHeight } from '../sim/terrain/elevation';
+import { findEntrance } from '../sim/population';
+import { BALANCE } from '../shared/balance';
 import { flushUVs, QuadBatch, setQuadTexture, shadeColor, tintColor, type QuadSlot, type Vec } from './ground/TileMesh';
-import { cellQuadPoints, tileLift, tileQuadPoints, tileShade } from './view/lift';
+import { cellQuadPoints, tileLift, tileQuadPoints } from './view/lift';
 import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { ViewWorld } from './view/ViewWorld';
 import type { Rect } from './Camera';
@@ -24,6 +26,8 @@ import { computeDualCell, isWaterTerrain } from './transitions';
 
 /** Ground cells over-draw their neighbours by this much (px), so the sloped meshes never seam. */
 const CELL_GROW = 1.5;
+/** Zoned lots with no road within reach: grey, so it's clear they won't grow. */
+const STRANDED_TINT = 0x9aa6b8;
 /** Seconds per water animation frame. */
 const WATER_FRAME_TIME = 0.16;
 
@@ -185,8 +189,9 @@ export class ChunkRenderer {
         const i = w.index(x, y);
         const z = w.zone[i];
         if (!isZoned(z)) continue;
-        // Developed lots show only a faint tint around the building.
-        const color = tintColor(ZONE_TINT[z], w.building[i] === -1 ? 0.75 : 0.35);
+        // Developed lots show only a faint tint; empty lots no road reaches are greyed out (they can't grow).
+        const stranded = w.building[i] === -1 && findEntrance(w, x, y, 1, 1, BALANCE.roadAccessRange) === -1;
+        const color = stranded ? tintColor(STRANDED_TINT, 0.8) : tintColor(ZONE_TINT[z], w.building[i] === -1 ? 0.75 : 0.35);
         zones.add({ texture: this.tex.zoneLot, points: tileQuadPoints(w, x, y), colors: [color, color, color, color, color], grow: 0 });
       }
     }
@@ -196,7 +201,7 @@ export class ChunkRenderer {
         if (type === RoadType.None) continue;
         const bridge = w.bridge[w.index(x, y)];
         if (!bridge) {
-          const shade = shadeColor(tileShade(w, x, y));
+          const shade = shadeColor(1);
           const texture = this.tex.roads[type as BuildableRoad][roadMask(w, x, y)];
           roads.add({ texture, points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
           continue;
@@ -260,9 +265,9 @@ export class ChunkRenderer {
     const variant = hash % 4;
     const wobble = (hash >>> 3) % WOBBLE_VARIANTS;
     const points = cellQuadPoints(w, i, j);
-    // Hill light from the 4 tiles at the corners; the centre takes their mean.
-    const corner = [tileShade(w, i - 1, j - 1), tileShade(w, i, j - 1), tileShade(w, i, j), tileShade(w, i - 1, j)];
-    const colors = [...corner, (corner[0] + corner[1] + corner[2] + corner[3]) / 4].map((k) => shadeColor(k));
+    // No hill light: on gentle slopes it read as random dark patches (D-047).
+    const white = shadeColor(1);
+    const colors = [white, white, white, white, white];
     const add = (texture: Texture, into: QuadBatch, onSlot?: (s: QuadSlot) => void) =>
       into.add({ texture, points, colors, grow: CELL_GROW }, onSlot);
 

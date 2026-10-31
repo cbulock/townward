@@ -25,6 +25,7 @@ export function CostLabel() {
       style={{ transform: `translate(${dx}, ${dy})` }}
     >
       <span className="cost-verb">{verb}</span>
+      {p.note && <span className="cost-note">{p.note}</span>}
       {p.blocked ? (
         <span className="cost-dim">can't build here</span>
       ) : empty ? (

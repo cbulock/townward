@@ -168,6 +168,7 @@ export class Renderer {
     this.ground.setGrid(grid);
     // Allow panning a quarter of the way into the borderlands.
     const b = mapWorldBounds(this.view.viewW, this.view.viewH);
+    this.camera.setFitWidth(b.maxX - b.minX);
     const m = this.ring * 0.25 * TILE_W;
     this.camera.setBounds({ minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m / 2, maxY: b.maxY + m / 2 });
   }

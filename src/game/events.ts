@@ -71,6 +71,8 @@ export interface ToolPreviewInfo {
   /** Tiles that will change. */
   count: number;
   affordable: boolean;
+  /** Extra warning under the cost (e.g. zone tiles that no road reaches). */
+  note: string | null;
 }
 
 export interface Notice {

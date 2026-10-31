@@ -66,10 +66,6 @@ function paintTiles(world: World, view: ViewTransform): ImageData {
   const H = view.viewH;
   const img = new ImageData(W, H);
   const d = img.data;
-  const level = (vx: number, vy: number) => {
-    const t = view.tileToWorld(Math.min(W - 1, Math.max(0, vx)), Math.min(H - 1, Math.max(0, vy)));
-    return world.elevation[world.index(t.x, t.y)];
-  };
   for (let vy = 0; vy < H; vy++) {
     for (let vx = 0; vx < W; vx++) {
       const t = view.tileToWorld(vx, vy);
@@ -83,13 +79,10 @@ function paintTiles(world: World, view: ViewTransform): ImageData {
         if (world.tree[i] > 0) c = mix(c, FOREST, 0.35 + world.tree[i] * 0.15);
         if (isZoned(z)) c = mix(c, numberToRgb(ZONE_TINT[z]), 0.5);
       }
-      // Hill shading in view space (lit toward the lower-left, like the map), plus a little lift with height.
-      const k = 1 - 0.09 * (level(vx, vy + 1) - level(vx, vy - 1)) + 0.09 * (level(vx + 1, vy) - level(vx - 1, vy));
-      const shade = Math.min(1.25, Math.max(0.7, k)) * (1 + world.elevation[i] * 0.012);
       const o = (vy * W + vx) * 4;
-      d[o] = Math.min(255, c[0] * shade);
-      d[o + 1] = Math.min(255, c[1] * shade);
-      d[o + 2] = Math.min(255, c[2] * shade);
+      d[o] = c[0];
+      d[o + 1] = c[1];
+      d[o + 2] = c[2];
       d[o + 3] = 255;
     }
   }

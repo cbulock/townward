@@ -99,7 +99,7 @@ describe('terraforming', () => {
 });
 
 describe('borderlands', () => {
-  it('copy the map in the middle, continue edge water outward, rise into hills and keep the slope rule', async () => {
+  it('copy the map in the middle, continue edge water outward, stay low and keep the slope rule', async () => {
     const { borderRing, generateBorderlands } = await import('../src/sim/terrain/borderlands');
     const map = generateTerrain(presetSettings('coastal', 4, 64));
     const ring = borderRing(64);
@@ -124,15 +124,7 @@ describe('borderlands', () => {
       if (isW(ext.terrain[ext.index(x + ring, ring - 1)])) continued++;
     }
     expect(edgeWater === 0 || continued / edgeWater > 0.8).toBe(true);
-    // The outer ring is higher than the map on average (hills and mountains).
-    let outer = 0;
-    let count = 0;
-    for (let x = 0; x < ext.width; x++) {
-      const t = ext.terrain[ext.index(x, 0)];
-      if (isW(t)) continue;
-      outer += ext.elevation[ext.index(x, 0)];
-      count++;
-    }
-    expect(count === 0 || outer / count > 4).toBe(true);
+    // Away from the map the ring stays low and gentle (no mountains).
+    for (let x = 0; x < ext.width; x++) expect(ext.elevation[ext.index(x, 0)]).toBeLessThanOrEqual(2);
   });
 });
