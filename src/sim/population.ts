@@ -1,6 +1,7 @@
 import { BALANCE } from '../shared/balance';
 import { BUILDINGS } from './buildings/catalog';
-import type { BuildingInstance } from './buildings/catalog';
+import { upkeepOf, type BuildingDef, type BuildingInstance } from './buildings/catalog';
+import { needsUtilities, serviceFactor } from './services';
 import type { City } from './City';
 import { BridgeAxis, RoadType } from './roads';
 import type { World } from './World';
@@ -24,6 +25,9 @@ export interface BudgetReport {
   income: number;
   expenses: number;
   net: number;
+  /** Tax rate (percent) the income was collected at. */
+  taxRate: number;
+  breakdown: { roads: number; services: number; utilities: number; parks: number };
 }
 
 /** A land road tile (bridges have no kerb to stop at, so they never count as an entrance). */
@@ -91,7 +95,7 @@ export function cityStats(world: World): CityStats {
       population += b.occupants;
       housing += d.capacity;
     } else {
-      jobs += b.entrance === -1 ? 0 : d.capacity;
+      jobs += b.entrance === -1 || !hasUtilities(b) ? 0 : d.capacity;
       workers += b.occupants;
     }
   }
@@ -113,7 +117,8 @@ export function simulateDay(world: World) {
   for (const b of world.buildings.values()) {
     const d = BUILDINGS[b.def];
     if (d.category !== 'residential' || !isActive(b)) continue;
-    const target = Math.round(d.capacity * fill);
+    // No power or water: people leave. Otherwise services set how full a home gets (docs/specs/core.md).
+    const target = hasUtilities(b) ? Math.round(d.capacity * fill * serviceFactor(b)) : 0;
     if (b.occupants < target) b.occupants += Math.max(1, Math.round((target - b.occupants) * BALANCE.moveInRate));
     else if (b.occupants > target) b.occupants -= Math.max(1, Math.round((b.occupants - target) * BALANCE.moveInRate));
     b.occupants = Math.min(d.capacity, Math.max(0, b.occupants));
@@ -126,30 +131,50 @@ export function simulateDay(world: World) {
   for (const b of world.buildings.values()) {
     const d = BUILDINGS[b.def];
     if (d.category === 'residential' || b.construction > 0) continue;
-    b.occupants = b.entrance === -1 ? 0 : Math.floor(d.capacity * share);
+    const factor = d.category === 'civic' ? 1 : serviceFactor(b);
+    b.occupants = b.entrance === -1 || !hasUtilities(b) ? 0 : Math.floor(d.capacity * share * factor);
   }
 }
 
-export function monthlyBudget(world: World): BudgetReport {
+/** Has the power and water it needs (civic buildings need none). */
+export function hasUtilities(b: BuildingInstance): boolean {
+  return !needsUtilities(BUILDINGS[b.def]) || (b.powered && b.watered);
+}
+
+/** Taxes scale with the rate: the base rate gives the BALANCE per-resident and per-worker amounts. */
+export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRate): BudgetReport {
   const s = cityStats(world);
-  const income = Math.round(s.population * BALANCE.taxPerResident + s.workers * BALANCE.taxPerWorker);
-  let upkeep = 0;
+  const rate = taxRate / BALANCE.baseTaxRate;
+  const income = Math.round((s.population * BALANCE.taxPerResident + s.workers * BALANCE.taxPerWorker) * rate);
+  let roads = 0;
   for (let i = 0; i < world.road.length; i++) {
     const r = world.road[i];
     if (r === RoadType.None) continue;
-    upkeep += world.bridge[i] !== BridgeAxis.None ? BALANCE.bridgeUpkeep : r === RoadType.Highway ? BALANCE.highwayUpkeep : BALANCE.roadUpkeep;
+    roads += world.bridge[i] !== BridgeAxis.None ? BALANCE.bridgeUpkeep : r === RoadType.Highway ? BALANCE.highwayUpkeep : BALANCE.roadUpkeep;
   }
+  let services = 0;
+  let utilities = 0;
+  let parks = 0;
   for (const b of world.buildings.values()) {
-    const d = BUILDINGS[b.def];
-    if (d.category === 'civic') upkeep += d.cost * BALANCE.civicUpkeepShare;
+    const d: BuildingDef = BUILDINGS[b.def];
+    const upkeep = upkeepOf(b.def);
+    if (d.group === 'services') services += upkeep;
+    else if (d.group === 'utilities') utilities += upkeep;
+    else parks += upkeep;
   }
-  const expenses = Math.round(upkeep);
-  return { income, expenses, net: income - expenses };
+  const expenses = Math.round(roads + services + utilities + parks);
+  return {
+    income,
+    expenses,
+    net: income - expenses,
+    taxRate,
+    breakdown: { roads: Math.round(roads), services, utilities, parks },
+  };
 }
 
 /** Apply a month's budget to the city. */
 export function collectBudget(city: City): BudgetReport {
-  const r = monthlyBudget(city.world);
+  const r = monthlyBudget(city.world, city.taxRate);
   city.funds += r.net;
   return r;
 }

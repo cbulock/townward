@@ -10,8 +10,9 @@ import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { growDay, zoneDemand } from '../sim/growth';
 import { mulberry32, subSeed } from '../shared/rng';
-import { isPlaceable, type BuildingInstance } from '../sim/buildings/catalog';
-import { cityStats, collectBudget, findEntrance, simulateDay, updateRoadAccess } from '../sim/population';
+import { isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
+import { cityStats, collectBudget, findEntrance, monthlyBudget, simulateDay, updateRoadAccess, type BudgetReport } from '../sim/population';
+import { needsUtilities, rollFires, serviceBit, updateServices, type ServiceReport } from '../sim/services';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Traffic } from '../sim/traffic';
 import { Decor } from '../sim/terrain/types';
@@ -21,7 +22,7 @@ import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
 import { daylightTint, nightness } from '../render/daylight';
 import type { Point, ViewTransform } from '../render/view/ViewTransform';
-import { EventBus, type GameEventMap, type InspectInfo } from './events';
+import { EventBus, type DayNightMode, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
 import { isZoneTool, planTool, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
@@ -40,23 +41,29 @@ const STATS_INTERVAL = 0.25;
 const MAX_RIPPLE_TIME = 0.5;
 /** Particle budget shared across all tiles of one action. */
 const PARTICLE_BUDGET = 900;
-/** Sim-time multipliers for pause, 1×, 2×, 3× (the fastest step is 4× for a real jump). */
-export const GAME_SPEEDS = [0, 1, 2, 4] as const;
-const DAY_NIGHT_KEY = 'citybuilder.dayNight';
+/** Sim-time multipliers for pause, 1×, 2×, 3×. */
+export const GAME_SPEEDS = [0, 1, 2, 3] as const;
+const DAY_NIGHT_KEY = 'citybuilder.dayNightMode';
+const DAY_NIGHT_MODES: readonly DayNightMode[] = ['cycle', 'day', 'night'];
+/** The clock hour shown while the mode is "always night". */
+const NIGHT_HOUR = 1;
 
-function readDayNight(): boolean {
+function readDayNight(): DayNightMode {
   try {
-    return localStorage.getItem(DAY_NIGHT_KEY) !== '0';
+    const v = localStorage.getItem(DAY_NIGHT_KEY);
+    return DAY_NIGHT_MODES.find((m) => m === v) ?? 'cycle';
   } catch {
-    return true;
+    return 'cycle';
   }
 }
 
 /** Cursor-label names for the zone tools. */
 const TOOL_LABEL = {
-  'zone-r': 'Residential',
-  'zone-c': 'Commercial',
-  'zone-i': 'Industrial',
+  'zone-r': 'Homes',
+  'zone-rh': 'Apartments',
+  'zone-c': 'Shops',
+  'zone-ch': 'Offices',
+  'zone-i': 'Industry',
 } as const;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -82,9 +89,13 @@ export class Game {
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
   private noticeId = 0;
-  private dayNightOn = readDayNight();
+  private dayNightMode = readDayNight();
   /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
   private worldVersion = 0;
+  private serviceReport: ServiceReport = { power: { supply: 0, demand: 0, short: 0 }, water: { supply: 0, demand: 0, short: 0 } };
+  private lastBudget: BudgetReport | null = null;
+  /** Utility hints already shown this game. */
+  private readonly hinted = new Set<'power' | 'water'>();
   private statsTimer = 0;
   private statsFrames = 0;
   private statsTime = 0;
@@ -264,7 +275,9 @@ export class Game {
   private afterWorldChange(roadsChanged: boolean) {
     this.bumpWorld();
     updateRoadAccess(this.world);
+    this.serviceReport = updateServices(this.world);
     this.renderer.indicators.sync(this.world);
+    this.hintUtilities();
     this.traffic.refreshDemand();
     if (roadsChanged) this.traffic.invalidateRoutes();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
@@ -299,10 +312,14 @@ export class Game {
     const city = this.city;
     city.day++;
     this.grow();
+    this.fires();
+    this.serviceReport = updateServices(this.world);
     simulateDay(this.world);
     this.traffic.refreshDemand();
     if (city.day % BALANCE.daysPerMonth === 0) {
       const r = collectBudget(city);
+      this.lastBudget = r;
+      this.emitBudget();
       this.events.emit('funds', city.funds);
       const month = MONTH_NAMES[(city.date.month + 11) % 12];
       const sign = r.net >= 0 ? '+' : '−';
@@ -314,7 +331,7 @@ export class Game {
 
   /** A day of zoned growth: refresh what changed, with dust for new sites and a pop for finished ones. */
   private grow() {
-    const g = growDay(this.world, this.growthRng);
+    const g = growDay(this.world, this.growthRng, this.city.taxRate);
     if (g.changed.length === 0) return;
     this.renderer.refreshWorld(...g.changed);
     const fx = this.renderer.effects;
@@ -371,19 +388,77 @@ export class Game {
     this.renderer.panToViewTile(p);
   }
 
-  get dayNight(): boolean {
-    return this.dayNightOn;
+  get dayNight(): DayNightMode {
+    return this.dayNightMode;
   }
 
-  setDayNight(on: boolean) {
-    this.dayNightOn = on;
+  setDayNight(mode: DayNightMode) {
+    this.dayNightMode = mode;
     try {
-      localStorage.setItem(DAY_NIGHT_KEY, on ? '1' : '0');
+      localStorage.setItem(DAY_NIGHT_KEY, mode);
     } catch {
       // Storage unavailable: the setting just won't persist.
     }
-    this.events.emit('dayNight', on);
-    this.notify('info', on ? 'Day/night cycle on' : 'Day/night cycle off');
+    this.events.emit('dayNight', mode);
+  }
+
+  /** The hour the world is drawn at: the clock, or fixed for "always day/night". */
+  private visibleHour(): number | null {
+    if (this.dayNightMode === 'day') return null;
+    return this.dayNightMode === 'night' ? NIGHT_HOUR : this.city.hour;
+  }
+
+  /** Fires in buildings no fire station covers: clear the lot, smoke and a toast. */
+  private fires() {
+    const burned = rollFires(this.world, cityStats(this.world).population, this.growthRng);
+    if (burned.length === 0) return;
+    for (const b of burned) {
+      const { w, h } = BUILDINGS[b.def].size;
+      this.renderer.refreshWorld({ x: b.x, y: b.y, w, h });
+      for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) this.renderer.effects.burst(x, y, 'dust', 10, Math.random() * 0.4);
+    }
+    this.sound.play('clear');
+    const name = BUILDINGS[burned[0].def].name;
+    this.notify('error', burned.length === 1 ? `A fire destroyed a ${name}. Build a Fire Station nearby.` : `${burned.length} buildings burned down. Build Fire Stations to cover the city.`);
+    this.afterWorldChange(false);
+  }
+
+  /** Once per game: explain missing power or water the first time homes go without. */
+  private hintUtilities() {
+    const r = this.serviceReport;
+    for (const kind of ['power', 'water'] as const) {
+      if (this.hinted.has(kind) || r[kind].short === 0) continue;
+      this.hinted.add(kind);
+      this.notify(
+        'info',
+        kind === 'power'
+          ? 'Buildings need power: build a Power Plant (Civic → Utilities) on the same roads'
+          : 'Buildings need water: build a Water Tower (Civic → Utilities) on the same roads',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------- budget
+
+  get taxRate(): number {
+    return this.city.taxRate;
+  }
+
+  setTaxRate(rate: number) {
+    this.city.taxRate = Math.max(0, Math.min(BALANCE.maxTaxRate, Math.round(rate)));
+    this.emitBudget();
+    this.emitCity();
+  }
+
+  /** Budget panel data: the tax rate, last month's report and what next month looks like now. */
+  emitBudget() {
+    this.events.emit('budget', {
+      taxRate: this.city.taxRate,
+      last: this.lastBudget,
+      forecast: monthlyBudget(this.world, this.city.taxRate),
+      power: this.serviceReport.power,
+      water: this.serviceReport.water,
+    });
   }
 
   /** Push current city stats to listeners (also used by the UI bridge on connect). */
@@ -393,7 +468,9 @@ export class Game {
     for (const a of this.traffic.agents) if (a.kind !== 'person') cars++;
     this.events.emit('city', {
       ...s,
-      demand: zoneDemand(this.world),
+      demand: zoneDemand(this.world, this.city.taxRate),
+      power: this.serviceReport.power,
+      water: this.serviceReport.water,
       date: this.city.date,
       speed: this.speedIndex,
       cars,
@@ -424,7 +501,7 @@ export class Game {
       this.events.emit('inspect', null);
       return;
     }
-    const d = BUILDINGS[b.def];
+    const d: BuildingDef = BUILDINGS[b.def];
     const info: InspectInfo = {
       id: b.id,
       name: d.name,
@@ -438,6 +515,12 @@ export class Game {
       size: d.size,
       grown: b.grown,
       constructionDays: b.construction,
+      needsUtilities: needsUtilities(d),
+      powered: b.powered,
+      watered: b.watered,
+      services: d.category === 'civic' ? [] : SERVICE_KINDS.filter((k) => b.services & serviceBit(k)),
+      provides: d.service ? { kind: 'service', service: d.service, radius: d.radius ?? 0 } : d.supplies ? { kind: 'utility', ...d.supplies } : null,
+      upkeep: d.upkeep ?? 0,
     };
     this.events.emit('inspect', info);
   }
@@ -607,7 +690,8 @@ export class Game {
   private frame(dt: number) {
     this.input.update(dt);
     this.city.clock += dt * GAME_SPEEDS[this.speedIndex];
-    this.renderer.setDaylight(this.dayNightOn ? daylightTint(this.city.hour) : 0xffffff);
+    const hour = this.visibleHour();
+    this.renderer.setDaylight(hour === null ? 0xffffff : daylightTint(hour));
     // Agents move every frame (smooth), scaled by game speed.
     this.traffic.update(dt * GAME_SPEEDS[this.speedIndex], this.city.hour);
     this.renderer.render(dt);
@@ -648,7 +732,8 @@ export class Game {
     const running = this.speedIndex > 0;
     const cars = r.agents.visible;
     const city = running ? Math.min(1, cars / 60) : 0;
-    const night = this.dayNightOn ? nightness(this.city.hour) : 0;
+    const hour = this.visibleHour();
+    const night = hour === null ? 0 : nightness(hour);
     this.sound.setAmbience({
       wind: Math.min(1, Math.max(0.25, 1.3 - z * 0.7)),
       city,
@@ -675,7 +760,7 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
-    else if (code === 'KeyL') this.setDayNight(!this.dayNightOn);
+    else if (code === 'KeyL') this.setDayNight(DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length]);
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);
     else if (code === 'Space') this.togglePause();

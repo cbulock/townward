@@ -5,6 +5,7 @@ import { City } from '../src/sim/City';
 import { applyPlace, applyRoad, planPlace, planRoad } from '../src/sim/commands';
 import { cityStats, collectBudget, monthlyBudget, simulateDay, updateRoadAccess } from '../src/sim/population';
 import { roadPath, RoadType } from '../src/sim/roads';
+import { updateServices } from '../src/sim/services';
 import { Terrain } from '../src/sim/terrain/types';
 import { agentPose, findRoute, Traffic } from '../src/sim/traffic';
 import { World } from '../src/sim/World';
@@ -13,21 +14,32 @@ function town() {
   const w = new World(16, 16, 0);
   w.terrain.fill(Terrain.Grass);
   const city = new City(w, 100_000);
-  // A road along y = 5 from x = 0..15.
+  // A road along y = 5 from x = 0..15, with a power plant and a water tower south of it.
   applyRoad(city, planRoad(w, roadPath({ x: 0, y: 5 }, { x: 15, y: 5 }, true), RoadType.Road), RoadType.Road);
+  place(city, 'power_plant', 13, 6);
+  place(city, 'water_tower', 11, 6);
   return { w, city };
 }
 
 const place = (city: City, id: Parameters<typeof planPlace>[1], x: number, y: number) =>
   applyPlace(city, planPlace(city.world, id, x, y), 0);
 
+/** The test's own buildings, in placement order (skips the town's power plant and water tower). */
+const zoned = (w: World) => [...w.buildings.values()].filter((b) => BUILDINGS[b.def].category !== 'civic');
+
+/** Road access, then utilities and services (what Game does after every change). */
+function refresh(w: World) {
+  updateRoadAccess(w);
+  updateServices(w);
+}
+
 describe('road access', () => {
   it('finds a road touching the footprint', () => {
     const { w, city } = town();
     place(city, 'cottage', 2, 4); // just north of the road
     place(city, 'cottage', 2, 1); // far from it
-    updateRoadAccess(w);
-    const [near, far] = [...w.buildings.values()];
+    refresh(w);
+    const [near, far] = [...w.buildings.values()].filter((b) => b.def === 'cottage');
     expect(near.entrance).toBe(w.index(2, 5));
     expect(far.entrance).toBe(-1);
   });
@@ -38,26 +50,27 @@ describe('population and jobs', () => {
     const { w, city } = town();
     place(city, 'walkup', 3, 4);
     place(city, 'walkup', 3, 1);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 40; d++) simulateDay(w);
-    const [connected, isolated] = [...w.buildings.values()];
+    const [connected, isolated] = zoned(w);
     expect(connected.occupants).toBeGreaterThan(0);
     expect(isolated.occupants).toBe(0);
   });
 
-  it('without jobs homes stop part-full; adding jobs lets them fill', () => {
+  it('homes stop part-full when jobs run short; adding jobs lets them fill', () => {
     const { w, city } = town();
-    place(city, 'walkup', 3, 4);
-    updateRoadAccess(w);
+    // Six walk-ups want more workers than the power plant and water tower employ.
+    for (let x = 1; x <= 6; x++) place(city, 'walkup', x, 4);
+    refresh(w);
     for (let d = 0; d < 60; d++) simulateDay(w);
-    const home = [...w.buildings.values()][0];
-    const capped = home.occupants;
-    expect(capped).toBeLessThanOrEqual(Math.round(BUILDINGS.walkup.capacity * BALANCE.minHousingFill));
+    const before = cityStats(w).population;
+    expect(before).toBeLessThan(cityStats(w).housing * 0.85);
 
-    place(city, 'small_office', 6, 4);
-    updateRoadAccess(w);
+    place(city, 'small_office', 8, 4);
+    place(city, 'small_office', 9, 4);
+    refresh(w);
     for (let d = 0; d < 60; d++) simulateDay(w);
-    expect(home.occupants).toBeGreaterThan(capped);
+    expect(cityStats(w).population).toBeGreaterThan(before);
     const stats = cityStats(w);
     expect(stats.workers).toBeGreaterThan(0);
     expect(stats.workers).toBeLessThanOrEqual(Math.floor(stats.population * BALANCE.workforceShare));
@@ -67,7 +80,7 @@ describe('population and jobs', () => {
     const { w, city } = town();
     place(city, 'cottage', 1, 4);
     place(city, 'office_tower', 4, 3);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 200; d++) simulateDay(w);
     for (const b of w.buildings.values()) expect(b.occupants).toBeLessThanOrEqual(BUILDINGS[b.def].capacity);
   });
@@ -75,11 +88,11 @@ describe('population and jobs', () => {
   it('losing road access empties a building', () => {
     const { w, city } = town();
     place(city, 'cottage', 2, 4);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 10; d++) simulateDay(w);
     w.road.fill(RoadType.None);
-    updateRoadAccess(w);
-    expect([...w.buildings.values()][0].occupants).toBe(0);
+    refresh(w);
+    expect(zoned(w)[0].occupants).toBe(0);
   });
 });
 
@@ -88,9 +101,11 @@ describe('budget', () => {
     const { w, city } = town();
     const empty = monthlyBudget(w);
     expect(empty.income).toBe(0);
-    expect(empty.expenses).toBe(Math.round(16 * BALANCE.roadUpkeep));
+    expect(empty.breakdown.roads).toBe(Math.round(16 * BALANCE.roadUpkeep));
+    expect(empty.breakdown.utilities).toBe(150 + 80);
+    expect(empty.expenses).toBe(empty.breakdown.roads + empty.breakdown.utilities);
     place(city, 'walkup', 3, 4);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 30; d++) simulateDay(w);
     const before = city.funds;
     const r = collectBudget(city);
@@ -118,7 +133,7 @@ describe('traffic', () => {
     const { w, city } = town();
     place(city, 'apartment_block', 3, 3);
     place(city, 'office_tower', 10, 3);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 60; d++) simulateDay(w);
     const traffic = new Traffic(w, 7);
     traffic.refreshDemand();
@@ -144,7 +159,7 @@ describe('traffic', () => {
     const { w, city } = town();
     place(city, 'walkup', 3, 4);
     place(city, 'small_office', 9, 4);
-    updateRoadAccess(w);
+    refresh(w);
     for (let d = 0; d < 40; d++) simulateDay(w);
     const traffic = new Traffic(w, 3);
     traffic.refreshDemand();

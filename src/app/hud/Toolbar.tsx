@@ -22,7 +22,7 @@ function zoneIcon(letter: string): ReactNode {
     <g>
       <path d="M12 3l9 5v8l-9 5-9-5V8z" fill="currentColor" opacity="0.22" />
       <path d="M12 3l9 5v8l-9 5-9-5V8z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <text x="12" y="16.2" textAnchor="middle" fontSize="10" fontWeight="800" fill="currentColor">
+      <text x="12" y="16.2" textAnchor="middle" fontSize={letter.length > 1 ? 8 : 10} fontWeight="800" fill="currentColor">
         {letter}
       </text>
     </g>
@@ -60,7 +60,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'edit',
     label: 'Civic',
     key: 'E',
-    hint: 'Place parks and the town hall. Homes, shops and industry grow on zones (1–3)',
+    hint: 'Police, fire, clinics, schools, power, water and parks',
     icon: (
       <g {...stroke}>
         <path d="M3 11l7-6 7 6" />
@@ -76,24 +76,42 @@ const TOOLS: readonly ToolDef[] = [
     group: 'zone',
     label: 'Homes',
     key: '1',
-    hint: `Drag to zone homes · $${BALANCE.zoneCost}/tile · houses grow within ${BALANCE.roadAccessRange} tiles of a road`,
+    hint: `Drag to zone houses · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('R'),
     tone: 'tone-r',
+  },
+  {
+    id: 'zone-rh',
+    group: 'zone',
+    label: 'Apartments',
+    key: '2',
+    hint: `Drag to zone apartments: walk-ups, then blocks and towers · $${BALANCE.zoneCost}/tile`,
+    icon: zoneIcon('R+'),
+    tone: 'tone-rh',
   },
   {
     id: 'zone-c',
     group: 'zone',
     label: 'Shops',
-    key: '2',
-    hint: `Drag to zone shops · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
+    key: '3',
+    hint: `Drag to zone shops and cafés · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('C'),
     tone: 'tone-c',
+  },
+  {
+    id: 'zone-ch',
+    group: 'zone',
+    label: 'Offices',
+    key: '4',
+    hint: `Drag to zone offices: small offices, then hotels and towers · $${BALANCE.zoneCost}/tile`,
+    icon: zoneIcon('C+'),
+    tone: 'tone-ch',
   },
   {
     id: 'zone-i',
     group: 'zone',
     label: 'Industry',
-    key: '3',
+    key: '5',
     hint: `Drag to zone industry · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('I'),
     tone: 'tone-i',

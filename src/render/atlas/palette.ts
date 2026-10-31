@@ -32,6 +32,8 @@ export const ZONE_TINT: Readonly<Record<ZonedType, number>> = {
   [ZoneType.Residential]: 0x4ade80,
   [ZoneType.Commercial]: 0x60a5fa,
   [ZoneType.Industrial]: 0xfacc15,
+  [ZoneType.ResidentialHigh]: 0x15a34a,
+  [ZoneType.CommercialHigh]: 0x2563eb,
 };
 
 export function hexToRgb(hex: string): [number, number, number] {

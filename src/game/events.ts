@@ -1,5 +1,8 @@
 import type { BuildingId } from '../sim/buildings/catalog';
 import type { ZoneDemand } from '../sim/growth';
+import type { BudgetReport } from '../sim/population';
+import type { UtilityTotals } from '../sim/services';
+import type { ServiceKind } from '../sim/buildings/catalog';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -19,12 +22,16 @@ export interface GameEventMap {
   city: CityInfo;
   /** Hour of day on the clock (0–24), a few times a second. */
   clock: number;
-  dayNight: boolean;
+  dayNight: DayNightMode;
   /** Version counter, bumped when tiles or buildings change (minimap repaint). */
   worldChanged: number;
+  budget: BudgetInfo;
   /** Building shown in the info panel, or null when it's closed. */
   inspect: InspectInfo | null;
 }
+
+/** Day/night look: follow the clock, or stay in daylight or at night. */
+export type DayNightMode = 'cycle' | 'day' | 'night';
 
 export interface CityInfo {
   population: number;
@@ -39,7 +46,25 @@ export interface CityInfo {
   people: number;
   /** R/C/I demand, each in [−1, 1]. */
   demand: ZoneDemand;
+  power: UtilityTotals;
+  water: UtilityTotals;
 }
+
+export interface BudgetInfo {
+  /** Percent. */
+  taxRate: number;
+  /** Last month's collected budget (null before the first month ends). */
+  last: BudgetReport | null;
+  /** Next month at today's numbers. */
+  forecast: BudgetReport;
+  power: UtilityTotals;
+  water: UtilityTotals;
+}
+
+/** What a civic building provides (shown in the info panel). */
+export type Provides =
+  | { kind: 'service'; service: ServiceKind; radius: number }
+  | { kind: 'utility'; power?: number; water?: number };
 
 export interface InspectInfo {
   id: number;
@@ -57,6 +82,14 @@ export interface InspectInfo {
   grown: boolean;
   /** Days of construction left; 0 when finished. */
   constructionDays: number;
+  needsUtilities: boolean;
+  powered: boolean;
+  watered: boolean;
+  /** Services covering it (zoned buildings). */
+  services: readonly ServiceKind[];
+  provides: Provides | null;
+  /** Monthly running cost. */
+  upkeep: number;
 }
 
 export interface ToolPreviewInfo {

@@ -2,16 +2,19 @@ import { BALANCE } from '../shared/balance';
 import {
   ART_VARIANTS,
   BUILDINGS,
+  SERVICE_KINDS,
+  startLevel,
   zonedBuildings,
   type BuildingDef,
   type BuildingId,
   type BuildingInstance,
 } from './buildings/catalog';
-import { cityStats, findEntrance } from './population';
+import { cityStats, findEntrance, hasUtilities } from './population';
+import { serviceScore } from './services';
 import { Decor } from './terrain/types';
 import { isFlat } from './terrain/elevation';
 import type { World } from './World';
-import { isZoned, ZONE_LETTER, ZONED_TYPES, zoneOfLetter, type ZonedType } from './zones';
+import { isZoned, ZONE_DENSITY, ZONE_LETTER, ZONED_TYPES, zoneOf, type ZonedType } from './zones';
 
 /**
  * Zoned growth: demand, new lots, construction and levelling up. Runs once per in-game day.
@@ -54,7 +57,8 @@ function ratio(want: number, have: number, floor: number): number {
  * Homes need jobs and jobs follow homes. Supply counts every building, including sites
  * under construction, so demand drops as soon as a lot starts and growth doesn't overshoot.
  */
-export function zoneDemand(world: World): ZoneDemand {
+/** Higher taxes than the base rate cool demand, lower ones warm it (docs/specs/core.md). */
+export function zoneDemand(world: World, taxRate: number = BALANCE.baseTaxRate): ZoneDemand {
   let housing = 0;
   let commercial = 0;
   let industrial = 0;
@@ -71,10 +75,12 @@ export function zoneDemand(world: World): ZoneDemand {
   const wantI = workforce * (1 - BALANCE.commercialJobShare) + BALANCE.seedIndustrialJobs;
   const jobs = commercial + industrial + civic;
   const wantR = (jobs / BALANCE.workforceShare) * BALANCE.housingSlack + BALANCE.seedHousing;
+  const tax = (taxRate - BALANCE.baseTaxRate) * BALANCE.taxDemandStep;
+  const adjust = (d: number) => Math.max(-1, Math.min(1, d - tax));
   return {
-    r: ratio(wantR, housing, DEMAND_FLOOR.r),
-    c: ratio(wantC, commercial, DEMAND_FLOOR.c),
-    i: ratio(wantI, industrial, DEMAND_FLOOR.i),
+    r: adjust(ratio(wantR, housing, DEMAND_FLOOR.r)),
+    c: adjust(ratio(wantC, commercial, DEMAND_FLOOR.c)),
+    i: adjust(ratio(wantI, industrial, DEMAND_FLOOR.i)),
   };
 }
 
@@ -108,7 +114,7 @@ function areaOf(b: BuildingInstance): TileArea {
 }
 
 /** One day of growth. Mutates the world; the caller refreshes rendering and road access. */
-export function growDay(world: World, rng: Rng): GrowthResult {
+export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTaxRate): GrowthResult {
   const changed: TileArea[] = [];
   const started: number[] = [];
   const completed: number[] = [];
@@ -125,7 +131,7 @@ export function growDay(world: World, rng: Rng): GrowthResult {
     }
   }
 
-  const demand = zoneDemand(world);
+  const demand = zoneDemand(world, taxRate);
   const build = (def: BuildingId, x: number, y: number, occupants = 0) => {
     const { w, h } = BUILDINGS[def].size;
     for (let ty = y; ty < y + h; ty++) {
@@ -153,7 +159,7 @@ export function growDay(world: World, rng: Rng): GrowthResult {
     changed.push(areaOf(b));
   };
 
-  // 2. New level-1 lots on empty zoned tiles with road access.
+  // 2. New lots on empty zoned tiles with road access, at their density's first level.
   const empty = new Map<ZonedType, { x: number; y: number }[]>(ZONED_TYPES.map((z) => [z, []]));
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
@@ -167,7 +173,7 @@ export function growDay(world: World, rng: Rng): GrowthResult {
   for (const z of ZONED_TYPES) {
     const d = demandFor(demand, z);
     if (d <= 0) continue;
-    const ids = zonedBuildings(ZONE_LETTER[z], 1, 1);
+    const ids = zonedBuildings(ZONE_LETTER[z], ZONE_DENSITY[z], startLevel(ZONE_LETTER[z], ZONE_DENSITY[z]), 1);
     if (ids.length === 0) continue;
     for (const t of sample(empty.get(z) ?? [], Math.ceil(d * BALANCE.growthPerDay), rng)) build(pick(ids, rng), t.x, t.y);
   }
@@ -177,9 +183,11 @@ export function growDay(world: World, rng: Rng): GrowthResult {
   const candidates = new Map<ZonedType, BuildingInstance[]>(ZONED_TYPES.map((z) => [z, []]));
   for (const b of world.buildings.values()) {
     const def: BuildingDef = BUILDINGS[b.def];
-    if (!b.grown || b.construction > 0 || b.entrance === -1 || def.zone === null || def.level >= 3) continue;
+    if (!b.grown || b.construction > 0 || b.entrance === -1 || def.zone === null || def.density === null || def.level >= 3) continue;
     if (b.fullDays < BALANCE.upgradeAfterDays || population < BALANCE.levelPopulation[def.level + 1]) continue;
-    candidates.get(zoneOfLetter(def.zone))?.push(b);
+    // Level 2 needs at least one service nearby, level 3 needs all four (and power and water).
+    if (!hasUtilities(b) || serviceScore(b) < (def.level + 1 >= 3 ? SERVICE_KINDS.length : 1)) continue;
+    candidates.get(zoneOf(def.zone, def.density))?.push(b);
   }
   for (const z of ZONED_TYPES) {
     const d = demandFor(demand, z);
@@ -201,6 +209,7 @@ type Build = (def: BuildingId, x: number, y: number, occupants?: number) => void
 function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build): boolean {
   const def: BuildingDef = BUILDINGS[b.def];
   const letter = ZONE_LETTER[zone];
+  const density = ZONE_DENSITY[zone];
   const next = def.level + 1;
   const replace = (olds: readonly BuildingInstance[], x: number, y: number, id: BuildingId) => {
     let occupants = 0;
@@ -213,14 +222,14 @@ function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, b
   };
 
   if (def.size.w === 2) {
-    const two = zonedBuildings(letter, next, 2);
+    const two = zonedBuildings(letter, density, next, 2);
     if (two.length === 0) return false;
     replace([b], b.x, b.y, pick(two, rng));
     return true;
   }
 
-  const one = zonedBuildings(letter, next, 1);
-  const two = zonedBuildings(letter, next, 2);
+  const one = zonedBuildings(letter, density, next, 1);
+  const two = zonedBuildings(letter, density, next, 2);
   const tryMerge = () => {
     if (two.length === 0) return false;
     const square = findMergeSquare(world, b, zone, def.level, rng);

@@ -22,9 +22,9 @@ export const BALANCE = {
 
   // --- Simulation (sim/population.ts) ---
   /** Sim seconds per in-game day at 1× speed. */
-  secondsPerDay: 2,
+  secondsPerDay: 6,
   /** Sim seconds per day on the time-of-day clock (day/night, rush hours). */
-  secondsPerClockDay: 90,
+  secondsPerClockDay: 240,
   clockStartHour: 7,
   daysPerMonth: 30,
   /** Share of the empty space in a home that fills each day (with road access). */
@@ -40,12 +40,22 @@ export const BALANCE = {
   roadUpkeep: 0.4,
   highwayUpkeep: 1.2,
   bridgeUpkeep: 2,
-  civicUpkeepShare: 0.01,
   /** A land road within this many tiles of a footprint gives road access. */
   roadAccessRange: 3,
 
   // --- Zoning & growth (sim/growth.ts, docs/specs/buildings.md) ---
-  /** Cost per tile to zone (dezoning is free). */
+  // --- Services & utilities (sim/services.ts, docs/specs/core.md) ---
+  /** Occupancy with no services; each covering service adds serviceStep (4 services = 100%). */
+  serviceBase: 0.7,
+  serviceStep: 0.075,
+  /** Daily chance that a finished building outside fire coverage burns down (once the city is this big). */
+  fireChance: 0.0003,
+  firePopulation: 200,
+  /** Default tax rate in percent; income scales with rate ÷ this. Each point away shifts demand by taxDemandStep. */
+  baseTaxRate: 9,
+  maxTaxRate: 20,
+  taxDemandStep: 0.04,
+  /** Cost per tile to zone. */
   zoneCost: 5,
   /** Days a construction site takes; the first half is the foundation, the second the scaffold. */
   constructionDays: 4,

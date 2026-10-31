@@ -1,7 +1,8 @@
 import { useAtomValue } from 'jotai';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildingArt';
-import { BUILDINGS, PLACEABLE_IDS, type BuildingId } from '../../sim/buildings/catalog';
+import { BUILDINGS, PLACEABLE_IDS, type BuildingDef, type BuildingId, type CivicGroup } from '../../sim/buildings/catalog';
+import type { ZoneToolId } from '../../game/tools';
 import { activeToolAtom, buildingChoiceAtom, fundsAtom, gameAtom } from '../atoms';
 
 const THUMB = 64;
@@ -25,34 +26,59 @@ function BuildingThumb({ id }: { id: BuildingId }) {
   return <canvas ref={ref} className="building-thumb" style={{ width: THUMB, height: THUMB }} aria-hidden="true" />;
 }
 
-/** Panel above the toolbar while the Build tool is active: civic buildings only. */
+const GROUPS: readonly { id: CivicGroup; label: string; hint: string }[] = [
+  { id: 'services', label: 'Services', hint: 'Cover the area around them. Covered buildings fill up, and all four let towers grow.' },
+  { id: 'utilities', label: 'Utilities', hint: 'Power and water every building on the same roads, up to their capacity.' },
+  { id: 'parks', label: 'Parks & Civic', hint: 'Parks and the town hall.' },
+];
+
+const ZONE_LINKS: readonly { tool: ZoneToolId; label: string; key: string; tone: string }[] = [
+  { tool: 'zone-r', label: 'Homes', key: '1', tone: 'tone-r' },
+  { tool: 'zone-rh', label: 'Apartments', key: '2', tone: 'tone-rh' },
+  { tool: 'zone-c', label: 'Shops', key: '3', tone: 'tone-c' },
+  { tool: 'zone-ch', label: 'Offices', key: '4', tone: 'tone-ch' },
+  { tool: 'zone-i', label: 'Industry', key: '5', tone: 'tone-i' },
+];
+
+/** The key number on a card: coverage radius, utility capacity, or footprint. */
+function cardStat(d: BuildingDef): string {
+  if (d.radius) return `${d.radius}-tile reach`;
+  if (d.supplies?.power) return `${d.supplies.power} ⚡`;
+  if (d.supplies?.water) return `${d.supplies.water} 💧`;
+  return `${d.size.w}×${d.size.h}`;
+}
+
+/** Panel above the toolbar while the Civic tool is active: services, utilities, parks. */
 export function BuildingPicker() {
   const game = useAtomValue(gameAtom);
   const tool = useAtomValue(activeToolAtom);
   const choice = useAtomValue(buildingChoiceAtom);
   const funds = useAtomValue(fundsAtom);
+  const [tab, setTab] = useState<CivicGroup>('services');
 
   if (tool !== 'build') return null;
+  const ids = PLACEABLE_IDS.filter((id) => (BUILDINGS[id] as BuildingDef).group === tab);
 
   return (
-    <div className="panel building-picker" role="dialog" aria-label="Choose a building">
-      <div className="picker-note">
-        <span>Looking for houses? Homes, shops and industry grow on zones next to roads.</span>
-        <span className="picker-zone-links">
-          <button type="button" className="zone-link tone-r" onClick={() => game?.setTool('zone-r')}>
-            Zone homes <kbd>1</kbd>
+    <div className="panel building-picker" role="dialog" aria-label="Choose a civic building">
+      <div className="picker-tabs" role="tablist">
+        {GROUPS.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={g.id === tab}
+            className={`picker-tab ${g.id === tab ? 'is-active' : ''}`}
+            onClick={() => setTab(g.id)}
+          >
+            {g.label}
           </button>
-          <button type="button" className="zone-link tone-c" onClick={() => game?.setTool('zone-c')}>
-            Shops <kbd>2</kbd>
-          </button>
-          <button type="button" className="zone-link tone-i" onClick={() => game?.setTool('zone-i')}>
-            Industry <kbd>3</kbd>
-          </button>
-        </span>
+        ))}
       </div>
+      <p className="picker-hint">{GROUPS.find((g) => g.id === tab)?.hint}</p>
       <div className="picker-grid">
-        {PLACEABLE_IDS.map((id) => {
-          const d = BUILDINGS[id];
+        {ids.map((id) => {
+          const d: BuildingDef = BUILDINGS[id];
           const affordable = d.cost <= funds;
           return (
             <button
@@ -66,13 +92,21 @@ export function BuildingPicker() {
               <span className="card-name">{d.name}</span>
               <span className="card-meta">
                 <span className="card-cost">${d.cost.toLocaleString()}</span>
-                <span className="card-size">
-                  {d.size.w}×{d.size.h}
-                </span>
+                <span className="card-size">{cardStat(d)}</span>
               </span>
             </button>
           );
         })}
+      </div>
+      <div className="picker-note">
+        <span>Houses, apartments, shops, offices and industry grow on zones next to roads.</span>
+        <span className="picker-zone-links">
+          {ZONE_LINKS.map((z) => (
+            <button key={z.tool} type="button" className={`zone-link ${z.tone}`} onClick={() => game?.setTool(z.tool)}>
+              {z.label} <kbd>{z.key}</kbd>
+            </button>
+          ))}
+        </span>
       </div>
     </div>
   );

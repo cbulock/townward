@@ -52,6 +52,9 @@ export class World {
       grown: b.grown ?? false,
       construction: b.construction ?? 0,
       fullDays: 0,
+      powered: false,
+      watered: false,
+      services: 0,
     };
     this.buildings.set(instance.id, instance);
     for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) this.building[this.index(x, y)] = instance.id;

@@ -78,8 +78,10 @@ export interface TerrainTextures {
   people: Texture[][];
   /** Bus stop shelters, indexed by view side (0 −y, 1 +x, 2 +y, 3 −x). */
   busStops: Texture[];
-  /** "No road access" warning badge. */
+  /** Warning badges: no road access, no power, no water. */
   warnRoad: Texture;
+  warnPower: Texture;
+  warnWater: Texture;
   hover: Texture;
   gridLine: Texture;
   /** The atlas pages (so their mesh shaders can be released). */
@@ -133,6 +135,52 @@ function paintSelection(ctx: CanvasRenderingContext2D) {
 }
 
 /** Map-pin style badge with a little road glyph: "this building has no road". */
+/** Map-pin badge body in the given colours; the caller draws the glyph inside (centre 9, 8). */
+function paintPin(ctx: CanvasRenderingContext2D, rim: string, fill: string) {
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(9, 18.5, 3.5, 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.arc(9, 8, 8, 0, Math.PI * 2);
+  ctx.moveTo(5, 13);
+  ctx.lineTo(9, 18);
+  ctx.lineTo(13, 13);
+  ctx.fill();
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(9, 8, 6.8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** "No power": a lightning bolt. */
+function paintWarnPower(ctx: CanvasRenderingContext2D) {
+  paintPin(ctx, '#5a4512', '#f5c518');
+  ctx.fillStyle = '#3b2b05';
+  ctx.beginPath();
+  ctx.moveTo(10, 2.8);
+  ctx.lineTo(5.6, 9);
+  ctx.lineTo(8.6, 9);
+  ctx.lineTo(7.8, 13.2);
+  ctx.lineTo(12.4, 7);
+  ctx.lineTo(9.4, 7);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** "No water": a drop. */
+function paintWarnWater(ctx: CanvasRenderingContext2D) {
+  paintPin(ctx, '#123a5a', '#3a9bf0');
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(9, 3);
+  ctx.bezierCurveTo(9, 3, 5.4, 7.6, 5.4, 9.6);
+  ctx.arc(9, 9.6, 3.6, Math.PI, 0, true);
+  ctx.bezierCurveTo(12.6, 7.6, 9, 3, 9, 3);
+  ctx.fill();
+}
+
 function paintWarnRoad(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
@@ -244,6 +292,8 @@ export function buildTerrainTextures(): TerrainTextures {
   }
   for (const side of [0, 1, 2, 3] as const) b.add(`stop_${side}`, STOP_FRAME_W, STOP_FRAME_H, (ctx) => paintBusStop(ctx, side));
   b.add('warn_road', 18, 20, paintWarnRoad);
+  b.add('warn_power', 18, 20, paintWarnPower);
+  b.add('warn_water', 18, 20, paintWarnWater);
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
   b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
@@ -293,6 +343,8 @@ export function buildTerrainTextures(): TerrainTextures {
     people: range(PERSON_VARIANTS, (v) => range(2, (f) => get(`person_${v}_${f}`))),
     busStops: range(4, (side) => get(`stop_${side}`)),
     warnRoad: get('warn_road'),
+    warnPower: get('warn_power'),
+    warnWater: get('warn_water'),
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),

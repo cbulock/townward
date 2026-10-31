@@ -1,7 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { CityInfo } from '../../game/events';
-import { cityAtom, clockAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import type { CityInfo, DayNightMode } from '../../game/events';
+import { cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -34,25 +34,70 @@ function Stat({ title, glyph, children, flash }: { title: string; glyph: ReactNo
 
 const SPEED_LABELS = ['Pause', '1×', '2×', '3×'] as const;
 
-/** hh:mm on the time-of-day clock, rounded down to 10 minutes so it doesn't flicker. */
+const DAY_NIGHT_OPTIONS: readonly { mode: DayNightMode; label: string; hint: string }[] = [
+  { mode: 'cycle', label: 'Day & night', hint: 'Follows the clock' },
+  { mode: 'day', label: 'Always day', hint: 'No night tint' },
+  { mode: 'night', label: 'Always night', hint: 'City lights' },
+];
+
+const sun = (
+  <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
+  </g>
+);
+const moon = <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="currentColor" />;
+
+/**
+ * hh:mm on the time-of-day clock (rounded to 10 minutes so it doesn't flicker). Click it to
+ * choose how day and night look: follow the clock, always day, or always night (`L` steps through).
+ */
 function Clock() {
   const hour = useAtomValue(clockAtom);
+  const mode = useAtomValue(dayNightAtom);
+  const game = useAtomValue(gameAtom);
+  const [open, setOpen] = useState(false);
   const h = Math.floor(hour);
   const m = Math.floor(((hour - h) * 60) / 10) * 10;
-  const day = hour >= 6.5 && hour < 19;
+  const day = mode === 'day' || (mode === 'cycle' && hour >= 6.5 && hour < 19);
   return (
-    <span className="clock" title="Time of day (L toggles day/night)">
-      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-        {day ? (
-          <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
-          </g>
-        ) : (
-          <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="currentColor" />
-        )}
-      </svg>
-      {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
+    <span className="clock-wrap">
+      <button
+        type="button"
+        className={`clock ${open ? 'is-open' : ''}`}
+        title="Day & night (L)"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+          {day ? sun : moon}
+        </svg>
+        {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
+        <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <span className="panel clock-menu" role="menu">
+          {DAY_NIGHT_OPTIONS.map((o) => (
+            <button
+              key={o.mode}
+              type="button"
+              role="menuitemradio"
+              aria-checked={mode === o.mode}
+              className={`clock-option ${mode === o.mode ? 'is-active' : ''}`}
+              onClick={() => {
+                game?.setDayNight(o.mode);
+                setOpen(false);
+              }}
+            >
+              <strong>{o.label}</strong>
+              <span>{o.hint}</span>
+            </button>
+          ))}
+        </span>
+      )}
     </span>
   );
 }

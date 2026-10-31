@@ -1,12 +1,21 @@
 /** Building catalog. See docs/specs/buildings.md. Visuals live in render/atlas/buildingArt.ts. */
 
 export type Zone = 'R' | 'C' | 'I';
+/** Low density: houses and shops. High density: apartments and offices. Industry is always low. */
+export type Density = 'low' | 'high';
 export type BuildingCategory = 'residential' | 'commercial' | 'industrial' | 'civic';
+/** City services with a coverage area (docs/specs/core.md). */
+export type ServiceKind = 'police' | 'fire' | 'health' | 'education';
+export const SERVICE_KINDS: readonly ServiceKind[] = ['police', 'fire', 'health', 'education'];
+/** Civic panel tabs. */
+export type CivicGroup = 'services' | 'utilities' | 'parks';
 
 export interface BuildingDef {
   name: string;
   category: BuildingCategory;
   zone: Zone | null;
+  /** Which zone density grows this building (null for civic buildings). */
+  density: Density | null;
   /** Development level 1–3 (civic: 0). */
   level: 0 | 1 | 2 | 3;
   size: { w: number; h: number };
@@ -14,6 +23,15 @@ export interface BuildingDef {
   /** Residents for housing, jobs for everything else. */
   capacity: number;
   description: string;
+  /** Civic buildings: which Civic panel tab lists it. */
+  group?: CivicGroup;
+  /** Monthly running cost (civic buildings). */
+  upkeep?: number;
+  /** Services: what it provides and how far (tiles from the footprint centre). */
+  service?: ServiceKind;
+  radius?: number;
+  /** Utilities: power and water supplied to buildings on the same road network. */
+  supplies?: { power?: number; water?: number };
 }
 
 export const BUILDINGS = {
@@ -21,6 +39,7 @@ export const BUILDINGS = {
     name: 'Cottage',
     category: 'residential',
     zone: 'R',
+    density: 'low',
     level: 1,
     size: { w: 1, h: 1 },
     cost: 120,
@@ -31,6 +50,7 @@ export const BUILDINGS = {
     name: 'Family House',
     category: 'residential',
     zone: 'R',
+    density: 'low',
     level: 1,
     size: { w: 1, h: 1 },
     cost: 200,
@@ -41,6 +61,7 @@ export const BUILDINGS = {
     name: 'Townhouses',
     category: 'residential',
     zone: 'R',
+    density: 'low',
     level: 2,
     size: { w: 1, h: 1 },
     cost: 450,
@@ -51,6 +72,7 @@ export const BUILDINGS = {
     name: 'Walk-up Apartments',
     category: 'residential',
     zone: 'R',
+    density: 'high',
     level: 2,
     size: { w: 1, h: 1 },
     cost: 700,
@@ -61,6 +83,7 @@ export const BUILDINGS = {
     name: 'Apartment Block',
     category: 'residential',
     zone: 'R',
+    density: 'high',
     level: 3,
     size: { w: 2, h: 2 },
     cost: 2400,
@@ -71,6 +94,7 @@ export const BUILDINGS = {
     name: 'Condo Tower',
     category: 'residential',
     zone: 'R',
+    density: 'high',
     level: 3,
     size: { w: 2, h: 2 },
     cost: 5200,
@@ -81,6 +105,7 @@ export const BUILDINGS = {
     name: 'Corner Shop',
     category: 'commercial',
     zone: 'C',
+    density: 'low',
     level: 1,
     size: { w: 1, h: 1 },
     cost: 260,
@@ -91,6 +116,7 @@ export const BUILDINGS = {
     name: 'Café',
     category: 'commercial',
     zone: 'C',
+    density: 'low',
     level: 1,
     size: { w: 1, h: 1 },
     cost: 240,
@@ -101,6 +127,7 @@ export const BUILDINGS = {
     name: 'Small Office',
     category: 'commercial',
     zone: 'C',
+    density: 'high',
     level: 2,
     size: { w: 1, h: 1 },
     cost: 900,
@@ -111,6 +138,7 @@ export const BUILDINGS = {
     name: 'Supermarket',
     category: 'commercial',
     zone: 'C',
+    density: 'low',
     level: 2,
     size: { w: 2, h: 2 },
     cost: 1800,
@@ -121,6 +149,7 @@ export const BUILDINGS = {
     name: 'Hotel',
     category: 'commercial',
     zone: 'C',
+    density: 'high',
     level: 3,
     size: { w: 2, h: 2 },
     cost: 4200,
@@ -131,6 +160,7 @@ export const BUILDINGS = {
     name: 'Office Tower',
     category: 'commercial',
     zone: 'C',
+    density: 'high',
     level: 3,
     size: { w: 2, h: 2 },
     cost: 6500,
@@ -141,6 +171,7 @@ export const BUILDINGS = {
     name: 'Workshop',
     category: 'industrial',
     zone: 'I',
+    density: 'low',
     level: 1,
     size: { w: 1, h: 1 },
     cost: 300,
@@ -151,6 +182,7 @@ export const BUILDINGS = {
     name: 'Warehouse',
     category: 'industrial',
     zone: 'I',
+    density: 'low',
     level: 2,
     size: { w: 2, h: 2 },
     cost: 1500,
@@ -161,6 +193,7 @@ export const BUILDINGS = {
     name: 'Factory',
     category: 'industrial',
     zone: 'I',
+    density: 'low',
     level: 3,
     size: { w: 2, h: 2 },
     cost: 3200,
@@ -171,21 +204,115 @@ export const BUILDINGS = {
     name: 'Park',
     category: 'civic',
     zone: null,
+    density: null,
     level: 0,
     size: { w: 1, h: 1 },
     cost: 100,
     capacity: 0,
     description: 'Lawn, trees, a path and a fountain.',
+    group: 'parks',
+    upkeep: 1,
   },
   town_hall: {
     name: 'Town Hall',
     category: 'civic',
     zone: null,
+    density: null,
     level: 0,
     size: { w: 2, h: 2 },
     cost: 5000,
     capacity: 30,
     description: 'The seat of your city government.',
+    group: 'parks',
+    upkeep: 50,
+  },
+  police_station: {
+    name: 'Police Station',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 750,
+    capacity: 20,
+    description: 'Keeps the streets safe. Buildings nearby fill up and grow.',
+    group: 'services',
+    upkeep: 60,
+    service: 'police',
+    radius: 14,
+  },
+  fire_station: {
+    name: 'Fire Station',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 750,
+    capacity: 20,
+    description: 'Stops fires before they spread. Buildings outside its reach can burn down.',
+    group: 'services',
+    upkeep: 60,
+    service: 'fire',
+    radius: 14,
+  },
+  clinic: {
+    name: 'Clinic',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 900,
+    capacity: 25,
+    description: 'Doctors and nurses for the neighbourhood.',
+    group: 'services',
+    upkeep: 80,
+    service: 'health',
+    radius: 12,
+  },
+  school: {
+    name: 'School',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 1500,
+    capacity: 30,
+    description: 'Classrooms and a playground. Educated cities grow taller.',
+    group: 'services',
+    upkeep: 80,
+    service: 'education',
+    radius: 14,
+  },
+  power_plant: {
+    name: 'Power Plant',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 4000,
+    capacity: 40,
+    description: 'Powers every building connected to it by road, up to its capacity.',
+    group: 'utilities',
+    upkeep: 150,
+    supplies: { power: 1200 },
+  },
+  water_tower: {
+    name: 'Water Tower',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 1200,
+    capacity: 10,
+    description: 'Supplies water to every building connected to it by road, up to its capacity.',
+    group: 'utilities',
+    upkeep: 80,
+    supplies: { water: 900 },
   },
 } as const satisfies Record<string, BuildingDef>;
 
@@ -201,6 +328,12 @@ export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
  * zoning (docs/decisions.md D-042). The sim itself can still place anything (tests use it).
  */
 export const PLACEABLE_IDS: readonly BuildingId[] = BUILDING_IDS.filter((id) => BUILDINGS[id].category === 'civic');
+
+/** Monthly upkeep of a building (0 for zoned buildings). */
+export function upkeepOf(id: BuildingId): number {
+  const d: BuildingDef = BUILDINGS[id];
+  return d.upkeep ?? 0;
+}
 
 export function isPlaceable(id: BuildingId): boolean {
   return PLACEABLE_IDS.includes(id);
@@ -230,6 +363,11 @@ export interface BuildingInstance {
   construction: number;
   /** Consecutive days at or above BALANCE.upgradeOccupancy. */
   fullDays: number;
+  /** Utilities reach it (set by sim/services.ts; civic buildings are always served). */
+  powered: boolean;
+  watered: boolean;
+  /** Bitmask of services covering it (bit = index in SERVICE_KINDS). */
+  services: number;
 }
 
 /** What a caller supplies when placing or growing; the runtime fields start empty. */
@@ -240,17 +378,27 @@ export interface NewBuilding extends Pick<BuildingInstance, 'def' | 'x' | 'y' | 
   occupants?: number;
 }
 
-/** Zoned buildings of a zone, level and square footprint size (1 or 2), in catalog order. */
-export function zonedBuildings(zone: Zone, level: number, size: number): BuildingId[] {
+/** Zoned buildings of a zone, density, level and square footprint size (1 or 2), in catalog order. */
+export function zonedBuildings(zone: Zone, density: Density, level: number, size: number): BuildingId[] {
   return BUILDING_IDS.filter((id) => {
     const d: BuildingDef = BUILDINGS[id];
-    return d.zone === zone && d.level === level && d.size.w === size && d.size.h === size;
+    return d.zone === zone && d.density === density && d.level === level && d.size.w === size && d.size.h === size;
   });
 }
 
-/** Pick a random zoned building, or null if the catalog has none for that zone/level/size. */
-export function chooseBuilding(zone: Zone, level: number, size: number, rng: () => number): BuildingId | null {
-  const ids = zonedBuildings(zone, level, size);
+/** The level new lots of this zone and density start at: its lowest 1×1 building. */
+export function startLevel(zone: Zone, density: Density): number {
+  let level = Infinity;
+  for (const id of BUILDING_IDS) {
+    const d: BuildingDef = BUILDINGS[id];
+    if (d.zone === zone && d.density === density && d.size.w === 1) level = Math.min(level, d.level);
+  }
+  return level;
+}
+
+/** Pick a random zoned building, or null if the catalog has none for that zone/density/level/size. */
+export function chooseBuilding(zone: Zone, density: Density, level: number, size: number, rng: () => number): BuildingId | null {
+  const ids = zonedBuildings(zone, density, level, size);
   return ids.length === 0 ? null : ids[Math.floor(rng() * ids.length)];
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/shared/balance';
 import { mulberry32 } from '../src/shared/rng';
-import { BUILDINGS, chooseBuilding } from '../src/sim/buildings/catalog';
+import { BUILDINGS, chooseBuilding, type BuildingDef } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, planPlace, planRoad, planZone } from '../src/sim/commands';
 import { growDay, zoneDemand } from '../src/sim/growth';
@@ -9,7 +9,8 @@ import { cityStats, findEntrance, simulateDay, updateRoadAccess } from '../src/s
 import { rectTiles, roadPath, RoadType } from '../src/sim/roads';
 import { Terrain } from '../src/sim/terrain/types';
 import { World } from '../src/sim/World';
-import { ZoneType, type ZoneTypeId } from '../src/sim/zones';
+import { zoneOf, ZoneType, type ZoneTypeId } from '../src/sim/zones';
+import { updateServices } from '../src/sim/services';
 
 function town(size = 24) {
   const w = new World(size, size, 0);
@@ -23,14 +24,34 @@ function town(size = 24) {
 const zone = (city: City, x0: number, y0: number, x1: number, y1: number, z: ZoneTypeId) =>
   applyZone(city, planZone(city.world, rectTiles({ x: x0, y: y0 }, { x: x1, y: y1 }), z), z);
 
-/** Run the daily loop the way Game does: growth, access, then population. */
+/** Run the daily loop the way Game does: growth, access, services, then population. */
 function runDays(w: World, days: number, seed = 1) {
   const rng = mulberry32(seed);
   for (let d = 0; d < days; d++) {
     growDay(w, rng);
     updateRoadAccess(w);
+    updateServices(w);
     simulateDay(w);
   }
+}
+
+/**
+ * Give a 32-wide town power, water and all four services: a second road along y = 4 (joined to
+ * the main road at x = 31) lined with power plants, water towers, police, fire, clinic and school.
+ */
+function serve(city: City) {
+  const w = city.world;
+  const road = (ax: number, ay: number, bx: number, by: number) =>
+    applyRoad(city, planRoad(w, roadPath({ x: ax, y: ay }, { x: bx, y: by }, true), RoadType.Road), RoadType.Road);
+  road(0, 4, 31, 4);
+  road(31, 4, 31, 8);
+  const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
+  for (const x of [0, 2, 4, 6]) place('power_plant', x, 2);
+  for (const x of [8, 9, 10, 11, 12]) place('water_tower', x, 3);
+  place('police_station', 14, 3);
+  place('fire_station', 15, 3);
+  place('clinic', 16, 3);
+  place('school', 17, 2);
 }
 
 describe('zoning', () => {
@@ -108,9 +129,12 @@ describe('growth', () => {
     for (const id of day1.started) expect(w.buildings.get(id)?.construction).toBe(0);
   });
 
-  it('a zoned town grows, levels up and merges lots over time', () => {
+  it('a serviced town grows, levels up and merges lots over time', () => {
     const { w, city } = town(32);
-    zone(city, 0, 5, 31, 7, ZoneType.Residential);
+    serve(city);
+    // Towers (level 3) come from high density; houses top out at level 2.
+    zone(city, 0, 5, 15, 7, ZoneType.ResidentialHigh);
+    zone(city, 16, 5, 31, 7, ZoneType.Residential);
     zone(city, 0, 9, 15, 11, ZoneType.Commercial);
     zone(city, 16, 9, 31, 11, ZoneType.Industrial);
     runDays(w, 400);
@@ -122,10 +146,30 @@ describe('growth', () => {
     expect([...w.buildings.values()].some((b) => BUILDINGS[b.def].size.w === 2)).toBe(true);
     // Every grown building sits on its own zone.
     for (const b of w.buildings.values()) {
-      const z = BUILDINGS[b.def].zone;
-      const expected = z === 'R' ? ZoneType.Residential : z === 'C' ? ZoneType.Commercial : ZoneType.Industrial;
-      expect(w.zone[w.index(b.x, b.y)]).toBe(expected);
+      const d: BuildingDef = BUILDINGS[b.def];
+      if (d.zone === null || d.density === null) continue;
+      expect(w.zone[w.index(b.x, b.y)]).toBe(zoneOf(d.zone, d.density));
     }
+  });
+
+  it('apartment and office zones grow high-density buildings from the start', () => {
+    const { w, city } = town(32);
+    serve(city);
+    zone(city, 0, 5, 15, 7, ZoneType.ResidentialHigh);
+    zone(city, 16, 5, 31, 7, ZoneType.CommercialHigh);
+    zone(city, 0, 9, 31, 11, ZoneType.Industrial);
+    runDays(w, 30);
+    const defs = [...w.buildings.values()].filter((b) => b.grown).map((b) => b.def);
+    expect(defs).toContain('walkup');
+    expect(defs.some((d) => d === 'cottage' || d === 'family_house' || d === 'corner_shop' || d === 'cafe')).toBe(false);
+  });
+
+  it('homes without power or water stay empty', () => {
+    const { w, city } = town();
+    zone(city, 0, 5, 23, 7, ZoneType.Residential);
+    runDays(w, 30);
+    expect(w.buildings.size).toBeGreaterThan(0);
+    expect(cityStats(w).population).toBe(0);
   });
 
   it('is deterministic for a given seed', () => {
@@ -154,8 +198,10 @@ describe('growth', () => {
 
   it('chooseBuilding picks from the matching zone, level and size', () => {
     const rng = mulberry32(3);
-    expect(['cottage', 'family_house']).toContain(chooseBuilding('R', 1, 1, rng));
-    expect(chooseBuilding('I', 2, 1, rng)).toBeNull();
-    expect(chooseBuilding('I', 2, 2, rng)).toBe('warehouse');
+    expect(['cottage', 'family_house']).toContain(chooseBuilding('R', 'low', 1, 1, rng));
+    expect(chooseBuilding('I', 'low', 2, 1, rng)).toBeNull();
+    expect(chooseBuilding('I', 'low', 2, 2, rng)).toBe('warehouse');
+    expect(chooseBuilding('R', 'high', 2, 1, rng)).toBe('walkup');
+    expect(chooseBuilding('C', 'high', 2, 1, rng)).toBe('small_office');
   });
 });

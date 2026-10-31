@@ -6,6 +6,8 @@ export class City {
   funds: number;
   /** Whole in-game days since founding. */
   day = 0;
+  /** Tax rate in percent (0 … BALANCE.maxTaxRate). */
+  taxRate: number = BALANCE.baseTaxRate;
   /** Sim seconds on the time-of-day clock (separate from the calendar; see docs/04-ui-ux.md). */
   clock = 0;
 

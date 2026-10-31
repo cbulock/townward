@@ -123,7 +123,7 @@ export class Renderer {
     this.textures = tex;
     this.effects = new Effects(tex.fx, this.viewRef);
     this.agents = new AgentRenderer(tex, this.viewRef);
-    this.indicators = new Indicators(tex.warnRoad, this.viewRef);
+    this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater }, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
     t0 = performance.now();
     this.ext = generateBorderlands(this.world, this.ring);

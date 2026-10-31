@@ -3,7 +3,7 @@ import { buildingHeadroom } from '../render/atlas/buildingArt';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import type { TerrainTextures } from '../render/atlas/tiles';
 import type { ViewTransform } from '../render/view/ViewTransform';
-import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
+import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
 import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/population';
@@ -12,13 +12,15 @@ import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
 
-export type ZoneToolId = 'zone-r' | 'zone-c' | 'zone-i';
+export type ZoneToolId = 'zone-r' | 'zone-rh' | 'zone-c' | 'zone-ch' | 'zone-i';
 export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId;
 
 /** What each zone tool paints. Removing a zone is done with Clear (D-051). */
 export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZonedType>> = {
   'zone-r': ZoneType.Residential,
+  'zone-rh': ZoneType.ResidentialHigh,
   'zone-c': ZoneType.Commercial,
+  'zone-ch': ZoneType.CommercialHigh,
   'zone-i': ZoneType.Industrial,
 };
 
@@ -34,8 +36,10 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   highway: 'KeyH',
   build: 'KeyE',
   'zone-r': 'Digit1',
-  'zone-c': 'Digit2',
-  'zone-i': 'Digit3',
+  'zone-rh': 'Digit2',
+  'zone-c': 'Digit3',
+  'zone-ch': 'Digit4',
+  'zone-i': 'Digit5',
 };
 
 export interface ToolDrag {
@@ -59,6 +63,31 @@ const TINT_NO_ROAD = 0xffb547;
 /** A land road is within reach of this tile (zones only grow there). */
 export function nearRoad(world: World, x: number, y: number): boolean {
   return findEntrance(world, x, y, 1, 1, BALANCE.roadAccessRange) !== -1;
+}
+
+/** Service colours for the coverage preview. */
+const SERVICE_TINT: Readonly<Record<ServiceKind, number>> = {
+  police: 0x4f8cff,
+  fire: 0xff6a4d,
+  health: 0xff8fb0,
+  education: 0xffc94d,
+};
+
+/** Placing a service: tint the circle it will cover (docs/specs/core.md). */
+function coverageTiles(world: World, tex: TerrainTextures, id: BuildingId, origin: TilePos): PreviewTile[] {
+  const d: BuildingDef = BUILDINGS[id];
+  if (!d.service || !d.radius) return [];
+  const cx = origin.x + d.size.w / 2;
+  const cy = origin.y + d.size.h / 2;
+  const r = d.radius;
+  const out: PreviewTile[] = [];
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      if (!world.inBounds(x, y) || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
+      out.push({ x, y, texture: tex.selection, tint: SERVICE_TINT[d.service], alpha: 0.16 });
+    }
+  }
+  return out;
 }
 
 /** How many of a zone plan's tiles no road reaches. */
@@ -94,7 +123,9 @@ export function planTool(
     case 'build':
       return { kind: 'place', tool, plan: planPlace(world, building, anchor.current.x, anchor.current.y) };
     case 'zone-r':
+    case 'zone-rh':
     case 'zone-c':
+    case 'zone-ch':
     case 'zone-i': {
       const zone = ZONE_TOOLS[tool];
       return { kind: 'zone', tool, plan: planZone(world, rectTiles(anchor.start, anchor.current), zone), zone };
@@ -150,7 +181,7 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
       tint: ok ? 0xffffff : TINT_INVALID,
       alpha: ok ? 0.8 : 0.55,
     };
-    return [...footprint, ghost];
+    return [...coverageTiles(world, tex, building, origin), ...footprint, ghost];
   }
 
   const planned = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));

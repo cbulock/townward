@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { CityInfo, DebugStats, InspectInfo, Notice, ToolPreviewInfo } from '../game/events';
+import type { CityInfo, DayNightMode, DebugStats, InspectInfo, Notice, ToolPreviewInfo } from '../game/events';
 import type { Game } from '../game/Game';
 import type { ToolId } from '../game/tools';
 import type { BuildingId } from '../sim/buildings/catalog';
@@ -20,6 +20,7 @@ export const mutedAtom = atom(false);
 export const buildingChoiceAtom = atom<BuildingId>('park');
 export const cityAtom = atom<CityInfo | null>(null);
 export const inspectAtom = atom<InspectInfo | null>(null);
+export const dayNightAtom = atom<DayNightMode>('cycle');
 /** Hour of day on the clock (0–24). */
 export const clockAtom = atom(7);
 /** Bumped when the world changes; the minimap repaints on it. */
