@@ -5,7 +5,7 @@ import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { World } from '../sim/World';
 import type { Rect } from './Camera';
 import { DECOR_VARIANTS } from './atlas/decorArt';
-import { GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
+import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber } from './atlas/palette';
 import type { TerrainTextures } from './atlas/tiles';
@@ -141,9 +141,11 @@ export class ChunkRenderer {
         const type = w.road[w.index(x, y)];
         if (type === RoadType.None) continue;
         const p = tileToWorld(x, y);
-        const s = new Sprite(this.tex.roads[type as BuildableRoad][roadMask(w, x, y)]);
+        const bridge = w.bridge[w.index(x, y)];
+        const set = bridge ? this.tex.bridges : this.tex.roads;
+        const s = new Sprite(set[type as BuildableRoad][bridge || roadMask(w, x, y)]);
         s.x = p.x - HALF_W - GROUND_PAD;
-        s.y = p.y - GROUND_PAD;
+        s.y = p.y - GROUND_PAD - (bridge ? BRIDGE_HEADROOM : 0);
         c.roads.addChild(s);
       }
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/shared/balance';
 import { City } from '../src/sim/City';
 import { applyClear, applyRoad, planClear, planRoad } from '../src/sim/commands';
-import { rectTiles, roadMask, roadPath, RoadType } from '../src/sim/roads';
+import { BridgeAxis, rectTiles, roadMask, roadPath, RoadType } from '../src/sim/roads';
 import { Decor, Terrain } from '../src/sim/terrain/types';
 import { World } from '../src/sim/World';
 
@@ -66,9 +66,9 @@ describe('planRoad / applyRoad', () => {
     expect(plan.cost).toBe(3 * BALANCE.roadCost + 2 * BALANCE.treeClearCost + BALANCE.boulderClearCost);
   });
 
-  it('stops at water: only the contiguous run from the start is valid', () => {
+  it('stops at rock: only the contiguous run from the start is valid', () => {
     const w = grassWorld();
-    w.terrain[w.index(2, 0)] = Terrain.ShallowWater;
+    w.terrain[w.index(2, 0)] = Terrain.Rock;
     const plan = planRoad(w, roadPath({ x: 0, y: 0 }, { x: 4, y: 0 }, false), RoadType.Road);
     expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, false, false]);
     expect(plan.count).toBe(2);
@@ -142,5 +142,88 @@ describe('planClear / applyClear', () => {
     const w = grassWorld();
     const city = new City(w, 100);
     expect(applyClear(city, planClear(w, rectTiles({ x: 0, y: 0 }, { x: 3, y: 3 }))).reason).toBe('nothing-to-do');
+  });
+});
+
+describe('bridges', () => {
+  /** Grass world with a vertical river (all y) at the given x columns. */
+  function riverWorld(cols: number[], n = 12): World {
+    const w = grassWorld(n);
+    for (let y = 0; y < n; y++) for (const x of cols) w.terrain[w.index(x, y)] = Terrain.ShallowWater;
+    return w;
+  }
+
+  it('crosses water in a straight line from land to land', () => {
+    const w = riverWorld([3, 4, 5]);
+    const plan = planRoad(w, roadPath({ x: 1, y: 2 }, { x: 7, y: 2 }, false), RoadType.Road);
+    expect(plan.tiles.every((t) => t.valid)).toBe(true);
+    expect(plan.tiles.filter((t) => t.bridge === BridgeAxis.X)).toHaveLength(3);
+    expect(plan.cost).toBe(4 * BALANCE.roadCost + 3 * BALANCE.bridgeCost);
+  });
+
+  it('cannot end over water', () => {
+    const w = riverWorld([3, 4, 5]);
+    const plan = planRoad(w, roadPath({ x: 1, y: 2 }, { x: 4, y: 2 }, false), RoadType.Road);
+    expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, false]);
+  });
+
+  it('cannot start in water', () => {
+    const w = riverWorld([3, 4, 5]);
+    const plan = planRoad(w, roadPath({ x: 4, y: 2 }, { x: 7, y: 2 }, false), RoadType.Road);
+    expect(plan.count).toBe(0);
+  });
+
+  it('cannot bend over water', () => {
+    const w = riverWorld([3, 4, 5]);
+    // L-path: along x to (4,2), then turns along y while still in the river.
+    const plan = planRoad(w, roadPath({ x: 1, y: 2 }, { x: 4, y: 6 }, false), RoadType.Road);
+    expect(plan.tiles.filter((t) => t.valid).every((t) => w.terrain[w.index(t.x, t.y)] === Terrain.Grass)).toBe(true);
+  });
+
+  it('respects the maximum span', () => {
+    const span = BALANCE.maxBridgeSpan + 1;
+    const w = riverWorld(Array.from({ length: span }, (_, k) => 2 + k), span + 6);
+    const plan = planRoad(w, roadPath({ x: 1, y: 0 }, { x: span + 3, y: 0 }, true), RoadType.Road);
+    expect(plan.count).toBe(1);
+  });
+
+  it('applies the bridge axis and clearing removes it', () => {
+    const w = riverWorld([3]);
+    const city = new City(w, 10_000);
+    const plan = planRoad(w, roadPath({ x: 3, y: 1 }, { x: 3, y: 1 }, false), RoadType.Road);
+    expect(plan.count).toBe(0); // a lone tile in water is not a bridge
+    const vertical = planRoad(w, roadPath({ x: 2, y: 5 }, { x: 4, y: 5 }, true), RoadType.Highway);
+    applyRoad(city, vertical, RoadType.Highway);
+    expect(w.bridge[w.index(3, 5)]).toBe(BridgeAxis.X);
+    applyClear(city, planClear(w, [{ x: 3, y: 5 }]));
+    expect(w.bridge[w.index(3, 5)]).toBe(BridgeAxis.None);
+    expect(w.road[w.index(3, 5)]).toBe(RoadType.None);
+  });
+
+  /** Grass world with a rectangular lake covering x0..x1, y0..y1. */
+  function lakeWorld(x0: number, x1: number, y0: number, y1: number): World {
+    const w = grassWorld(12);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) w.terrain[w.index(x, y)] = Terrain.ShallowWater;
+    return w;
+  }
+
+  it('bridges only connect along their axis', () => {
+    const w = riverWorld([3]);
+    w.terrain[w.index(3, 4)] = Terrain.Grass; // a bit of bank right beside the bridge
+    const city = new City(w, 10_000);
+    applyRoad(city, planRoad(w, roadPath({ x: 2, y: 5 }, { x: 4, y: 5 }, true), RoadType.Road), RoadType.Road);
+    w.road[w.index(3, 4)] = RoadType.Road;
+    expect(roadMask(w, 3, 5)).toBe(0b1010); // the bridge ignores the road on its side
+    expect(roadMask(w, 3, 4)).toBe(0); // and that road doesn't branch into the bridge
+  });
+
+  it('cannot cross an existing bridge sideways', () => {
+    const w = lakeWorld(3, 5, 3, 7);
+    const city = new City(w, 10_000);
+    applyRoad(city, planRoad(w, roadPath({ x: 2, y: 5 }, { x: 6, y: 5 }, true), RoadType.Road), RoadType.Road);
+    const across = planRoad(w, roadPath({ x: 4, y: 2 }, { x: 4, y: 8 }, true), RoadType.Road);
+    const at = (x: number, y: number) => across.tiles.find((t) => t.x === x && t.y === y)!;
+    expect(at(4, 4).valid).toBe(true);
+    expect(at(4, 5).valid).toBe(false);
   });
 });

@@ -13,6 +13,8 @@ export class World {
   readonly tree: Uint8Array;
   readonly decor: Uint8Array;
   readonly road: Uint8Array;
+  /** Bridge axis for road tiles over water (see sim/roads.ts BridgeAxis). */
+  readonly bridge: Uint8Array;
   readonly zone: Uint8Array;
   readonly building: Int32Array;
 
@@ -27,6 +29,7 @@ export class World {
     this.tree = new Uint8Array(n);
     this.decor = new Uint8Array(n);
     this.road = new Uint8Array(n);
+    this.bridge = new Uint8Array(n);
     this.zone = new Uint8Array(n);
     this.building = new Int32Array(n).fill(-1);
   }

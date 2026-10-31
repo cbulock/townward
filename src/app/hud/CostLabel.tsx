@@ -1,6 +1,11 @@
 import { useAtomValue } from 'jotai';
 import { toolPreviewAtom } from '../atoms';
 
+const CURSOR_GAP = 18;
+/** Space the label needs before it flips to the other side of the cursor. */
+const LABEL_ROOM_X = 220;
+const LABEL_ROOM_Y = 60;
+
 /** Follows the cursor during a drag: what the action costs and how many tiles it touches. */
 export function CostLabel() {
   const p = useAtomValue(toolPreviewAtom);
@@ -8,10 +13,15 @@ export function CostLabel() {
 
   const verb = p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : 'Road';
   const empty = p.count === 0;
+  // Flip to the other side of the cursor near the right/bottom edges so the label never clips.
+  const flipX = p.screen.x > window.innerWidth - LABEL_ROOM_X;
+  const flipY = p.screen.y > window.innerHeight - LABEL_ROOM_Y;
+  const dx = flipX ? `calc(${p.screen.x - CURSOR_GAP}px - 100%)` : `${p.screen.x + CURSOR_GAP}px`;
+  const dy = flipY ? `calc(${p.screen.y - CURSOR_GAP}px - 100%)` : `${p.screen.y + CURSOR_GAP}px`;
   return (
     <div
       className={`cost-label ${p.affordable ? '' : 'is-unaffordable'}`}
-      style={{ transform: `translate(${p.screen.x + 18}px, ${p.screen.y + 18}px)` }}
+      style={{ transform: `translate(${dx}, ${dy})` }}
     >
       <span className="cost-verb">{verb}</span>
       {empty ? (

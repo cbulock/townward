@@ -9,19 +9,46 @@ export const RoadType = {
 export type RoadTypeId = (typeof RoadType)[keyof typeof RoadType];
 export type BuildableRoad = Exclude<RoadTypeId, typeof RoadType.None>;
 
+/** Values stored in `World.bridge`: which way a bridge runs. Bridges only connect at their two ends. */
+export const BridgeAxis = {
+  None: 0,
+  /** Runs along x: connects SE and NW. */
+  X: 1,
+  /** Runs along y: connects NE and SW. */
+  Y: 2,
+} as const;
+export type BridgeAxisId = (typeof BridgeAxis)[keyof typeof BridgeAxis];
+
+/** Connection bits a bridge on this axis uses. */
+export function bridgeAxisMask(axis: number): number {
+  return axis === BridgeAxis.X ? 0b1010 : axis === BridgeAxis.Y ? 0b0101 : 0b1111;
+}
+
 export interface TilePos {
   x: number;
   y: number;
 }
 
 /**
- * Connection mask for auto-tiling: which of the 4 neighbours carry any road.
+ * Connection mask for auto-tiling: which of the 4 neighbours carry a road that connects here.
  *   bit 0 NE (x, y−1)   bit 1 SE (x+1, y)   bit 2 SW (x, y+1)   bit 3 NW (x−1, y)
- * Roads and highways connect to each other.
+ * Roads and highways connect to each other. Bridges only connect along their axis,
+ * so a road beside a bridge doesn't sprout a branch into it (and vice versa).
  */
 export function roadMask(world: World, x: number, y: number): number {
-  const has = (nx: number, ny: number) => world.inBounds(nx, ny) && world.road[world.index(nx, ny)] !== RoadType.None;
-  return (has(x, y - 1) ? 1 : 0) | (has(x + 1, y) ? 2 : 0) | (has(x, y + 1) ? 4 : 0) | (has(x - 1, y) ? 8 : 0);
+  const has = (nx: number, ny: number, axis: number) => {
+    if (!world.inBounds(nx, ny)) return false;
+    const i = world.index(nx, ny);
+    if (world.road[i] === RoadType.None) return false;
+    const b = world.bridge[i];
+    return b === BridgeAxis.None || b === axis;
+  };
+  const mask =
+    (has(x, y - 1, BridgeAxis.Y) ? 1 : 0) |
+    (has(x + 1, y, BridgeAxis.X) ? 2 : 0) |
+    (has(x, y + 1, BridgeAxis.Y) ? 4 : 0) |
+    (has(x - 1, y, BridgeAxis.X) ? 8 : 0);
+  return mask & bridgeAxisMask(world.bridge[world.index(x, y)]);
 }
 
 /**

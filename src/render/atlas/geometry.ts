@@ -15,6 +15,13 @@ export const GROUND_FRAME_H = TILE_H + GROUND_PAD * 2;
  */
 export const SEAM_OVERLAP = 0.75;
 
+/** Bridge frames: room above the deck for lamp posts, and below it for girder, piers and shadow. */
+export const BRIDGE_HEADROOM = 16;
+export const BRIDGE_DROP = 22;
+export const BRIDGE_FRAME_H = GROUND_FRAME_H + BRIDGE_HEADROOM + BRIDGE_DROP;
+/** Anchor that puts a bridge frame's diamond centre on the sprite position (for pop effects). */
+export const BRIDGE_ANCHOR_Y = (BRIDGE_HEADROOM + GROUND_PAD + TILE_H / 2) / BRIDGE_FRAME_H;
+
 /** Headroom above the ground diamond in object frames (trees, later buildings). */
 export const TREE_HEADROOM = 40;
 export const TREE_FRAME_H = GROUND_FRAME_H + TREE_HEADROOM;

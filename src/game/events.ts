@@ -10,6 +10,7 @@ export interface GameEventMap {
   /** Live cost label for an in-progress drag; null when there's nothing to show. */
   toolPreview: ToolPreviewInfo | null;
   notice: Notice;
+  muted: boolean;
 }
 
 export interface ToolPreviewInfo {

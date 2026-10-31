@@ -46,11 +46,14 @@ src/
     Game.ts                owns World + Renderer + loop
     loop.ts                fixed-timestep sim + rAF render
     input/                 pointer/keyboard, camera controls, picking
-    tools/                 RoadTool, ZoneTool, BulldozeTool, PlaceTool…
-    commands.ts            all world mutations go through commands (undo later)
-    events.ts              typed event bus (world → UI/renderer)
+    tools.ts               tool ids, hotkeys, drag → plan → ghost preview
+    audio.ts               procedural Web Audio sound effects + mute
+    events.ts              typed event bus (game → UI)
   sim/
     World.ts               map dimensions + layers
+    City.ts                funds (budget, population, date later)
+    commands.ts            plan*/apply* pairs: every world mutation (undo later)
+    roads.ts               road types, auto-tile mask, paths
     layers.ts              typed-array layers
     terrain/               generator, presets
     roads/                 autotile mask logic
@@ -62,7 +65,8 @@ src/
     Camera.ts              smooth pan/zoom
     ChunkRenderer.ts       chunked static tile rendering
     atlas/                 procedural tile art → texture atlas
-    overlays/              cursor, ghost preview, zone tint, grid
+    overlays/              hover, tool ghost preview
+    fx/                    build pops + pooled particles
   shared/                  constants, rng, math utils
 tests/
 docs/
@@ -83,7 +87,8 @@ serialization:
 | `variant` | `Uint8Array` | Random visual variant per tile (seeded) |
 | `tree` | `Uint8Array` | Tree density 0–3 (0 = none) |
 | `decor` | `Uint8Array` | Decoration (rocks, boulder, flowers, tall grass); visual only |
-| `road` | `Uint8Array` | 0 = none, else road type; connection mask is computed |
+| `road` | `Uint8Array` | 0 = none, 1 = road, 2 = highway; connection mask is computed |
+| `bridge` | `Uint8Array` | Bridge axis on water tiles (0 none, 1 along x, 2 along y) |
 | `zone` | `Uint8Array` | 0 none, 1 R, 2 C, 3 I (with density bits later) |
 | `building` | `Int32Array` | Building instance id covering this tile, −1 if none |
 

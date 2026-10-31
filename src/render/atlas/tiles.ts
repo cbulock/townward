@@ -1,12 +1,14 @@
 import { Texture } from 'pixi.js';
-import { RoadType, type BuildableRoad } from '../../sim/roads';
+import { BridgeAxis, RoadType, type BuildableRoad } from '../../sim/roads';
 import { Decor, DECOR_KINDS, GROUND_VARIANTS, Terrain, type DecorId, type TerrainId } from '../../sim/terrain/types';
 import { OVERLAY_TERRAINS } from '../transitions';
 import { AtlasBuilder, type FramePainter } from './AtlasBuilder';
 import { DECOR_VARIANTS, paintDecor } from './decorArt';
-import { diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
+import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
-import { paintRoad } from './roadArt';
+import { paintBridge, paintRoad } from './roadArt';
+import { CHIP_SIZE, LEAF_SIZE, paintChip, paintLeaf, paintPuff, PUFF_SIZE } from './fxArt';
+import type { FxTextures } from '../fx/Effects';
 import {
   foamOverlay,
   GRASS_SHAPE,
@@ -44,8 +46,11 @@ export interface TerrainTextures {
   decor: Texture[][];
   /** Road pieces, indexed by road type then 4-bit connection mask. */
   roads: Readonly<Record<BuildableRoad, Texture[]>>;
+  /** Bridge spans (taller frames: see BRIDGE_HEADROOM), indexed by road type then BridgeAxis (0 is Texture.EMPTY). */
+  bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Plain white diamond for tool previews (tinted at runtime). */
   selection: Texture;
+  fx: FxTextures;
   hover: Texture;
   gridLine: Texture;
 }
@@ -149,8 +154,12 @@ export function buildTerrainTextures(): TerrainTextures {
   }
   for (const t of ROAD_TYPES) {
     for (let m = 0; m < 16; m++) b.add(`road_${t}_${m}`, W, H, (ctx) => paintRoad(ctx, t, m));
+    for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis));
   }
   b.add('selection', W, H, paintSelection);
+  b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
+  b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
+  b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
   b.add('hover', W, H, paintHover);
   b.add('grid', W, H, paintGridLine);
 
@@ -179,7 +188,11 @@ export function buildTerrainTextures(): TerrainTextures {
       BuildableRoad,
       Texture[]
     >,
+    bridges: Object.fromEntries(
+      ROAD_TYPES.map((t) => [t, [Texture.EMPTY, get(`bridge_${t}_${BridgeAxis.X}`), get(`bridge_${t}_${BridgeAxis.Y}`)]]),
+    ) as Record<BuildableRoad, Texture[]>,
     selection: get('selection'),
+    fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),
   };

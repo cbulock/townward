@@ -6,6 +6,7 @@ import { buildTerrainTextures, type TerrainTextures } from './atlas/tiles';
 import { mapWorldBounds } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
 import { ToolPreview } from './overlays/ToolPreview';
+import { Effects } from './fx/Effects';
 
 /**
  * Owns the Pixi application and the world scene graph:
@@ -16,6 +17,7 @@ import { ToolPreview } from './overlays/ToolPreview';
  *      ├─ roads
  *      ├─ grid     (optional tile outlines)
  *      ├─ objects  (trees, decorations; buildings in later phases)
+ *      ├─ fx       (build pops, particles)
  *      └─ overlay  (tool ghosts, hover)
  */
 export class Renderer {
@@ -28,6 +30,7 @@ export class Renderer {
   ground!: ChunkRenderer;
   hover!: HoverHighlight;
   textures!: TerrainTextures;
+  effects!: Effects;
 
   /** Draw calls issued during the last rendered frame (WebGL only). */
   drawCalls = 0;
@@ -58,6 +61,7 @@ export class Renderer {
   private setup(world: World) {
     const tex = buildTerrainTextures();
     this.textures = tex;
+    this.effects = new Effects(tex.fx);
     this.ground = new ChunkRenderer(world, tex);
     this.hover = new HoverHighlight(tex.hover);
     this.overlay.addChild(this.toolPreview.container, this.hover.sprite);
@@ -70,6 +74,7 @@ export class Renderer {
       this.ground.roadsRoot,
       this.ground.gridRoot,
       this.objects,
+      this.effects.container,
       this.overlay,
     );
     this.app.stage.addChild(this.worldRoot);
@@ -111,6 +116,7 @@ export class Renderer {
     this.ground.update(dt);
     this.hover.update(dt);
     this.toolPreview.update(dt);
+    this.effects.update(dt);
 
     this.drawCallCounter = 0;
     this.app.render();

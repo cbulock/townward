@@ -9,6 +9,8 @@ export interface PreviewTile {
   texture: Texture;
   tint: number;
   alpha: number;
+  /** Extra room above the diamond in this texture's frame (e.g. bridges). */
+  offsetY?: number;
 }
 
 /** Ghost sprites showing what a tool will do. Sprites are pooled; a drag can redraw every frame. */
@@ -28,7 +30,7 @@ export class ToolPreview {
       const p = tileToWorld(tile.x, tile.y);
       s.texture = tile.texture;
       s.x = p.x - HALF_W - GROUND_PAD;
-      s.y = p.y - GROUND_PAD;
+      s.y = p.y - GROUND_PAD - (tile.offsetY ?? 0);
       s.tint = tile.tint;
       s.alpha = tile.alpha;
       s.visible = true;

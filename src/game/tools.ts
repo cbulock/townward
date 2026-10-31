@@ -1,4 +1,5 @@
 import type { PreviewTile } from '../render/overlays/ToolPreview';
+import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import type { TerrainTextures } from '../render/atlas/tiles';
 import { planClear, planRoad, type Plan } from '../sim/commands';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
@@ -65,14 +66,17 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan): P
   const planned = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));
   const hasRoad = (x: number, y: number) =>
     world.inBounds(x, y) && (planned.has(world.index(x, y)) || world.road[world.index(x, y)] !== RoadType.None);
-  const roads = tex.roads[p.roadType];
+  const roadType = p.roadType;
+  const roads = tex.roads[roadType];
   return p.plan.tiles.map((t) => {
     const mask =
       (hasRoad(t.x, t.y - 1) ? 1 : 0) | (hasRoad(t.x + 1, t.y) ? 2 : 0) | (hasRoad(t.x, t.y + 1) ? 4 : 0) | (hasRoad(t.x - 1, t.y) ? 8 : 0);
+    const texture = !t.valid ? tex.selection : t.bridge ? tex.bridges[roadType][t.bridge] : roads[mask];
     return {
       x: t.x,
       y: t.y,
-      texture: t.valid ? roads[mask] : tex.selection,
+      texture,
+      offsetY: t.valid && t.bridge ? BRIDGE_HEADROOM : 0,
       tint: t.valid ? TINT_VALID : TINT_INVALID,
       alpha: t.valid ? 0.85 : 0.6,
     };

@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 2a — River Valley terrain 🚧 (look approved on `?seed=42`; verify 60 FPS on real hardware) |
-| **Next phase** | Phase 2b — More terrains + New Game screen, or Phase 3 — Roads (user's call) |
+| **Current phase** | Phase 3 — Roads, highways, bridges & clearing ✅ (verify 60 FPS on real hardware) |
+| **Next phase** | Phase 4 — Zoning & buildings |
 | **Last updated** | 2026-10-31 |
 
 ## Run It

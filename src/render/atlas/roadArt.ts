@@ -1,6 +1,6 @@
 import { HALF_H, HALF_W } from '../../shared/constants';
-import { RoadType, type BuildableRoad } from '../../sim/roads';
-import { GROUND_PAD } from './geometry';
+import { BridgeAxis, bridgeAxisMask, RoadType, type BuildableRoad } from '../../sim/roads';
+import { BRIDGE_HEADROOM, GROUND_PAD } from './geometry';
 
 /**
  * Road pieces for all 16 connection masks, painted in tile space.
@@ -116,15 +116,112 @@ function paintHighway(ctx: CanvasRenderingContext2D, mask: number) {
   }
 }
 
-export function paintRoad(ctx: CanvasRenderingContext2D, type: BuildableRoad, mask: number) {
+/**
+ * Set up the (u, v) → iso diamond transform (the diamond's top vertex `offsetY` px below the
+ * frame top), optionally clipped slightly past the tile so connected pieces overlap.
+ */
+function inTileSpace(ctx: CanvasRenderingContext2D, paint: () => void, offsetY = 0, clip = true) {
   ctx.save();
-  // (u, v) → iso diamond in ground-frame coordinates.
-  ctx.transform(HALF_W, HALF_H, -HALF_W, HALF_H, GROUND_PAD + HALF_W, GROUND_PAD);
-  // Clip slightly past the tile so connected pieces overlap instead of leaving hairlines.
-  ctx.beginPath();
-  ctx.rect(-0.02, -0.02, 1.04, 1.04);
-  ctx.clip();
+  ctx.transform(HALF_W, HALF_H, -HALF_W, HALF_H, GROUND_PAD + HALF_W, GROUND_PAD + offsetY);
+  if (clip) {
+    ctx.beginPath();
+    ctx.rect(-0.02, -0.02, 1.04, 1.04);
+    ctx.clip();
+  }
+  paint();
+  ctx.restore();
+}
+
+/** In tile space, moving (d, d) shifts straight down on screen by 2·HALF_H·d px. */
+const PX = 1 / (2 * HALF_H);
+
+function paintDeck(ctx: CanvasRenderingContext2D, type: BuildableRoad, mask: number) {
   if (type === RoadType.Highway) paintHighway(ctx, mask);
   else paintStreet(ctx, mask);
-  ctx.restore();
+}
+
+export function paintRoad(ctx: CanvasRenderingContext2D, type: BuildableRoad, mask: number) {
+  inTileSpace(ctx, () => paintDeck(ctx, type, mask));
+}
+
+/**
+ * A bridge span, built up back to front like a little diorama:
+ *   shadow on the water → piers with ripple rings → girder (deck thickness)
+ *   → deck (same markings as the road, so it meets the shore road seamlessly)
+ *   → parapet walls with a lit top edge → lamp posts.
+ * The deck stays at ground level; height is suggested by everything hanging below it
+ * into the water. Drawn in a taller frame: BRIDGE_HEADROOM above, BRIDGE_DROP below.
+ */
+export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, axis: number) {
+  const mask = bridgeAxisMask(axis);
+  const highway = type === RoadType.Highway;
+  /** Half-width of the whole deck, out to the parapets. */
+  const edge = highway ? 0.5 : 0.41;
+  /** One arm along the span; its lateral +o side is the one facing the viewer. */
+  const along = axis === BridgeAxis.X ? 1 : 0;
+  const shift = (px: number, paint: () => void) => {
+    ctx.save();
+    ctx.translate(px * PX, px * PX);
+    paint();
+    ctx.restore();
+  };
+  const fill = (color: string, paint: () => void) => {
+    ctx.fillStyle = color;
+    paint();
+  };
+
+  inTileSpace(
+    ctx,
+    () => {
+      // Shadow on the water, well below the deck.
+      shift(17, () => body(ctx, mask, edge + 0.02, 'rgba(8, 38, 90, 0.36)'));
+
+      // Piers: a pair of concrete columns under the middle of each span tile.
+      const PIER_DEPTH = 18;
+      for (const o of [-edge * 0.55, edge * 0.55]) {
+        shift(PIER_DEPTH, () => fill('rgba(205, 240, 255, 0.75)', () => armQuad(ctx, along, -0.1, 0.1, o - 0.1, o + 0.1)));
+        for (let px = PIER_DEPTH; px >= 4; px--) {
+          const t = (px - 4) / (PIER_DEPTH - 4);
+          const shade = Math.round(122 - 46 * t);
+          shift(px, () => fill(`rgb(${shade}, ${shade + 6}, ${shade + 14})`, () => armQuad(ctx, along, -0.055, 0.055, o - 0.055, o + 0.055)));
+        }
+      }
+
+      // Girder: the deck's thickness, darker toward its underside.
+      for (let px = 7; px >= 1; px--) shift(px, () => body(ctx, mask, edge, px >= 6 ? '#3e444c' : '#6a717a'));
+      // Lighter lip where the deck slab meets the girder.
+      shift(1, () => body(ctx, mask, edge, '#9aa0a8'));
+    },
+    BRIDGE_HEADROOM,
+    false,
+  );
+
+  inTileSpace(ctx, () => paintDeck(ctx, type, mask), BRIDGE_HEADROOM);
+
+  inTileSpace(
+    ctx,
+    () => {
+      // Parapet walls: a face built up a few px, capped with a lit top.
+      for (const b of bits(mask)) {
+        for (let px = 0; px >= -3; px--) {
+          const color = px === -3 ? '#f4f1ea' : '#aeaaa1';
+          shift(px, () =>
+            fill(color, () => {
+              armQuad(ctx, b, -0.02, 0.52, edge - 0.04, edge);
+              armQuad(ctx, b, -0.02, 0.52, -edge, -edge + 0.04);
+            }),
+          );
+        }
+      }
+      // A lamp post on the far parapet, mid-span.
+      const POLE = 13;
+      for (let px = 0; px >= -POLE; px--) {
+        shift(px, () => fill('#5b6169', () => armQuad(ctx, along, -0.015, 0.015, -edge + 0.005, -edge + 0.035)));
+      }
+      shift(-POLE - 1, () => fill('#fff3bf', () => armQuad(ctx, along, -0.04, 0.04, -edge, -edge + 0.06)));
+      shift(-POLE + 1, () => fill('rgba(255, 236, 160, 0.35)', () => armQuad(ctx, along, -0.08, 0.08, -edge - 0.03, -edge + 0.1)));
+    },
+    BRIDGE_HEADROOM,
+    false,
+  );
 }

@@ -61,17 +61,22 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 ---
 
-## Phase 3 — Roads ⬜  → [specs/roads.md](specs/roads.md)
+## Phase 3 — Roads, Highways & Clearing ✅ (pending 60 FPS check)  → [specs/roads.md](specs/roads.md)
 
-- [ ] Toolbar shell + tool system (select/active tool, Esc to cancel)
-- [ ] Road tool: click-drag with L-shaped path, ghost preview, cost label at cursor
-- [ ] Validation (no roads on water yet, no overlap with buildings); invalid tiles tinted red
-- [ ] 4-bit autotiling: straight, corner, T, cross, dead-end (16 masks)
-- [ ] Bulldoze tool (drag rectangle) for roads and trees
-- [ ] Money: starting funds, costs, "not enough money" feedback
-- [ ] Placement juice: pop-in animation, dust puff, sound hook
+- [x] Toolbar + tool system (Select/Clear/Road/Highway, hotkeys, Esc/right-click cancel)
+- [x] Road tool: click-drag L-shaped path (Shift = straight), ghost preview, cost label at cursor
+- [x] Highway tool (wider, median, lane markings); roads and highways connect
+- [x] Validation (no roads on water/rock; contiguous run from start); invalid tiles tinted red
+- [x] Trees/rocks on a road path are auto-cleared at their clearing cost
+- [x] 4-bit autotiling for both types: straight, corner, T, cross, dead end (16 masks each)
+- [x] Clear tool: drag a rectangle to remove trees, rocks and roads, with live cost
+- [x] Money: starting funds, costs, top-bar funds with flash, "not enough money" toast
+- [x] Sim tests: paths, pricing, water cut-off, upgrades, insufficient funds, clearing
+- [x] Bridges over water: straight, land to land, max 12 tiles, connect only at their ends
+- [x] Placement juice: rippling pop flash, dust/leaf/grit/splash particles
+- [x] Procedural sound effects (build, bridge, clear, error, tool) + mute (`M`, persisted)
 
-**DoD:** drawing a road network feels instant and satisfying, pieces connect correctly in every configuration and bulldozing re-tiles the neighbours.
+**DoD:** drawing a road network feels instant and satisfying, pieces connect correctly in every configuration and clearing re-tiles the neighbours.
 
 ---
 

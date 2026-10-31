@@ -336,3 +336,24 @@ kbd {
   border-color: rgba(248, 113, 113, 0.5);
   color: #fecaca;
 }
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+.icon-button:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text);
+}
+.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+}

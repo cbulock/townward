@@ -4,6 +4,7 @@ const HINTS: [string, string][] = [
   ['Shift', 'Straight'],
   ['Esc', 'Cancel'],
   ['G', 'Grid'],
+  ['M', 'Mute'],
   ['N', 'New map'],
   ['F3', 'Debug'],
 ];

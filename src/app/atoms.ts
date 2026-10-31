@@ -15,3 +15,4 @@ export const fundsAtom = atom(0);
 export const activeToolAtom = atom<ToolId>('select');
 export const toolPreviewAtom = atom<ToolPreviewInfo | null>(null);
 export const noticesAtom = atom<readonly Notice[]>([]);
+export const mutedAtom = atom(false);

@@ -1,15 +1,19 @@
 import { worldToTile } from '../render/iso';
+import { BRIDGE_ANCHOR_Y } from '../render/atlas/geometry';
 import { Renderer } from '../render/Renderer';
 import { SIM_TICK_HZ } from '../shared/constants';
 import { City } from '../sim/City';
-import { applyClear, applyRoad, type ApplyResult } from '../sim/commands';
-import type { TilePos } from '../sim/roads';
+import type { BurstKind } from '../render/fx/Effects';
+import { applyClear, applyRoad, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { roadMask, type BuildableRoad, type TilePos } from '../sim/roads';
+import { Decor } from '../sim/terrain/types';
 import { generateRiverValley } from '../sim/terrain/riverValley';
 import type { World } from '../sim/World';
+import { SoundBoard } from './audio';
 import { EventBus, type GameEventMap } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId } from './tools';
+import { planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
   size: number;
@@ -18,11 +22,16 @@ export interface GameOptions {
 
 /** How often stats are pushed to the UI (they don't need 60 Hz React renders). */
 const STATS_INTERVAL = 0.25;
+/** The build ripple never takes longer than this, however long the road. */
+const MAX_RIPPLE_TIME = 0.5;
+/** Particle budget shared across all tiles of one action. */
+const PARTICLE_BUDGET = 900;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
 export class Game {
   readonly events = new EventBus<GameEventMap>();
   readonly city: City;
+  readonly sound = new SoundBoard();
   private readonly renderer: Renderer;
   private readonly input: InputController;
   private readonly loop: GameLoop;
@@ -74,6 +83,7 @@ export class Game {
   // ---------------------------------------------------------------- tools
 
   setTool(tool: ToolId) {
+    if (tool !== this.toolId) this.sound.play('tool');
     this.toolId = tool;
     this.drag = null;
     this.renderer.app.canvas.style.cursor = tool === 'select' ? '' : 'crosshair';
@@ -117,17 +127,81 @@ export class Game {
     const p = planTool(this.world, this.toolId, this.drag, null);
     this.drag = null;
     if (p) {
+      // What's on each tile before it changes decides the particles (leaves, grit, dust).
+      const debris = this.debrisOf(p.plan.tiles);
       const result: ApplyResult =
         p.roadType !== null ? applyRoad(this.city, p.plan, p.roadType) : applyClear(this.city, p.plan);
       if (result.ok && result.changed) {
         const c = result.changed;
         this.renderer.ground.refresh(c.minX, c.minY, c.maxX, c.maxY);
         this.events.emit('funds', this.city.funds);
+        this.buildFeedback(p, result.tiles ?? [], debris);
       } else if (result.reason === 'insufficient-funds') {
+        this.sound.play('error');
         this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
       }
     }
     this.updatePreview();
+  }
+
+  private debrisOf(tiles: readonly PlannedTile[]): Map<number, BurstKind> {
+    const w = this.world;
+    const out = new Map<number, BurstKind>();
+    for (const t of tiles) {
+      if (!t.valid) continue;
+      const i = w.index(t.x, t.y);
+      const d = w.decor[i];
+      if (w.tree[i] > 0) out.set(i, 'leaves');
+      else if (d === Decor.Rocks || d === Decor.Boulder) out.set(i, 'rocks');
+    }
+    return out;
+  }
+
+  /** Pop + particles rippling along the build order, with matching sound. */
+  private buildFeedback(p: ToolPlan, tiles: readonly PlannedTile[], debris: Map<number, BurstKind>) {
+    const n = tiles.length;
+    if (n === 0) return;
+    const fx = this.renderer.effects;
+    const stagger = Math.min(0.02, MAX_RIPPLE_TIME / n);
+    const perTile = Math.max(1, Math.min(6, Math.floor(PARTICLE_BUDGET / n)));
+
+    tiles.forEach((t, k) => {
+      const kind = debris.get(this.world.index(t.x, t.y));
+      if (kind) fx.burst(t.x, t.y, kind, perTile, k * stagger);
+    });
+
+    if (p.roadType !== null) {
+      const tex = this.renderer.textures;
+      const type: BuildableRoad = p.roadType;
+      fx.pop(
+        tiles.map((t) => ({
+          x: t.x,
+          y: t.y,
+          texture: t.bridge ? tex.bridges[type][t.bridge] : tex.roads[type][roadMask(this.world, t.x, t.y)],
+          anchorY: t.bridge ? BRIDGE_ANCHOR_Y : 0.5,
+        })),
+        stagger,
+      );
+      tiles.forEach((t, k) => fx.burst(t.x, t.y, t.bridge ? 'splash' : 'dust', Math.ceil(perTile / 2), k * stagger));
+      this.sound.play(tiles.some((t) => t.bridge) ? 'bridge' : 'build');
+      // Ticks follow the ripple, rising in pitch.
+      const ticks = Math.min(8, n);
+      for (let k = 1; k < ticks; k++) this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
+    } else {
+      tiles.forEach((t, k) => {
+        if (!debris.has(this.world.index(t.x, t.y))) fx.burst(t.x, t.y, 'dust', Math.ceil(perTile / 2), k * stagger);
+      });
+      this.sound.play('clear');
+    }
+  }
+
+  get muted(): boolean {
+    return this.sound.muted;
+  }
+
+  setMuted(muted: boolean) {
+    this.sound.setMuted(muted);
+    this.events.emit('muted', muted);
   }
 
   /** Right click / Esc: drop the drag if there is one, otherwise put the tool away. */
@@ -215,6 +289,7 @@ export class Game {
 
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
+    else if (code === 'KeyM') this.setMuted(!this.sound.muted);
     else if (code === 'Escape') this.cancel();
     else {
       const tool = (Object.keys(TOOL_KEYS) as ToolId[]).find((t) => TOOL_KEYS[t] === code);
@@ -231,6 +306,7 @@ export class Game {
     this.loop.stop();
     this.input.destroy();
     this.events.clear();
+    this.sound.destroy();
     this.renderer.destroy();
   }
 }
