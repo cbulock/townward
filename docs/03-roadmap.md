@@ -9,24 +9,26 @@ Each phase ends with a **Definition of Done (DoD)** that we verify before moving
 ## Phase 0 — Planning & Docs ✅
 
 - [x] Vision, architecture, roadmap, UI and specs written
-- [ ] User sign-off on open decisions (see [decisions.md](decisions.md), "Open")
+- [x] User sign-off: isometric view, rotation deferred, Jotai instead of Zustand, pnpm (name still open)
 
 ---
 
-## Phase 1 — Engine Foundation ⬜
+## Phase 1 — Engine Foundation 🚧 (built; awaiting 60 FPS check on real hardware)
 
 Goal: an empty isometric world you can fly around smoothly.
 
-- [ ] Vite + TS + React + Pixi project scaffold, ESLint/Prettier, Vitest
-- [ ] `World` with typed-array layers (flat grass map for now)
-- [ ] Iso math (`iso.ts`) with unit tests (tile ↔ screen round-trip)
-- [ ] Procedural atlas v0: grass tile with variants plus grid line
-- [ ] Chunked ground renderer + viewport culling
-- [ ] Camera: drag-pan (middle/right mouse), WASD/arrow keys, edge-scroll, wheel zoom anchored at cursor, eased motion, zoom limits
-- [ ] Tile hover highlight (accurate diamond picking)
-- [ ] Fixed-timestep loop + debug overlay (FPS, draw calls, hovered tile) on `F3`
+- [x] Vite + TS + React + Pixi project scaffold, ESLint/Prettier, Vitest
+- [x] `World` with typed-array layers (flat grass map for now)
+- [x] Iso math (`iso.ts`) with unit tests (tile ↔ screen round-trip)
+- [x] Procedural atlas v0: grass tile with variants plus grid line
+- [x] Chunked ground renderer + viewport culling
+- [x] Camera: drag-pan (middle/right mouse), WASD/arrow keys, edge-scroll, wheel zoom anchored at cursor, eased motion, zoom limits
+- [x] Tile hover highlight (accurate diamond picking)
+- [x] Fixed-timestep loop + debug overlay (FPS, draw calls, hovered tile) on `F3`
 
 **DoD:** 256×256 flat map pans/zooms at 60 FPS and the hover highlight is pixel-accurate.
+
+> Test it with `pnpm dev`, then open `http://localhost:5173/?size=256`. Hover picking is covered by unit tests and was checked in a headless browser. FPS must be checked on a real GPU, because headless Chrome renders in software.
 
 ---
 

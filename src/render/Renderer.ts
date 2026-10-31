@@ -74,6 +74,8 @@ export class Renderer {
     for (const name of names) {
       const original = gl[name] as (...args: unknown[]) => void;
       if (typeof original !== 'function') continue;
+      // Safe: we replace a method with a wrapper of the same arity that forwards all args.
+      // The GL context type has no index signature, so a double cast is needed to assign by name.
       (gl as unknown as Record<string, unknown>)[name] = (...args: unknown[]) => {
         this.drawCallCounter++;
         original.apply(gl, args);

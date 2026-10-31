@@ -7,9 +7,18 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 0 — Planning & docs ✅ (awaiting sign-off) |
-| **Next phase** | Phase 1 — Engine foundation |
+| **Current phase** | Phase 1 — Engine foundation 🚧 (built; verify 60 FPS on real hardware) |
+| **Next phase** | Phase 2 — Terrain |
 | **Last updated** | 2026-10-31 |
+
+## Run It
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173  (?size=64|128|256&seed=N)
+pnpm test         # unit tests
+pnpm typecheck && pnpm lint
+```
 
 ## Index
 
