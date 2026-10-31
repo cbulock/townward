@@ -1,4 +1,4 @@
-import { Texture } from 'pixi.js';
+import { Texture, type TextureSource } from 'pixi.js';
 import { BridgeAxis, RoadType, type BuildableRoad } from '../../sim/roads';
 import { Decor, DECOR_KINDS, GROUND_VARIANTS, Terrain, type DecorId, type TerrainId } from '../../sim/terrain/types';
 import { OVERLAY_TERRAINS } from '../transitions';
@@ -82,6 +82,8 @@ export interface TerrainTextures {
   warnRoad: Texture;
   hover: Texture;
   gridLine: Texture;
+  /** The atlas pages (so their mesh shaders can be released). */
+  sources: readonly TextureSource[];
 }
 
 const ROAD_TYPES: readonly BuildableRoad[] = [RoadType.Road, RoadType.Highway];
@@ -294,5 +296,6 @@ export function buildTerrainTextures(): TerrainTextures {
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),
+    sources: b.sources,
   };
 }

@@ -9,6 +9,7 @@ import {
 } from './buildings/catalog';
 import { cityStats, findEntrance } from './population';
 import { Decor } from './terrain/types';
+import { isFlat } from './terrain/elevation';
 import type { World } from './World';
 import { isZoned, ZONE_LETTER, ZONED_TYPES, zoneOfLetter, type ZonedType } from './zones';
 
@@ -273,7 +274,9 @@ function findMergeSquare(
         else found.push(o);
       }
     }
-    if (ok && findEntrance(world, sx, sy, 2, 2, BALANCE.roadAccessRange) !== -1) return { x: sx, y: sy, buildings: found };
+    if (ok && isFlat(world, sx, sy, 2, 2) && findEntrance(world, sx, sy, 2, 2, BALANCE.roadAccessRange) !== -1) {
+      return { x: sx, y: sy, buildings: found };
+    }
   }
   return null;
 }

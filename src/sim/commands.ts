@@ -18,6 +18,8 @@ export interface PlannedTile extends TilePos {
   cost: number;
   /** Set for road tiles over water. */
   bridge?: BridgeAxisId;
+  /** Terraform: a neighbour that changes to keep the slope rule (not in the dragged area). */
+  ripple?: boolean;
 }
 
 export interface Plan {
@@ -227,7 +229,9 @@ export function planPlace(world: World, id: BuildingId, cx: number, cy: number):
         !isWater(world, i) &&
         world.terrain[i] !== Terrain.Rock &&
         world.road[i] === RoadType.None &&
-        world.building[i] === -1;
+        world.building[i] === -1 &&
+        // Buildings need a flat footprint (docs/specs/elevation.md).
+        world.elevation[i] === world.elevation[world.index(origin.x, origin.y)];
       const c = valid ? clearCost(world, i) : 0;
       tiles.push({ x, y, valid, cost: c });
       clearing += c;

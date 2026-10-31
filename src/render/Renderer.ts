@@ -5,8 +5,10 @@ import type { TileRect } from './view/ViewTransform';
 import { ViewTransform, type Point, type Rotation } from './view/ViewTransform';
 import { ViewWorld } from './view/ViewWorld';
 import { Camera } from './Camera';
+import { BorderRenderer } from './BorderRenderer';
+import { borderRing, generateBorderlands } from '../sim/terrain/borderlands';
 import { releaseTileShaders } from './ground/TileMesh';
-import { HEIGHT_STEP } from '../shared/constants';
+import { HEIGHT_STEP, TILE_W } from '../shared/constants';
 import { surfaceHeight } from '../sim/terrain/elevation';
 import { ChunkRenderer } from './ChunkRenderer';
 import { buildTerrainTextures, type TerrainTextures } from './atlas/tiles';
@@ -59,6 +61,10 @@ export class Renderer {
   agents!: AgentRenderer;
   indicators!: Indicators;
   private viewWorld!: ViewWorld;
+  /** Borderlands: decorative land round the map (render-only), regenerated if the map edge changes. */
+  private ext!: World;
+  private readonly ring: number;
+  border!: BorderRenderer;
   private agentSource: () => readonly Agent[] = () => [];
   private stopSource: () => readonly BusStop[] = () => [];
   private rotateFade = 0;
@@ -78,6 +84,7 @@ export class Renderer {
   ) {
     this.app = app;
     this.viewRef = { current: new ViewTransform(world.width, world.height, 0), ground: world };
+    this.ring = borderRing(world.width);
     this.toolPreview = new ToolPreview(this.viewRef);
   }
 
@@ -119,6 +126,7 @@ export class Renderer {
     this.indicators = new Indicators(tex.warnRoad, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
     t0 = performance.now();
+    this.ext = generateBorderlands(this.world, this.ring);
     this.buildTerrain();
     this.timings.chunks = performance.now() - t0;
     this.overlay.addChild(this.toolPreview.container, this.hover.container, this.indicators.container);
@@ -139,22 +147,29 @@ export class Renderer {
   private buildTerrain() {
     const grid = this.ground?.gridOn ?? false;
     if (this.ground) this.ground.destroy();
+    this.border?.destroy();
     this.viewWorld = new ViewWorld(this.view, this.world.seed);
     this.viewWorld.sync(this.world);
     this.viewRef.ground = this.viewWorld;
     this.ground = new ChunkRenderer(this.viewWorld, this.textures);
+    this.border = new BorderRenderer(this.ext, this.ring, this.viewWorld, this.view.r, this.textures);
     this.terrain.addChild(
-      this.ground.slab,
+      this.border.ground,
       this.ground.groundMask,
       this.ground.groundRoot,
+      this.border.line,
       this.ground.zonesRoot,
       this.ground.roadsRoot,
       this.ground.gridRoot,
     );
     this.ground.zonesRoot.alpha = this.zoneView ? 1 : ZONE_ALPHA;
-    this.objects.addChild(this.ground.objectsRoot);
+    // Ring trees behind the map draw before its objects, the ones in front after.
+    this.objects.addChild(this.border.backObjects, this.ground.objectsRoot, this.border.frontObjects);
     this.ground.setGrid(grid);
-    this.camera.setBounds(mapWorldBounds(this.view.viewW, this.view.viewH));
+    // Allow panning a quarter of the way into the borderlands.
+    const b = mapWorldBounds(this.view.viewW, this.view.viewH);
+    const m = this.ring * 0.25 * TILE_W;
+    this.camera.setBounds({ minX: b.minX - m, maxX: b.maxX + m, minY: b.minY - m / 2, maxY: b.maxY + m / 2 });
   }
 
   get rotation(): Rotation {
@@ -212,6 +227,19 @@ export class Renderer {
   panToViewTile(p: Point) {
     const w = tileToWorld(p.x, p.y);
     this.camera.panTo(w.x, w.y);
+  }
+
+  /** Terrain heights changed inside `rect` (world tiles): rebuild the ground there too. */
+  refreshTerrain(rect: TileRect) {
+    this.viewWorld.sync(this.world);
+    const r = this.view.rectToView(rect);
+    this.ground.refreshTerrain([{ minX: r.x, minY: r.y, maxX: r.x + r.w - 1, maxY: r.y + r.h - 1 }]);
+    // Reshaping the map edge changes the seam with the borderlands: rebuild them (rare).
+    const w = this.world;
+    if (rect.x <= 1 || rect.y <= 1 || rect.x + rect.w >= w.width - 1 || rect.y + rect.h >= w.height - 1) {
+      this.ext = generateBorderlands(w, this.ring);
+      this.buildTerrain();
+    }
   }
 
   /** Show zones at full strength (while a zone tool is active). */
@@ -281,6 +309,8 @@ export class Renderer {
       this.daylight.height = viewRect.maxY - viewRect.minY;
     }
     this.ground.cull(viewRect);
+    this.border.cull(viewRect);
+    this.border.update(dt);
     this.agents.update(this.world, this.agentSource(), this.stopSource(), viewRect, cam.zoom);
     this.ground.update(dt);
     this.hover.update(dt);
@@ -296,7 +326,7 @@ export class Renderer {
   destroy() {
     // Shaders hold the atlas pages; let go of them before the textures are destroyed.
     this.ground.destroy();
-    releaseTileShaders();
+    releaseTileShaders(this.textures.sources);
     this.app.destroy(true, { children: true, texture: true, textureSource: true });
   }
 }

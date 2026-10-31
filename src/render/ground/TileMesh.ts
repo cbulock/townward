@@ -67,10 +67,12 @@ function shaderFor(source: TextureSource): Shader {
   return s;
 }
 
-/** Destroy every cached shader; call before the atlas textures are destroyed. */
-export function releaseTileShaders() {
-  for (const s of shaders.values()) s.destroy();
-  shaders.clear();
+/** Destroy the cached shaders for these atlas pages; call before the pages are destroyed. */
+export function releaseTileShaders(sources: readonly TextureSource[]) {
+  for (const source of sources) {
+    shaders.get(source)?.destroy();
+    shaders.delete(source);
+  }
 }
 
 /** Frame-space points of the padded diamond, grown by `g` (2:1, so x grows twice as fast). */

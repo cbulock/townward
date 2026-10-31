@@ -9,6 +9,7 @@ import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { growDay, zoneDemand } from '../sim/growth';
+import { applyTerraform } from '../sim/terraform';
 import { mulberry32, subSeed } from '../shared/rng';
 import { isPlaceable, type BuildingInstance } from '../sim/buildings/catalog';
 import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/population';
@@ -53,7 +54,15 @@ function readDayNight(): boolean {
 }
 
 /** Cursor-label names for the zone tools. */
-const ZONE_TOOL_LABEL = { 'zone-r': 'Residential', 'zone-c': 'Commercial', 'zone-i': 'Industrial', dezone: 'Dezone' } as const;
+const TOOL_LABEL = {
+  'zone-r': 'Residential',
+  'zone-c': 'Commercial',
+  'zone-i': 'Industrial',
+  dezone: 'Dezone',
+  raise: 'Raise',
+  lower: 'Lower',
+  level: 'Level',
+} as const;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
@@ -222,14 +231,17 @@ export class Game {
     if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType);
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
     else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
+    else if (p.kind === 'terraform') result = applyTerraform(this.city, p.plan);
     else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
 
     if (p.kind === 'place' && !p.plan.ok) {
       this.sound.play('error');
-      this.notify('error', "Can't build there: needs clear land, no roads or water");
+      this.notify('error', "Can't build there: needs clear, flat land with no roads or water");
     } else if (result.ok && result.changed) {
       const c = result.changed;
-      this.renderer.refreshWorld({ x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 });
+      const rect = { x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 };
+      if (p.kind === 'terraform') this.renderer.refreshTerrain(rect);
+      else this.renderer.refreshWorld(rect);
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
       this.afterWorldChange(p.kind === 'road' || p.kind === 'clear');
@@ -465,6 +477,12 @@ export class Game {
       return;
     }
 
+    if (p.kind === 'terraform') {
+      tiles.forEach((t, k) => fx.burst(t.x, t.y, debris.get(this.world.index(t.x, t.y)) ?? 'dust', Math.ceil(perTile / 2), k * stagger));
+      this.sound.play('build', 0, p.tool === 'lower' ? 0.7 : 1);
+      return;
+    }
+
     if (p.kind === 'zone') {
       tiles.forEach((t, k) => {
         if (debris.has(this.world.index(t.x, t.y))) fx.burst(t.x, t.y, 'dust', perTile, k * stagger);
@@ -551,7 +569,7 @@ export class Game {
     }
     this.events.emit('toolPreview', {
       tool: this.toolId,
-      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' ? ZONE_TOOL_LABEL[p.tool] : null,
+      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' || p.kind === 'terraform' ? TOOL_LABEL[p.tool] : null,
       blocked: p.kind === 'place' && !p.plan.ok,
       screen: this.lastPointer,
       cost: p.plan.cost,

@@ -6,12 +6,18 @@ import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
 import { isZoned, ZoneType, type ZoneTypeId } from '../sim/zones';
+import { planTerraform, type TerraformOp, type TerraformPlan } from '../sim/terraform';
 import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
 
 export type ZoneToolId = 'zone-r' | 'zone-c' | 'zone-i' | 'dezone';
-export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId;
+export type TerraformToolId = 'raise' | 'lower' | 'level';
+export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId | TerraformToolId;
+
+export function isTerraformTool(tool: ToolId): tool is TerraformToolId {
+  return tool === 'raise' || tool === 'lower' || tool === 'level';
+}
 
 /** What each zone tool paints (dezone paints "no zone"). */
 export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZoneTypeId>> = {
@@ -36,6 +42,9 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   'zone-c': 'Digit2',
   'zone-i': 'Digit3',
   dezone: 'Digit4',
+  raise: 'Digit5',
+  lower: 'Digit6',
+  level: 'Digit7',
 };
 
 export interface ToolDrag {
@@ -49,6 +58,7 @@ export type ToolPlan =
   | { kind: 'road'; tool: 'road' | 'highway'; plan: Plan; roadType: BuildableRoad }
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
   | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZoneTypeId }
+  | { kind: 'terraform'; tool: TerraformToolId; plan: TerraformPlan }
   | { kind: 'place'; tool: 'build'; plan: PlacePlan };
 
 const TINT_VALID = 0x8ff7ec;
@@ -88,6 +98,13 @@ export function planTool(
       const zone = ZONE_TOOLS[tool];
       return { kind: 'zone', tool, plan: planZone(world, rectTiles(anchor.start, anchor.current), zone), zone };
     }
+    case 'raise':
+    case 'lower':
+    case 'level': {
+      // Level flattens to the height of the tile the drag started on.
+      const op: TerraformOp = tool === 'level' ? { kind: 'level', level: world.elevation[world.index(anchor.start.x, anchor.start.y)] } : { kind: tool };
+      return { kind: 'terraform', tool, plan: planTerraform(world, rectTiles(anchor.start, anchor.current), op) };
+    }
   }
 }
 
@@ -96,6 +113,18 @@ export function planTool(
  * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
  */
 export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform): PreviewTile[] {
+  if (p.kind === 'terraform') {
+    const tint = p.tool === 'lower' ? TINT_CLEAR : TINT_VALID;
+    return p.plan.tiles.map((t) => ({
+      x: t.x,
+      y: t.y,
+      texture: tex.selection,
+      tint: t.valid ? tint : TINT_INVALID,
+      // The ripple to neighbours shows fainter than the dragged area.
+      alpha: !t.valid ? 0.55 : t.ripple ? 0.3 : 0.75,
+    }));
+  }
+
   if (p.kind === 'zone') {
     const tint = isZoned(p.zone) ? ZONE_TINT[p.zone] : TINT_CLEAR;
     return p.plan.tiles.map((t) => ({

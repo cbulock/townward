@@ -43,6 +43,8 @@ export class AtlasBuilder {
 
   /** Number of pages the last build produced (for the debug overlay). */
   pageCount = 0;
+  /** The pages of the last build. */
+  sources: CanvasSource[] = [];
 
   build(): Map<string, Texture> {
     const placed: Placed[] = [];
@@ -94,6 +96,7 @@ export class AtlasBuilder {
       return new CanvasSource({ resource: canvas, resolution: r, scaleMode: 'linear', autoGenerateMipmaps: true });
     });
 
+    this.sources = sources;
     const textures = new Map<string, Texture>();
     for (const p of placed) {
       textures.set(p.f.name, new Texture({ source: sources[p.page], frame: new Rectangle(p.x, p.y, p.f.w, p.f.h) }));

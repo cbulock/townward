@@ -67,5 +67,5 @@ export function cellQuadPoints(ground: World, i: number, j: number): Vec[] {
 export function tileShade(ground: World, vx: number, vy: number): number {
   const dx = levelAt(ground, vx + 1, vy) - levelAt(ground, vx - 1, vy);
   const dy = levelAt(ground, vx, vy + 1) - levelAt(ground, vx, vy - 1);
-  return Math.min(1.18, Math.max(0.78, 1 - 0.07 * dy + 0.07 * dx));
+  return Math.min(1.22, Math.max(0.72, 1 - 0.1 * dy + 0.1 * dx));
 }

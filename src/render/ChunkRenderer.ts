@@ -26,8 +26,6 @@ import { computeDualCell, isWaterTerrain } from './transitions';
 const CELL_GROW = 1.5;
 /** Seconds per water animation frame. */
 const WATER_FRAME_TIME = 0.16;
-/** Height of the soil slab under the map's front edges (world px). */
-const SLAB_DEPTH = 26;
 
 interface WaterTile {
   slot: QuadSlot;
@@ -76,8 +74,6 @@ export class ChunkRenderer {
   readonly roadsRoot = new Container();
   readonly gridRoot = new Container();
   readonly objectsRoot = new Container();
-  /** Soil slab under the map edges; drawn beneath everything else. */
-  readonly slab: Graphics;
   /** Map-shaped mask: dual cells on the border overhang the map by half a tile. */
   readonly groundMask: Graphics;
   private readonly chunks: Chunk[] = [];
@@ -101,7 +97,6 @@ export class ChunkRenderer {
     this.groundRoot.addChild(this.baseRoot, this.overlayRoot);
     for (const [cx, cy] of order) this.buildChunk(cx, cy);
 
-    this.slab = this.buildSlab();
     this.groundMask = this.buildMapShape(new Graphics()).fill(0xffffff);
     this.groundRoot.mask = this.groundMask;
   }
@@ -119,15 +114,6 @@ export class ChunkRenderer {
     const roads = new Container({ isRenderGroup: true });
     const objects = new Container({ isRenderGroup: true });
     const water: WaterTile[] = [];
-    base.addChild(this.buildUnderlay(x0, y0, x1, y1));
-
-    // Dual cells: the last chunk in each direction also owns the extra row/column (i = width).
-    const i1 = x1 === w.width ? x1 + 1 : x1;
-    const j1 = y1 === w.height ? y1 + 1 : y1;
-    const batches = { land: new QuadBatch(), water: new QuadBatch(), overlay: new QuadBatch() };
-    for (let j = y0; j < j1; j++) for (let i = x0; i < i1; i++) this.buildDualCell(i, j, batches, water);
-    base.addChild(batches.water.build(), batches.land.build());
-    overlay.addChild(batches.overlay.build());
 
 
     const top = tileToWorld(x0, y0);
@@ -148,8 +134,45 @@ export class ChunkRenderer {
     this.roadsRoot.addChild(roads);
     this.objectsRoot.addChild(objects);
     const chunk: Chunk = { x0, y0, x1, y1, base, overlay, zones, roads, objects, grid: null, water, bounds, visible: true };
+    this.fillGround(chunk);
     this.fillRoadsAndObjects(chunk);
     this.chunks.push(chunk);
+  }
+
+  /** Ground meshes (underlay, water, land, transitions); rebuilt when the terrain is reshaped. */
+  private fillGround(c: Chunk) {
+    const w = this.world;
+    c.water.length = 0;
+    c.base.addChild(this.buildUnderlay(c.x0, c.y0, c.x1, c.y1));
+    // Dual cells: the last chunk in each direction also owns the extra row/column (i = width).
+    const i1 = c.x1 === w.width ? c.x1 + 1 : c.x1;
+    const j1 = c.y1 === w.height ? c.y1 + 1 : c.y1;
+    const batches = { land: new QuadBatch(), water: new QuadBatch(), overlay: new QuadBatch() };
+    for (let j = c.y0; j < j1; j++) for (let i = c.x0; i < i1; i++) this.buildDualCell(i, j, batches, c.water);
+    c.base.addChild(batches.water.build(), batches.land.build());
+    c.overlay.addChild(batches.overlay.build());
+  }
+
+  /**
+   * The terrain changed inside these view-tile rectangles: rebuild the ground of every chunk
+   * they touch (grown by 2, since cells and hill light read their neighbours), then that
+   * chunk's roads and objects, and the map edge.
+   */
+  refreshTerrain(rects: readonly { minX: number; minY: number; maxX: number; maxY: number }[]) {
+    const grown = rects.map((r) => ({ minX: r.minX - 1, minY: r.minY - 1, maxX: r.maxX + 1, maxY: r.maxY + 1 }));
+    for (const c of this.chunks) {
+      if (!grown.some((r) => !(c.x1 <= r.minX - 1 || c.x0 > r.maxX + 1 || c.y1 <= r.minY - 1 || c.y0 > r.maxY + 1))) continue;
+      for (const layer of [c.base, c.overlay]) layer.removeChildren().forEach((s) => s.destroy({ children: true }));
+      this.fillGround(c);
+      if (c.grid) {
+        c.grid.destroy({ children: true });
+        c.grid = this.buildGrid(c);
+        c.grid.visible = c.visible;
+        this.gridRoot.addChild(c.grid);
+      }
+    }
+    this.refresh(grown);
+    this.buildMapShape(this.groundMask.clear()).fill(0xffffff);
   }
 
   /** Zones, roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
@@ -348,50 +371,6 @@ export class ChunkRenderer {
    * solid piece of land rather than ending in a hard cut. Water along the edge
    * shows as a blue band on the slab.
    */
-  private buildSlab(): Graphics {
-    const w = this.world;
-    const n = w.width;
-    const m = w.height;
-    const g = new Graphics();
-    const lift = (x: number, y: number) => {
-      const p = tileToWorld(x, y);
-      return { x: p.x, y: p.y - cornerHeight(w, x, y) * HEIGHT_STEP };
-    };
-    // Each face runs from the (lifted) ground edge down to a level base under the map.
-    const face = (ax: number, ay: number, bx: number, by: number, color: number) => {
-      const a = lift(ax, ay);
-      const b = lift(bx, by);
-      const fa = tileToWorld(ax, ay);
-      const fb = tileToWorld(bx, by);
-      g.poly([a.x, a.y, b.x, b.y, fb.x, fb.y + SLAB_DEPTH, fa.x, fa.y + SLAB_DEPTH]).fill(color);
-    };
-
-    // South-west face (along y = m) is lit, south-east face (along x = n) is in shade.
-    for (let x = 0; x < n; x++) {
-      const water = isWaterTerrain(w.terrain[w.index(x, m - 1)]);
-      face(x, m, x + 1, m, water ? 0x2f78c0 : 0x8a5a33);
-    }
-    for (let y = 0; y < m; y++) {
-      const water = isWaterTerrain(w.terrain[w.index(n - 1, y)]);
-      face(n, y, n, y + 1, water ? 0x245f9e : 0x6b4426);
-    }
-    // Darker strata line along the level base, and a grass lip along the ground edge.
-    const left = tileToWorld(0, m);
-    const bottom = tileToWorld(n, m);
-    const right = tileToWorld(n, 0);
-    g.moveTo(left.x, left.y + SLAB_DEPTH * 0.55)
-      .lineTo(bottom.x, bottom.y + SLAB_DEPTH * 0.55)
-      .lineTo(right.x, right.y + SLAB_DEPTH * 0.55)
-      .stroke({ width: 2, color: 0x000000, alpha: 0.12 });
-    const lip: Vec[] = [];
-    for (let x = 0; x <= n; x++) lip.push(lift(x, m));
-    for (let y = m - 1; y >= 0; y--) lip.push(lift(n, y));
-    g.moveTo(lip[0].x, lip[0].y + 1.5);
-    for (const p of lip.slice(1)) g.lineTo(p.x, p.y + 1.5);
-    g.stroke({ width: 3, color: 0x3f8f2a, alpha: 0.9 });
-    return g;
-  }
-
   setGrid(on: boolean) {
     if (on === this.gridOnState) return;
     this.gridOnState = on;
@@ -470,7 +449,7 @@ export class ChunkRenderer {
 
   /** Free every display object (used when the view rotates and the terrain is rebuilt). */
   destroy() {
-    for (const c of [this.groundRoot, this.zonesRoot, this.roadsRoot, this.gridRoot, this.objectsRoot, this.slab, this.groundMask]) {
+    for (const c of [this.groundRoot, this.zonesRoot, this.roadsRoot, this.gridRoot, this.objectsRoot, this.groundMask]) {
       c.destroy({ children: true });
     }
   }

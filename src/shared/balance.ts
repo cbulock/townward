@@ -41,6 +41,8 @@ export const BALANCE = {
   roadAccessRange: 3,
 
   // --- Zoning & growth (sim/growth.ts, docs/specs/buildings.md) ---
+  /** Terraforming: cost per level changed per tile (docs/specs/elevation.md). */
+  terraformCost: 15,
   /** Cost per tile to zone (dezoning is free). */
   zoneCost: 5,
   /** Days a construction site takes; the first half is the foundation, the second the scaffold. */
