@@ -1,0 +1,21 @@
+/* Design tokens. See docs/04-ui-ux.md. */
+:root {
+  --bg-app: #0d1117;
+  --bg-panel: rgba(18, 22, 30, 0.72);
+  --bg-panel-hover: rgba(30, 36, 48, 0.85);
+  --border-panel: rgba(255, 255, 255, 0.08);
+  --text: #e8edf5;
+  --text-dim: #9aa6b8;
+  --accent: #4fd1c5;
+  --zone-r: #4ade80;
+  --zone-c: #60a5fa;
+  --zone-i: #facc15;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --money: #a3e635;
+  --radius: 12px;
+  --blur: 14px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}

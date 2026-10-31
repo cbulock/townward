@@ -1,0 +1,154 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.game-screen {
+  position: fixed;
+  inset: 0;
+}
+
+.game-canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.game-canvas canvas {
+  display: block;
+}
+
+/* Hides the first frames while the atlas builds, then fades the world in. */
+.fade-in {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-app);
+  pointer-events: none;
+  transition: opacity 600ms var(--ease-out);
+}
+.fade-in.is-ready {
+  opacity: 0;
+}
+
+/* ---------- Glass panel ---------- */
+.panel {
+  position: absolute;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+  box-shadow: var(--shadow);
+  animation: panel-in 220ms var(--ease-out) both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* ---------- Debug overlay ---------- */
+.debug-overlay {
+  top: 16px;
+  left: 16px;
+  min-width: 190px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.debug-fps {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.fps-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+.fps-value.good {
+  color: var(--accent);
+}
+.fps-value.warn {
+  color: var(--warn);
+}
+.fps-value.bad {
+  color: var(--danger);
+}
+.fps-label {
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.debug-dim {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+.debug-overlay dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  margin: 0;
+}
+.debug-overlay dt {
+  color: var(--text-dim);
+}
+.debug-overlay dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* ---------- Controls hint ---------- */
+.controls-hint {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  pointer-events: none;
+  animation-name: hint-in;
+}
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+kbd {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-width: 2px;
+}
