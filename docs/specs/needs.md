@@ -1,6 +1,6 @@
 # Spec: Citizen Needs & Happiness (Phase 9)
 
-Status: **In progress.** Step 3 of the plan (D-057). Residents react to the city and say what's wrong.
+Status: **Implemented** (2026-11-01). Step 3 of the plan (D-057). Residents react to the city and say what's wrong.
 
 ## Needs (`sim/systems/needs.ts`, after every change and daily)
 
@@ -62,3 +62,9 @@ Every finished, connected zoned building scores each need it has from 0 (bad) to
 
 - **Happiness view** (`Y`, or the smiley button in the top bar): building footprints tinted green (happy) → yellow → red (unhappy), with abandoned buildings dark. Buildings fade, as in the traffic view, and only one data view is on at a time.
 - **Info panel:** a happiness bar plus each need as a small labelled score.
+
+## Result
+
+- **/demo** (seed 42): **87–88% city happiness** and no abandonment. The top complaint is "We don't feel safe" (about 80 buildings), from the edge blocks outside police and fire reach. "Show me" jumps there.
+- **The jam test town:** 69% happiness. Complaints are safety and "not enough customers" (shops stranded in the job district). Four shops are abandoned after a few months.
+- **Tests:** `tests/needs.test.ts` covers a serviced home against an unserved one, happiness raising occupancy, and abandonment and recovery.

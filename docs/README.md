@@ -8,7 +8,7 @@ work session, read **Current Status** below, then the relevant spec.
 | | |
 |---|---|
 | **Current phase** | Phases 0–7 built ✅ (latest: 7, core city: density, services, utilities, budget) plus the `/demo` city. Open: the 60 FPS check on real hardware |
-| **Next phase** | Phase 9 — citizen needs (plan: foundation ✅ → traffic ✅ → needs → backend, D-057) |
+| **Next phase** | Phase 10 — backend saving (plan: foundation ✅ → traffic ✅ → needs ✅ → backend, D-057) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It
@@ -36,6 +36,8 @@ pnpm typecheck && pnpm lint
 | [specs/elevation.md](specs/elevation.md) | Heights, sloped rendering, terraforming, borderlands |
 | [specs/core.md](specs/core.md) | Time, density, services, utilities, budget (Phase 7) |
 | [specs/demo.md](specs/demo.md) | The `/demo` showcase city |
+| [specs/traffic.md](specs/traffic.md) | Commute model, visible traffic, lights, traffic view |
+| [specs/needs.md](specs/needs.md) | Citizen needs, happiness, complaints, abandonment |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

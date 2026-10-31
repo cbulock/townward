@@ -176,11 +176,18 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Traffic overlay (`T` / top-bar button) with legend; buildings fade in traffic view; commute time in the info panel
 - [x] Gridlock regression test (48% stuck → 0–3% stopped) and commute tests (4 new, 115 total)
 
+## Phase 9 — Citizen Needs ✅  → [specs/needs.md](specs/needs.md)
+
+- [x] Needs system: jobs, shopping, safety, health, education, commute, clean air, parks (workers and customers for businesses); happiness as their weighted average
+- [x] Happiness drives occupancy (replaces the per-service bonus) and gates level-ups; abandonment after 30 unhappy days, recovery after 15 better ones
+- [x] Speech bubbles with need icons over complaining buildings; "Citizens say…" panel with Show me
+- [x] Happiness view (`Y` / top-bar smiley) and city happiness %; info panel happiness and need scores; abandoned buildings look run-down
+- [x] Tests (3 new, 121 total)
+
 ## Later Phases (to be specced when we get there)
 
 | Phase | Theme |
 |---|---|
-| 9 | Citizen needs (next): per-neighbourhood happiness (jobs, shopping, safety, health, school, commute, noise), speech bubbles and a "Citizens say…" feed |
-| 10 | Save/Load: Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
+| 10 | Save/Load (next): Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
 | 11+ | Public transport (buses, trains), libraries and more services, pollution and data overlays |
 | 12 | Performance pass: sim in a Web Worker, 256×256+ maps |

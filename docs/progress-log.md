@@ -2,6 +2,18 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Phase 9 — Citizen needs (step 3 of the plan)
+- User decision: abandonment included.
+- **New `systems/needs.ts`:** ten needs, weighted happiness, complaints, city happiness, and abandonment streaks (abandoned and recovered buildings go into the day outcome).
+- **Happiness feeds the sim:** it replaces the service occupancy bonus (55–100%), and level 2 needs 0.5 happiness, level 3 needs 0.7.
+- **The demo** now covers its industrial corner with a service block.
+- **UI:**
+  - Bubble icons (`atlas/bubbleArt.ts`) and a rotating bubble overlay (`overlays/Bubbles.ts`).
+  - "Citizens say…" panel with Show me, and a happiness % that toggles the happiness view (`Y`).
+  - The data overlay is now generic: traffic or happiness, one at a time.
+  - Info panel happiness and needs; a dark tint for abandoned buildings.
+- **Checked:** the demo at 87–88% happiness, the panel, bubbles, the happiness view and Show me in the browser; no errors. Tests: 121.
+
 ## 2026-11-01: City art pass (buildings, streets, people, smoke)
 - User request: make buildings, parks, utilities, roads and highways look far better, with real variety, footpaths and overhead bridges. Later: animated smoke from factories and power plants. Spec: `docs/specs/city-art.md`, decision D-060.
 - **Buildings (`buildingRecipes.ts` + `buildingArt.ts`):**
