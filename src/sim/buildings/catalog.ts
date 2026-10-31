@@ -368,6 +368,12 @@ export interface BuildingInstance {
   watered: boolean;
   /** Bitmask of services covering it (bit = index in SERVICE_KINDS). */
   services: number;
+  /** 0..1 from its needs (sim/systems/needs.ts); new buildings start neutral. */
+  happiness: number;
+  /** Consecutive days below the abandonment line (or, once abandoned, above the recovery line). */
+  moodDays: number;
+  /** Run-down and empty after a long unhappy spell (docs/specs/needs.md). */
+  abandoned: boolean;
 }
 
 /** What a caller supplies when placing or growing; the runtime fields start empty. */

@@ -55,6 +55,20 @@ export const BALANCE = {
   baseTaxRate: 9,
   maxTaxRate: 20,
   taxDemandStep: 0.04,
+  // --- Needs & happiness (sim/systems/needs.ts, docs/specs/needs.md) ---
+  /** Occupancy multiplier = happinessBase + happinessRange × happiness. */
+  happinessBase: 0.55,
+  happinessRange: 0.45,
+  /** Happiness needed to level up to level 2 and level 3. */
+  happyLevel2: 0.5,
+  happyLevel3: 0.7,
+  /** Below this for abandonDays in a row: abandoned. At recoverLine or above for recoverDays: recovers. */
+  abandonLine: 0.3,
+  abandonDays: 30,
+  recoverLine: 0.45,
+  recoverDays: 15,
+  /** Buildings below this happiness complain. */
+  complainLine: 0.6,
   /** Cost per tile to zone. */
   zoneCost: 5,
   /** Days a construction site takes; the first half is the foundation, the second the scaffold. */

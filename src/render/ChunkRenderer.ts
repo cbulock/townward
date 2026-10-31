@@ -334,7 +334,7 @@ export class ChunkRenderer {
       const style = hash % 5;
       return style < f.street[axis].length ? f.street[axis][style] : null;
     }
-    const t = f.lights[mask] !== Texture.EMPTY ? f.lights[mask] : f.cornerLamp[mask];
+    const t = f.cornerLamp[mask];
     return t === Texture.EMPTY ? null : t;
   }
 

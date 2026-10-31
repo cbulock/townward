@@ -10,7 +10,7 @@ import type { ViewRef } from '../Renderer';
 
 /** Below this zoom plumes are too small to read, so nothing is emitted. */
 const MIN_ZOOM = 0.3;
-const MAX_PUFFS = 700;
+const MAX_PUFFS = 900;
 /** Seconds between rebuilding the list of emitting stacks (buildings come and go slowly). */
 const RESCAN = 1;
 /** Cull margin (world px): plumes drift up and sideways out of their stack's spot. */
@@ -28,8 +28,8 @@ interface PlumeStyle {
 }
 
 const STYLES: Readonly<Record<SmokeSource['kind'], PlumeStyle>> = {
-  smoke: { rate: 3.2, life: 3.6, rise: 13, scale0: 0.35, scale1: 1.7, alpha: 0.6, tints: [0x8f949b, 0x7d838a, 0xa3a7ad, 0x6f747b] },
-  steam: { rate: 2.4, life: 4.2, rise: 10, scale0: 0.9, scale1: 3, alpha: 0.75, tints: [0xffffff, 0xf2f6fa, 0xe6edf3] },
+  smoke: { rate: 4.5, life: 4, rise: 12, scale0: 0.55, scale1: 2.4, alpha: 0.85, tints: [0x5d6268, 0x6b7076, 0x7a7f86, 0x50555b] },
+  steam: { rate: 3.5, life: 4.5, rise: 11, scale0: 1.2, scale1: 3.8, alpha: 0.95, tints: [0xffffff, 0xf6f9fc, 0xeef3f7] },
 };
 
 /** Gentle wind, in world px per second. */
@@ -153,7 +153,7 @@ export class Smoke {
       s.rotation += p.spin * dt;
       s.scale.set(p.scale0 + (p.scale1 - p.scale0) * Math.sqrt(t));
       // Quick fade in, long fade out.
-      s.alpha = p.alpha * Math.min(1, t * 8) * (1 - t) ** 1.5;
+      s.alpha = p.alpha * Math.min(1, t * 8) * (1 - t);
     }
   }
 

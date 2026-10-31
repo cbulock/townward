@@ -113,8 +113,6 @@ export function buildingTexture(tex: TerrainTextures, id: BuildingId, variant: n
 export interface StreetFurniture {
   /** Straight streets, indexed by axis then style. */
   street: Readonly<Record<RoadAxis, readonly Texture[]>>;
-  /** Traffic lights for junctions (3–4 arms), indexed by mask. */
-  lights: readonly Texture[];
   /** A lamp on the outside of a bend, indexed by mask. */
   cornerLamp: readonly Texture[];
   highwayLamp: Readonly<Record<RoadAxis, Texture>>;
@@ -135,7 +133,6 @@ function furniturePieces(): [string, FurniturePiece][] {
     out.push([`furn_overbridge_${axis}`, { kind: 'overbridge', axis }]);
   }
   for (let m = 0; m < 16; m++) {
-    if (armCount(m) >= 3) out.push([`furn_lights_${m}`, { kind: 'lights', mask: m }]);
     if (isBend(m)) out.push([`furn_corner_${m}`, { kind: 'cornerLamp', mask: m }]);
   }
   return out;
@@ -400,7 +397,6 @@ export function buildTerrainTextures(): TerrainTextures {
     ) as Record<BuildableRoad, Texture[]>,
     furniture: {
       street: { u: range(STREET_STYLES, (k) => get(`furn_street_u_${k}`)), v: range(STREET_STYLES, (k) => get(`furn_street_v_${k}`)) },
-      lights: range(16, (m) => (armCount(m) >= 3 ? get(`furn_lights_${m}`) : Texture.EMPTY)),
       cornerLamp: range(16, (m) => (isBend(m) ? get(`furn_corner_${m}`) : Texture.EMPTY)),
       highwayLamp: { u: get('furn_hwlamp_u'), v: get('furn_hwlamp_v') },
       gantry: { u: get('furn_gantry_u'), v: get('furn_gantry_v') },

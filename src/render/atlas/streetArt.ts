@@ -6,7 +6,8 @@ import { IsoFrame, paintRoundTree, shade, type Box } from './isoPaint';
  * Street furniture (docs/specs/city-art.md): one sprite per road tile, drawn in the objects
  * layer so it sorts with buildings and trees. All positions are in view tile space; a road
  * "along u" has mask 0b1010, "along v" has 0b0101. The near side of a road is its +lateral
- * side (larger u or v), the side facing the camera.
+ * side (larger u or v), the side facing the camera. Junction traffic lights are live
+ * (AgentRenderer draws them from the traffic sim's phases), so they aren't furniture.
  */
 
 export const FURNITURE_HEADROOM = 40;
@@ -20,7 +21,6 @@ export const STREET_STYLES = 3;
 
 export type FurniturePiece =
   | { kind: 'street'; axis: RoadAxis; style: number }
-  | { kind: 'lights'; mask: number }
   | { kind: 'cornerLamp'; mask: number }
   | { kind: 'highwayLamp'; axis: RoadAxis }
   | { kind: 'gantry'; axis: RoadAxis }
@@ -72,31 +72,7 @@ function streetTree(iso: IsoFrame, u: number, v: number, tone: number) {
   paintRoundTree(iso.ctx, x, y, 0.58, tone);
 }
 
-/** A traffic signal on a corner: pole plus a dark head with red, amber and green lamps. */
-function signal(iso: IsoFrame, u: number, v: number) {
-  pole(iso, u, v, 0, 12, 1.1);
-  const [x, y] = iso.p(u, v, 12);
-  const c = iso.ctx;
-  c.fillStyle = '#23272d';
-  c.fillRect(x - 1.6, y - 7, 3.2, 7.4);
-  c.fillStyle = '#ff4a3d';
-  c.fillRect(x - 0.8, y - 6.3, 1.6, 1.6);
-  c.fillStyle = '#5a4a20';
-  c.fillRect(x - 0.8, y - 4.2, 1.6, 1.6);
-  c.fillStyle = '#4ee07a';
-  c.fillRect(x - 0.8, y - 2.1, 1.6, 1.6);
-}
-
 const CORNER = 0.42;
-
-/** Footpath corners that get furniture: all but the far one (−u, −v), which agents would pass in front of. */
-function nearCorners(): [number, number][] {
-  return [
-    [0.5 + CORNER, 0.5 - CORNER],
-    [0.5 - CORNER, 0.5 + CORNER],
-    [0.5 + CORNER, 0.5 + CORNER],
-  ];
-}
 
 /** Paint one piece into a FURNITURE frame (tile diamond's top vertex FURNITURE_HEADROOM below the top). */
 export function paintFurniture(ctx: CanvasRenderingContext2D, piece: FurniturePiece) {
@@ -114,10 +90,6 @@ export function paintFurniture(ctx: CanvasRenderingContext2D, piece: FurniturePi
         streetTree(iso, ...onRoad(axis, 0.22, 0.41), 2);
         streetTree(iso, ...onRoad(axis, 0.74, 0.41), 3);
       }
-      return;
-    }
-    case 'lights': {
-      for (const [u, v] of nearCorners()) signal(iso, u, v);
       return;
     }
     case 'cornerLamp': {
