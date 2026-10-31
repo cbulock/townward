@@ -8,6 +8,7 @@ const HINTS: [string, string][] = [
   [', .', 'Rotate'],
   ['G', 'Grid'],
   ['M', 'Mute'],
+  ['L', 'Day/night'],
   ['N', 'New map'],
   ['F3', 'Debug'],
 ];

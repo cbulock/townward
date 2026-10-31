@@ -135,7 +135,7 @@ describe('traffic', () => {
   it('drives on the right: eastbound cars sit south of the centre line', () => {
     const { w } = town();
     const path = findRoute(w, w.index(1, 5), w.index(6, 5))!;
-    const pose = agentPose(w, { kind: 'car', path, seg: 1, t: 0.5, speed: 1, variant: 0, age: 0 });
+    const pose = agentPose(w, { kind: 'car', path, seg: 1, t: 0.5, speed: 1, variant: 0, age: 0, wait: 0, dwell: 0, stopSeg: -1 });
     expect(pose.dir).toBe(1);
     expect(pose.y).toBeGreaterThan(5.5);
   });

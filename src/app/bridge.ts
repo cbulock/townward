@@ -13,6 +13,8 @@ import {
   mutedAtom,
   noticesAtom,
   rotationAtom,
+  clockAtom,
+  worldVersionAtom,
   toolPreviewAtom,
 } from './atoms';
 
@@ -41,6 +43,8 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('funds', (f) => store.set(fundsAtom, f)),
     game.events.on('muted', (m) => store.set(mutedAtom, m)),
     game.events.on('rotation', (r) => store.set(rotationAtom, r)),
+    game.events.on('clock', (h) => store.set(clockAtom, h)),
+    game.events.on('worldChanged', (v) => store.set(worldVersionAtom, v)),
     game.events.on('city', (c) => store.set(cityAtom, c)),
     game.events.on('inspect', (i) => store.set(inspectAtom, i)),
     game.events.on('toolPreview', (p) => store.set(toolPreviewAtom, p)),

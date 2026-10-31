@@ -49,6 +49,14 @@ export class Camera {
     this.clamp();
   }
 
+  /** Glide to a world-pixel point (eased by update()). */
+  panTo(x: number, y: number) {
+    this.targetX = x;
+    this.targetY = y;
+    this.anchor = null;
+    this.clamp();
+  }
+
   /** Move immediately by a screen-pixel delta (1:1 drag feel). */
   dragBy(dxScreen: number, dyScreen: number) {
     const dx = -dxScreen / this.zoom;

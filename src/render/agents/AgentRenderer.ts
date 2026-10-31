@@ -1,8 +1,9 @@
 import { Container, Sprite } from 'pixi.js';
-import { agentPose, type Agent } from '../../sim/traffic';
+import { agentPose, type Agent, type BusStop } from '../../sim/traffic';
 import type { World } from '../../sim/World';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
+import { STOP_ANCHOR } from '../atlas/stopArt';
 import type { TerrainTextures } from '../atlas/tiles';
 import { tileToWorld } from '../iso';
 import type { ViewRef } from '../Renderer';
@@ -24,6 +25,7 @@ const MARGIN = 40;
 export class AgentRenderer {
   readonly container = new Container({ sortableChildren: true });
   private readonly pool: Sprite[] = [];
+  private readonly stopPool: Sprite[] = [];
   visible = 0;
 
   constructor(
@@ -31,7 +33,8 @@ export class AgentRenderer {
     private readonly viewRef: ViewRef,
   ) {}
 
-  update(world: World, agents: readonly Agent[], view: Rect, zoom: number) {
+  update(world: World, agents: readonly Agent[], stops: readonly BusStop[], view: Rect, zoom: number) {
+    this.drawStops(world, zoom >= MIN_ZOOM_VEHICLES ? stops : [], view);
     let used = 0;
     if (zoom >= MIN_ZOOM_VEHICLES) {
       const people = zoom >= MIN_ZOOM_PEOPLE;
@@ -65,5 +68,39 @@ export class AgentRenderer {
     }
     for (let k = used; k < this.pool.length; k++) this.pool[k].visible = false;
     this.visible = used;
+  }
+
+  /** Shelters sort with the agents (by their spot on the pavement), so cars pass in front or behind correctly. */
+  private drawStops(world: World, stops: readonly BusStop[], view: Rect) {
+    const vt = this.viewRef.current;
+    let used = 0;
+    for (const stop of stops) {
+      const x = stop.tile % world.width;
+      const y = (stop.tile - x) / world.width;
+      const vtile = vt.tileToView(x, y);
+      const p = tileToWorld(vtile.x, vtile.y);
+      if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
+      const side = vt.dir(stop.side);
+      let s = this.stopPool[used];
+      if (!s) {
+        s = new Sprite();
+        s.anchor.set(STOP_ANCHOR.x, STOP_ANCHOR.y);
+        this.stopPool.push(s);
+        this.container.addChild(s);
+      }
+      used++;
+      s.texture = this.tex.busStops[side];
+      s.position.set(p.x, p.y);
+      // Depth of the shelter's spot: tile centre pushed toward its side.
+      const push = [
+        [0, -0.4],
+        [0.4, 0],
+        [0, 0.4],
+        [-0.4, 0],
+      ][side];
+      s.zIndex = vtile.x + 0.5 + push[0] + vtile.y + 0.5 + push[1];
+      s.visible = true;
+    }
+    for (let k = used; k < this.stopPool.length; k++) this.stopPool[k].visible = false;
   }
 }

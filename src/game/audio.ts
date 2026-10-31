@@ -23,8 +23,22 @@ function writeMuted(muted: boolean) {
   }
 }
 
+/** Ambient bed levels, each 0..1 (docs/04-ui-ux.md, "Ambient Audio"). */
+export interface Ambience {
+  wind: number;
+  city: number;
+  birds: number;
+}
+
+/** Peak gains of the ambient layers: quiet, under the effects. */
+const AMBIENT_GAIN = { wind: 0.05, city: 0.06 } as const;
+
 export class SoundBoard {
   private ctx: AudioContext | null = null;
+  private wind: GainNode | null = null;
+  private hum: GainNode | null = null;
+  private birdLevel = 0;
+  private nextBird = 0;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private mutedState = readMuted();
@@ -62,6 +76,8 @@ export class SoundBoard {
       this.ctx = ctx;
       this.master = master;
       this.noise = noise;
+      this.wind = this.loop(ctx, master, 'lowpass', 380);
+      this.hum = this.loop(ctx, master, 'bandpass', 240);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -96,6 +112,47 @@ export class SoundBoard {
         this.tone('square', 98, 92, t + 0.11, 0.12, 0.05);
         break;
     }
+  }
+
+  /** A looping brown-noise bed through a filter, starting silent. Returns its gain. */
+  private loop(ctx: AudioContext, out: AudioNode, type: BiquadFilterType, freq: number): GainNode {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i++) {
+      // Integrated white noise (brown noise): soft and rumbly.
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      data[i] = last * 3.5;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    src.connect(filter).connect(g).connect(out);
+    src.start();
+    return g;
+  }
+
+  /** Set the ambient bed (call a few times a second); levels ease, birds chirp at random. */
+  setAmbience(a: Ambience) {
+    const ctx = this.ctx;
+    if (!ctx || !this.wind || !this.hum) return;
+    const t = ctx.currentTime;
+    this.wind.gain.setTargetAtTime(a.wind * AMBIENT_GAIN.wind, t, 0.8);
+    this.hum.gain.setTargetAtTime(a.city * AMBIENT_GAIN.city, t, 0.8);
+    this.birdLevel = a.birds;
+    if (this.mutedState || this.birdLevel < 0.05 || t < this.nextBird) return;
+    // A short two- or three-note chirp, then a random pause (shorter when there's more nature).
+    const base = 2600 + Math.random() * 1400;
+    const notes = 2 + Math.floor(Math.random() * 2);
+    for (let k = 0; k < notes; k++) {
+      this.tone('sine', base * (1 + k * 0.08), base * (1.25 + k * 0.05), t + k * 0.09, 0.07, 0.012 * this.birdLevel);
+    }
+    this.nextBird = t + 1.5 + Math.random() * 6 / this.birdLevel;
   }
 
   /** Oscillator sweeping from f0 to f1 with a fast attack and exponential decay. */

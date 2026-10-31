@@ -1,5 +1,5 @@
-import { Application, Container } from 'pixi.js';
-import type { Agent } from '../sim/traffic';
+import { Application, Container, Sprite, Texture } from 'pixi.js';
+import type { Agent, BusStop } from '../sim/traffic';
 import type { World } from '../sim/World';
 import type { TileRect } from './view/ViewTransform';
 import { ViewTransform, type Point, type Rotation } from './view/ViewTransform';
@@ -55,7 +55,10 @@ export class Renderer {
   indicators!: Indicators;
   private viewWorld!: ViewWorld;
   private agentSource: () => readonly Agent[] = () => [];
+  private stopSource: () => readonly BusStop[] = () => [];
   private rotateFade = 0;
+  /** Multiply layer for the day/night tint, over the world but under tool overlays. */
+  private readonly daylight = new Sprite(Texture.WHITE);
   private zoneView = false;
   /** Boot timings (ms) for the debug overlay. */
   readonly timings = { atlas: 0, chunks: 0 };
@@ -95,9 +98,10 @@ export class Renderer {
     return this.viewRef.current;
   }
 
-  /** Where the agent layer reads cars and people from each frame. */
-  setAgentSource(source: () => readonly Agent[]) {
+  /** Where the agent layer reads cars, people and bus stops from each frame. */
+  setAgentSource(source: () => readonly Agent[], stops: () => readonly BusStop[]) {
     this.agentSource = source;
+    this.stopSource = stops;
   }
 
   private setup() {
@@ -114,7 +118,9 @@ export class Renderer {
     this.timings.chunks = performance.now() - t0;
     this.overlay.addChild(this.toolPreview.container, this.hover.sprite, this.indicators.container);
 
-    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.effects.container, this.overlay);
+    this.daylight.blendMode = 'multiply';
+    this.daylight.visible = false;
+    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.effects.container, this.daylight, this.overlay);
     this.app.stage.addChild(this.worldRoot);
 
     this.camera.setScreenSize(this.app.screen.width, this.app.screen.height);
@@ -176,6 +182,32 @@ export class Renderer {
     );
   }
 
+  /** Day/night colour (0xffffff = plain daylight, which hides the layer). */
+  setDaylight(color: number) {
+    this.daylight.tint = color;
+    this.daylight.visible = color !== 0xffffff;
+  }
+
+  /** Corners of the screen as continuous *view* tile coordinates (for the minimap). */
+  viewportTiles(): Point[] {
+    const cam = this.camera;
+    return [
+      [0, 0],
+      [cam.screenW, 0],
+      [cam.screenW, cam.screenH],
+      [0, cam.screenH],
+    ].map(([sx, sy]) => {
+      const w = cam.screenToWorld(sx, sy);
+      return worldToTileFloat(w.x, w.y);
+    });
+  }
+
+  /** Glide the camera to a continuous view-tile point. */
+  panToViewTile(p: Point) {
+    const w = tileToWorld(p.x, p.y);
+    this.camera.panTo(w.x, w.y);
+  }
+
   /** Show zones at full strength (while a zone tool is active). */
   setZoneView(on: boolean) {
     this.zoneView = on;
@@ -226,8 +258,13 @@ export class Renderer {
     } else if (this.worldRoot.alpha !== 1) this.worldRoot.alpha = 1;
 
     const viewRect = cam.viewRect();
+    if (this.daylight.visible) {
+      this.daylight.position.set(viewRect.minX, viewRect.minY);
+      this.daylight.width = viewRect.maxX - viewRect.minX;
+      this.daylight.height = viewRect.maxY - viewRect.minY;
+    }
     this.ground.cull(viewRect);
-    this.agents.update(this.world, this.agentSource(), viewRect, cam.zoom);
+    this.agents.update(this.world, this.agentSource(), this.stopSource(), viewRect, cam.zoom);
     this.ground.update(dt);
     this.hover.update(dt);
     this.toolPreview.update(dt);

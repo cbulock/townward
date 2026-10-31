@@ -2,6 +2,27 @@
 
 Newest first. One entry per work session.
 
+## 2026-10-31: Finishing the open items (Phases 5, 4c extras, 2b)
+- **Phase 5:**
+  - The toolbar is grouped.
+  - New minimap (`render/minimap.ts` and `hud/Minimap.tsx`): view-rotation aware, repaints at most 4 times a second, live viewport quad, click or drag to glide there.
+  - Time-of-day clock in the top bar (D-039), with a day/night multiply tint that `L` toggles.
+  - Procedural ambience: wind by zoom, city hum by cars on screen, birds by day.
+- **Phase 4c extras:**
+  - Rush-hour trip curve, with morning trips outbound and evening trips home.
+  - Lane-gap queuing plus junction boxes, with patience so nothing deadlocks (D-040).
+  - Automatic bus stops with glass shelters; buses run stop to stop and dwell (D-041).
+- **Phase 2b:**
+  - `generate.ts` (was `riverValley.ts`) is now preset and slider driven, and River Valley stays byte-identical (hash test).
+  - Five new presets that use dry grass, dirt and rock.
+  - New Game screen with live preview and URL options (D-038), and New city in the top bar.
+- Tests: 102 total (8 new: traffic 4, presets 4).
+- Verified in headless Chromium:
+  - New Game → Coastal "Bayport" → reload keeps the city → New city returns.
+  - Minimap jump, a night tint at 01:50, bus stops by the shops, all six preset previews.
+  - No console errors.
+- Still open: the 60 FPS check on real hardware (Phases 1, 2a, 3). Headless Chrome renders in software, so it can't measure this.
+
 ## 2026-10-31: Zoning & growth (Phase 4b)
 - Agreed the save/backend plan before starting, to build later: Express + SQLite, email/password accounts, saves hold the seed plus what changed (D-034).
 - **Zoning:** `sim/zones.ts`; `planZone`/`applyZone` (rezoning or dezoning removes grown buildings; roads and placed buildings clear the zone). Four tools on `1`–`4`, with zone-coloured previews and a "Residential $150 · 30 tiles" cost label.

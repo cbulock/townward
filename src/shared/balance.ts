@@ -19,6 +19,9 @@ export const BALANCE = {
   // --- Simulation (sim/population.ts) ---
   /** Sim seconds per in-game day at 1× speed. */
   secondsPerDay: 2,
+  /** Sim seconds per day on the time-of-day clock (day/night, rush hours). */
+  secondsPerClockDay: 90,
+  clockStartHour: 7,
   daysPerMonth: 30,
   /** Share of the empty space in a home that fills each day (with road access). */
   moveInRate: 0.12,

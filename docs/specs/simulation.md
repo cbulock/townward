@@ -45,6 +45,25 @@ Status: **Implemented (first version).** Tuning numbers live in `src/shared/bala
   - LOD: people are hidden below 0.6× zoom and all agents below 0.32×.
 - **Art** (`render/atlas/agentArt.ts`): car, taxi (roof sign), bus and truck in 6 colours × 4 headings. Headlights or taillights show depending on which end faces the camera. Pedestrians come in 8 skin and shirt combinations.
 
+## Rush Hours, Queuing & Buses (Phase 4c, second part)
+
+- **Rush hours.** The time-of-day clock (one clock day = 90 sim seconds; docs/04-ui-ux.md) scales the car trip rate:
+  - ×0.25 at night (00–05);
+  - ramping to ×2 for the morning peak (07:30–09:00);
+  - ×1 at midday;
+  - ×2 for the evening peak (16:30–18:30);
+  - easing to ×0.5 late evening.
+
+  Morning trips go home → work 85% of the time and evening trips work → home. Pedestrians follow a softer curve (few at night).
+- **Queuing.**
+  - Cars keep a gap of 0.42 tiles (0.55 behind a bus or truck) to the car ahead in their lane, a lane being one direction of one road segment. That includes the last car in the lane they're about to enter.
+  - **Junctions** (road tiles with 3–4 connections) have a box, entered halfway along the approach. Only one movement uses it at a time. The exception is straight-through traffic on the same axis, which shares it, so two opposing straight lanes flow together.
+  - A car that has waited 4 s ignores the box (no gridlock). One that has waited 25 s gives up and leaves the map.
+- **Bus stops.**
+  - Placed automatically once the city has buses (150+ residents), on the road outside the biggest buildings (homes with 12+ residents, offices, shops, civic). The busiest go first, each at least 6 tiles from the next, up to 40 stops.
+  - A stop is a small glass shelter on the pavement on the building's side. Stops are recomputed when buildings change.
+  - Buses run between two stops at least 8 tiles apart. They pause 2 s at every stop they pass, and the cars behind them queue.
+
 ## Inspect
 
 - With the **Select** tool, click a building to open its info panel:

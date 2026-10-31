@@ -32,6 +32,7 @@ import {
   type MaskShape,
 } from './transitionArt';
 import { paintTreeCluster, TREE_VARIANTS } from './treeArt';
+import { paintBusStop, STOP_FRAME_H, STOP_FRAME_W } from './stopArt';
 import { paintSite, SITE_SIZES, SITE_STAGES, siteFrameSize, type SiteSize } from './constructionArt';
 
 const ALL_TERRAINS: readonly TerrainId[] = [
@@ -75,6 +76,8 @@ export interface TerrainTextures {
   vehicles: Readonly<Record<Exclude<AgentKind, 'person'>, Texture[][]>>;
   /** Pedestrians, indexed by variant then walk frame (0/1). */
   people: Texture[][];
+  /** Bus stop shelters, indexed by view side (0 −y, 1 +x, 2 +y, 3 −x). */
+  busStops: Texture[];
   /** "No road access" warning badge. */
   warnRoad: Texture;
   hover: Texture;
@@ -237,6 +240,7 @@ export function buildTerrainTextures(): TerrainTextures {
   for (let v = 0; v < PERSON_VARIANTS; v++) {
     for (let f = 0; f < 2; f++) b.add(`person_${v}_${f}`, PERSON_W, PERSON_H, (ctx) => paintPerson(ctx, v, f));
   }
+  for (const side of [0, 1, 2, 3] as const) b.add(`stop_${side}`, STOP_FRAME_W, STOP_FRAME_H, (ctx) => paintBusStop(ctx, side));
   b.add('warn_road', 18, 20, paintWarnRoad);
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
@@ -285,6 +289,7 @@ export function buildTerrainTextures(): TerrainTextures {
       VEHICLE_KINDS.map((k) => [k, range(VEHICLE_VARIANTS, (v) => range(4, (d) => get(`veh_${k}_${v}_${d}`)))]),
     ) as Record<Exclude<AgentKind, 'person'>, Texture[][]>,
     people: range(PERSON_VARIANTS, (v) => range(2, (f) => get(`person_${v}_${f}`))),
+    busStops: range(4, (side) => get(`stop_${side}`)),
     warnRoad: get('warn_road'),
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),

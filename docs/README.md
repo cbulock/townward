@@ -7,15 +7,16 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 4b ✅ zoning & growth (Phases 4a–4c done) |
-| **Next phase** | Phase 5 — HUD & polish (then Phase 10 save/load is agreed: D-034) |
+| **Current phase** | Phases 0–5 built ✅ (2b presets & New Game, 4c traffic extras, 5 HUD & polish). Open: the 60 FPS check on real hardware (Phases 1, 2a, 3) |
+| **Next phase** | Phase 6 — Elevation & terraforming, or Phase 10 save/load (agreed design: D-034) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173  (?size=64|128|256&seed=N&funds=N)
+pnpm dev          # http://localhost:5173 opens the New Game screen
+                  # (?seed=N&size=64|128|256&preset=coastal&funds=N skips it)
 pnpm test         # unit tests
 pnpm typecheck && pnpm lint
 ```

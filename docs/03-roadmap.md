@@ -51,11 +51,12 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 **DoD:** any seed produces a natural-looking river valley with no visual seams or hard tile edges, and it holds 60 FPS on 128×128.
 
-## Phase 2b — More terrains + New Game screen ⬜
+## Phase 2b — More terrains + New Game screen ✅  → [specs/terrain.md](specs/terrain.md)
 
-- [ ] Presets: Plains, Coastal, Island, Lakes, Forested
-- [ ] **New Game screen:** preset cards, seed field + 🎲, map size, sliders (water, trees, …), live minimap preview, "Start" button
-- [ ] Minimap component (reused in HUD later)
+- [x] Presets: Plains, Coastal, Island, Lakes, Forested (River Valley unchanged, byte-identical)
+- [x] **New Game screen:** preset cards, seed field + 🎲, map size, sliders (water, trees, rivers, coast), live minimap preview (< 10 ms at 128), "Start building"; options kept in the URL; "New city" in the top bar
+- [x] Minimap painter (`render/minimap.ts`), shared by the HUD and the preview
+- [x] Preset tests (4 new)
 
 **DoD:** the player picks a preset, tweaks sliders, sees the preview update in under 100 ms and starts a game on that terrain.
 
@@ -118,20 +119,20 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Agent renderer: pooled, culled, depth-sorted, zoom LOD
 - [x] Top bar: date, population, workers/jobs, funds, speed; building info panel with Demolish
 - [x] Sim tests (11 new, 70 total)
-- [ ] Car queuing at junctions, rush hours, bus stops
+- [x] Car queuing (lane gaps, junction boxes), rush hours on the time-of-day clock, bus stops with shelters and dwelling buses (4 new tests)
 
 **DoD (4a–4c):** zone next to roads, watch a small town grow, and see cars driving around it, all at 60 FPS.
 
 ---
 
-## Phase 5 — HUD & Polish ⬜  → [04-ui-ux.md](04-ui-ux.md)
+## Phase 5 — HUD & Polish ✅  → [04-ui-ux.md](04-ui-ux.md)
 
-- [ ] Final toolbar with icons, tooltips and hotkeys
-- [ ] Top bar: city name, date, money, population, speed controls (pause/1×/2×/3×)
-- [ ] Minimap in HUD with click-to-jump and a viewport rectangle
-- [ ] Toast notifications
-- [ ] Sound effects + ambient audio, with a mute toggle
-- [ ] Day/night tint (cosmetic)
+- [x] Final toolbar with icons, tooltips and hotkeys, in three groups
+- [x] Top bar: city name, date + clock, money, population, demand, speed controls, rotate, mute, New city
+- [x] Minimap in HUD with click/drag-to-jump and a viewport quad
+- [x] Toast notifications
+- [x] Sound effects + ambient audio (wind, city hum, birds), with a mute toggle
+- [x] Day/night tint on a time-of-day clock (`L` toggles)
 
 ---
 

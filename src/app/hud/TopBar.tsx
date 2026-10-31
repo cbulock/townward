@@ -1,7 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo } from '../../game/events';
-import { cityAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { cityAtom, clockAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -33,6 +33,29 @@ function Stat({ title, glyph, children, flash }: { title: string; glyph: ReactNo
 }
 
 const SPEED_LABELS = ['Pause', '1×', '2×', '3×'] as const;
+
+/** hh:mm on the time-of-day clock, rounded down to 10 minutes so it doesn't flicker. */
+function Clock() {
+  const hour = useAtomValue(clockAtom);
+  const h = Math.floor(hour);
+  const m = Math.floor(((hour - h) * 60) / 10) * 10;
+  const day = hour >= 6.5 && hour < 19;
+  return (
+    <span className="clock" title="Time of day (L toggles day/night)">
+      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+        {day ? (
+          <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
+          </g>
+        ) : (
+          <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="currentColor" />
+        )}
+      </svg>
+      {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
+    </span>
+  );
+}
 
 const DEMAND_BARS = [
   ['r', 'R', 'Residential'],
@@ -67,8 +90,13 @@ function DemandMeter({ demand }: { demand: CityInfo['demand'] | undefined }) {
   );
 }
 
+interface TopBarProps {
+  cityName: string;
+  onNewCity: () => void;
+}
+
 /** Floating top bar: city, date, population, jobs, funds, speed and sound. */
-export function TopBar() {
+export function TopBar({ cityName, onNewCity }: TopBarProps) {
   const funds = useAtomValue(fundsAtom);
   const city = useAtomValue(cityAtom);
   const muted = useAtomValue(mutedAtom);
@@ -81,10 +109,19 @@ export function TopBar() {
 
   return (
     <div className="panel top-bar">
-      <span className="city-name">River Valley</span>
+      <button type="button" className="icon-button" title="New city" aria-label="New city" onClick={onNewCity}>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+          <g {...icon}>
+            <path d="M4 20V10l5-4 5 4v10M14 20v-7h6v7M2 20h20" />
+            <path d="M18 3v6M15 6h6" />
+          </g>
+        </svg>
+      </button>
+      <span className="city-name">{cityName}</span>
       <span className="top-divider" />
       <Stat title="Date" glyph={<g {...icon}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></g>}>
         <span className="stat-value date">{date}</span>
+        <Clock />
       </Stat>
       <Stat
         title={city ? `Population ${city.population.toLocaleString()} of ${city.housing.toLocaleString()} homes` : 'Population'}

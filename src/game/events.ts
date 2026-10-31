@@ -17,6 +17,11 @@ export interface GameEventMap {
   /** View rotation in quarter turns (0–3). */
   rotation: number;
   city: CityInfo;
+  /** Hour of day on the clock (0–24), a few times a second. */
+  clock: number;
+  dayNight: boolean;
+  /** Version counter, bumped when tiles or buildings change (minimap repaint). */
+  worldChanged: number;
   /** Building shown in the info panel, or null when it's closed. */
   inspect: InspectInfo | null;
 }

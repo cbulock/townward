@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateRiverValley } from '../src/sim/terrain/riverValley';
+import { generateRiverValley } from '../src/sim/terrain/generate';
 import { Decor, Terrain } from '../src/sim/terrain/types';
 import type { World } from '../src/sim/World';
 

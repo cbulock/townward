@@ -37,7 +37,36 @@
 ```
 
 - **Info panel** slides in from the right when you inspect a tile or building.
+- **Minimap** sits bottom-right (see below). The controls hint is bottom-left and the toolbar bottom-centre.
+- **Toolbar groups**, separated by thin dividers: *Select · Clear · Build* | *Homes · Shops · Industry · Dezone* | *Road · Highway*.
 - **Tool options** (e.g. zone density, road type) pop up above the active toolbar button.
+
+## Minimap (Phase 5)
+
+- A small diamond-shaped map of the whole city, matching the current view rotation. It's painted from the world layers, one pixel per tile:
+  - terrain colours, darker where there's forest;
+  - zones tinted;
+  - buildings in their category colour (orange while under construction);
+  - roads dark.
+- It repaints when the world changes (at most 4 times a second) and on rotation.
+- A white quad shows the part of the map on screen and follows the camera every frame.
+- **Click or drag** on the minimap to move the camera there (smooth pan).
+- The same painter (`render/minimap.ts`) draws the New Game preview (Phase 2b).
+
+## Time of Day & Day/Night (Phase 5)
+
+- A **clock** separate from the calendar: one clock day is 90 sim seconds (it pauses and speeds up with the game). It's shown as `hh:mm` next to the date. The calendar keeps its fast 2-second days for the economy.
+- **Day/night tint:** a multiply-blended layer over the world, under the HUD and the tool overlays. It goes clear by day, warm at dawn and dusk, and deep blue at night.
+- `L` toggles the cycle (it stays clear daylight when off). The setting persists.
+- The clock also drives rush hours (docs/specs/simulation.md).
+
+## Ambient Audio (Phase 5)
+
+- Procedural, like the effects, and quiet:
+  - **wind:** low-passed brown noise, louder when zoomed out;
+  - **city hum:** band-passed noise that scales with the cars on screen and fades when paused;
+  - **birds:** occasional chirps by day when the view is mostly nature.
+- Everything goes through the master gain, so `M` mutes it too.
 
 ## New Game Screen
 
@@ -58,12 +87,14 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 | Zoom | Wheel / pinch (anchored at cursor) | `+` / `-` |
 | Use tool | Left click / drag | — |
 | Cancel tool / drag | Right click | `Esc` |
-| Road / Zone R/C/I / Bulldoze | — | `R` / `1` `2` `3` / `B` |
+| Road / Zone R/C/I / Dezone / Bulldoze | — | `R` / `1` `2` `3` / `4` / `B` |
 | Inspect | — | `Q` |
 | Pause / speed | Top-bar buttons | `Space` / `[` `]` |
 | Inspect building | Click (Select tool) | `Esc` closes |
 | Build | — | `E` |
 | Mute | Speaker button | `M` |
+| Day/night cycle on/off | — | `L` |
+| Jump to a place | Click/drag the minimap | — |
 | Rotate view | Top-bar ⟲ ⟳ (compass shows north) | `,` / `.` |
 | Debug overlay | — | `F3` |
 

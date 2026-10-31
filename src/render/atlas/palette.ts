@@ -39,6 +39,10 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+export function numberToRgb(n: number): [number, number, number] {
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 export function hexToNumber(hex: string): number {
   return parseInt(hex.slice(1), 16);
 }

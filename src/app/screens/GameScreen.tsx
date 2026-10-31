@@ -1,65 +1,44 @@
 import { useStore } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 import { Game, type GameOptions } from '../../game/Game';
-import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { connectGameToStore } from '../bridge';
+import { randomSeed } from '../options';
 import { BuildingPicker } from '../hud/BuildingPicker';
 import { ControlsHint } from '../hud/ControlsHint';
 import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
 import { InfoPanel } from '../hud/InfoPanel';
+import { Minimap } from '../hud/Minimap';
 import { Notices } from '../hud/Notices';
 import { Toolbar } from '../hud/Toolbar';
 import { TopBar } from '../hud/TopBar';
 
-/** The approved River Valley map (docs/specs/terrain.md). Used when the URL has no seed. */
-const DEFAULT_SEED = 42;
-
-/**
- * Until the New Game screen exists, options live in the URL:
- * `?size=256&seed=42&funds=100000` (funds is handy for testing expensive buildings).
- */
-function readOptions(): GameOptions {
-  const q = new URLSearchParams(location.search);
-  const size = Number(q.get('size'));
-  const seed = Number(q.get('seed'));
-  const funds = Number(q.get('funds'));
-  return {
-    size: (MAP_SIZES as readonly number[]).includes(size) ? size : DEFAULT_MAP_SIZE,
-    seed: q.has('seed') && Number.isInteger(seed) ? seed : DEFAULT_SEED,
-    funds: q.has('funds') && Number.isFinite(funds) && funds >= 0 ? funds : undefined,
-  };
+interface GameScreenProps {
+  options: GameOptions;
+  /** Same settings, new seed (the `N` key). */
+  onReroll: (o: GameOptions) => void;
+  /** Back to the New Game screen. */
+  onNewCity: () => void;
 }
 
-function randomSeed(): number {
-  return Math.floor(Math.random() * 1_000_000);
-}
-
-function writeSeedToUrl(seed: number) {
-  const url = new URL(location.href);
-  url.searchParams.set('seed', String(seed));
-  history.replaceState(null, '', url);
-}
-
-export function GameScreen() {
+export function GameScreen({ options, onReroll, onNewCity }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const store = useStore();
-  const [options, setOptions] = useState(readOptions);
   const [ready, setReady] = useState(false);
 
-  // N: roll a new map.
+  // N: roll a new map with the same preset and sliders.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyN' || e.repeat || e.metaKey || e.ctrlKey) return;
+      if (e.target instanceof HTMLInputElement) return;
       setReady(false);
-      setOptions((o) => ({ ...o, seed: randomSeed() }));
+      onReroll({ ...options, terrain: { ...options.terrain, seed: randomSeed() } });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [options, onReroll]);
 
   useEffect(() => {
-    writeSeedToUrl(options.seed);
     const host = hostRef.current!;
     let game: Game | null = null;
     let disconnect: (() => void) | null = null;
@@ -87,11 +66,12 @@ export function GameScreen() {
     <div className="game-screen">
       <div ref={hostRef} className="game-canvas" />
       <div className={`fade-in ${ready ? 'is-ready' : ''}`} />
-      <TopBar />
+      <TopBar cityName={options.name} onNewCity={onNewCity} />
       <DebugOverlay />
       <InfoPanel />
       <BuildingPicker />
       <Toolbar />
+      <Minimap />
       <Notices />
       <CostLabel />
       <ControlsHint />

@@ -15,17 +15,21 @@ import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Traffic } from '../sim/traffic';
 import { Decor } from '../sim/terrain/types';
-import { generateRiverValley } from '../sim/terrain/riverValley';
+import { generateTerrain } from '../sim/terrain/generate';
+import type { TerrainSettings } from '../sim/terrain/presets';
 import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
+import { daylightTint, nightness } from '../render/daylight';
+import type { Point, ViewTransform } from '../render/view/ViewTransform';
 import { EventBus, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
 import { isZoneTool, planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
-  size: number;
-  seed: number;
+  /** Preset, seed, size and sliders (see sim/terrain/presets.ts). */
+  terrain: TerrainSettings;
+  name: string;
   /** Starting money; defaults to BALANCE.startingFunds. */
   funds?: number;
 }
@@ -38,6 +42,16 @@ const MAX_RIPPLE_TIME = 0.5;
 const PARTICLE_BUDGET = 900;
 /** Sim-time multipliers for pause, 1×, 2×, 3× (the fastest step is 4× for a real jump). */
 export const GAME_SPEEDS = [0, 1, 2, 4] as const;
+const DAY_NIGHT_KEY = 'citybuilder.dayNight';
+
+function readDayNight(): boolean {
+  try {
+    return localStorage.getItem(DAY_NIGHT_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 /** Cursor-label names for the zone tools. */
 const ZONE_TOOL_LABEL = { 'zone-r': 'Residential', 'zone-c': 'Commercial', 'zone-i': 'Industrial', dezone: 'Dezone' } as const;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -64,6 +78,9 @@ export class Game {
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
   private noticeId = 0;
+  private dayNightOn = readDayNight();
+  /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
+  private worldVersion = 0;
   private statsTimer = 0;
   private statsFrames = 0;
   private statsTime = 0;
@@ -82,7 +99,10 @@ export class Game {
     });
     this.traffic = new Traffic(city.world, city.world.seed);
     this.growthRng = mulberry32(subSeed(city.world.seed, 0x6077));
-    renderer.setAgentSource(() => this.traffic.agents);
+    renderer.setAgentSource(
+      () => this.traffic.agents,
+      () => this.traffic.stops,
+    );
     this.loop = new GameLoop(
       SIM_TICK_HZ,
       () => this.tick(),
@@ -91,7 +111,7 @@ export class Game {
   }
 
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
-    const world = generateRiverValley({ seed: opts.seed, size: opts.size });
+    const world = generateTerrain(opts.terrain);
     const renderer = await Renderer.create(host, world);
     const game = new Game(new City(world, opts.funds), renderer);
     game.loop.speed = GAME_SPEEDS[game.speedIndex];
@@ -153,6 +173,7 @@ export class Game {
     this.renderer.setRotation(r);
     this.sound.play('tool');
     this.events.emit('rotation', r);
+    this.bumpWorld();
     this.updatePreview();
   }
 
@@ -219,6 +240,7 @@ export class Game {
 
   /** Roads or buildings changed: recheck road access, warning badges, routes and the info panel. */
   private afterWorldChange(roadsChanged: boolean) {
+    this.bumpWorld();
     updateRoadAccess(this.world);
     this.renderer.indicators.sync(this.world);
     this.traffic.refreshDemand();
@@ -303,6 +325,43 @@ export class Game {
       ],
       delay,
     );
+  }
+
+  private bumpWorld() {
+    this.worldVersion++;
+    this.events.emit('worldChanged', this.worldVersion);
+  }
+
+  // ---------------------------------------------------------------- minimap & clock
+
+  /** The current view transform (the minimap paints in view space). */
+  get view(): ViewTransform {
+    return this.renderer.view;
+  }
+
+  /** Screen corners in view-tile coordinates. */
+  viewportTiles(): Point[] {
+    return this.renderer.viewportTiles();
+  }
+
+  /** Glide the camera to a view-tile point (minimap click). */
+  lookAt(p: Point) {
+    this.renderer.panToViewTile(p);
+  }
+
+  get dayNight(): boolean {
+    return this.dayNightOn;
+  }
+
+  setDayNight(on: boolean) {
+    this.dayNightOn = on;
+    try {
+      localStorage.setItem(DAY_NIGHT_KEY, on ? '1' : '0');
+    } catch {
+      // Storage unavailable: the setting just won't persist.
+    }
+    this.events.emit('dayNight', on);
+    this.notify('info', on ? 'Day/night cycle on' : 'Day/night cycle off');
   }
 
   /** Push current city stats to listeners (also used by the UI bridge on connect). */
@@ -518,8 +577,10 @@ export class Game {
 
   private frame(dt: number) {
     this.input.update(dt);
+    this.city.clock += dt * GAME_SPEEDS[this.speedIndex];
+    this.renderer.setDaylight(this.dayNightOn ? daylightTint(this.city.hour) : 0xffffff);
     // Agents move every frame (smooth), scaled by game speed.
-    this.traffic.update(dt * GAME_SPEEDS[this.speedIndex]);
+    this.traffic.update(dt * GAME_SPEEDS[this.speedIndex], this.city.hour);
     this.renderer.render(dt);
 
     this.statsFrames++;
@@ -527,6 +588,8 @@ export class Game {
     this.statsTimer += dt;
     if (this.statsTimer >= STATS_INTERVAL) {
       const r = this.renderer;
+      this.events.emit('clock', this.city.hour);
+      this.updateAmbience();
       this.events.emit('stats', {
         fps: this.statsFrames / this.statsTime,
         frameMs: (this.statsTime / this.statsFrames) * 1000,
@@ -549,6 +612,21 @@ export class Game {
     }
   }
 
+  /** Wind when zoomed out, city hum from the cars on screen, birds by day away from traffic. */
+  private updateAmbience() {
+    const r = this.renderer;
+    const z = r.camera.zoom;
+    const running = this.speedIndex > 0;
+    const cars = r.agents.visible;
+    const city = running ? Math.min(1, cars / 60) : 0;
+    const night = this.dayNightOn ? nightness(this.city.hour) : 0;
+    this.sound.setAmbience({
+      wind: Math.min(1, Math.max(0.25, 1.3 - z * 0.7)),
+      city,
+      birds: (1 - night) * Math.max(0, 1 - cars / 25) * (z > 0.5 ? 1 : 0.4),
+    });
+  }
+
   private updateHover(screen: ScreenPoint | null) {
     let tile: TilePos | null = null;
     if (screen) {
@@ -568,6 +646,7 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
+    else if (code === 'KeyL') this.setDayNight(!this.dayNightOn);
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);
     else if (code === 'Space') this.togglePause();

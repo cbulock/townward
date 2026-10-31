@@ -20,5 +20,9 @@ export const mutedAtom = atom(false);
 export const buildingChoiceAtom = atom<BuildingId>('cottage');
 export const cityAtom = atom<CityInfo | null>(null);
 export const inspectAtom = atom<InspectInfo | null>(null);
+/** Hour of day on the clock (0–24). */
+export const clockAtom = atom(7);
+/** Bumped when the world changes; the minimap repaints on it. */
+export const worldVersionAtom = atom(0);
 /** View rotation in quarter turns (0–3). */
 export const rotationAtom = atom(0);
