@@ -1,37 +1,37 @@
-import { Sprite, type Texture } from 'pixi.js';
-import { HALF_W } from '../../shared/constants';
-import { GROUND_PAD } from '../atlas/geometry';
-import { tileToWorld } from '../iso';
+import { Container, type Texture } from 'pixi.js';
+import { QuadBatch, shadeColor } from '../ground/TileMesh';
+import { tileQuadPoints } from '../view/lift';
 import type { ViewRef } from '../Renderer';
 
-/** Gently pulsing diamond over the tile under the cursor. */
+/** Gently pulsing diamond over the tile under the cursor, bent to the terrain. */
 export class HoverHighlight {
-  readonly sprite: Sprite;
+  readonly container = new Container();
   private t = 0;
 
   constructor(
-    texture: Texture,
+    private readonly texture: Texture,
     private readonly viewRef: ViewRef,
   ) {
-    this.sprite = new Sprite(texture);
-    this.sprite.visible = false;
+    this.container.visible = false;
   }
 
   /** Highlight a world tile (or hide with null). */
   set(tile: { x: number; y: number } | null) {
+    this.container.removeChildren().forEach((c) => c.destroy({ children: true }));
     if (!tile) {
-      this.sprite.visible = false;
+      this.container.visible = false;
       return;
     }
     const v = this.viewRef.current.tileToView(tile.x, tile.y);
-    const p = tileToWorld(v.x, v.y);
-    this.sprite.x = p.x - HALF_W - GROUND_PAD;
-    this.sprite.y = p.y - GROUND_PAD;
-    this.sprite.visible = true;
+    const white = shadeColor(1);
+    const batch = new QuadBatch();
+    batch.add({ texture: this.texture, points: tileQuadPoints(this.viewRef.ground, v.x, v.y), colors: [white, white, white, white, white], grow: 0 });
+    this.container.addChild(batch.build());
+    this.container.visible = true;
   }
 
   update(dt: number) {
     this.t += dt;
-    this.sprite.alpha = 0.8 + 0.2 * Math.sin(this.t * 4);
+    this.container.alpha = 0.8 + 0.2 * Math.sin(this.t * 4);
   }
 }

@@ -3,6 +3,8 @@ import { mulberry32, subSeed } from '../../shared/rng';
 import { World } from '../World';
 import { Decor, GROUND_VARIANTS, Terrain } from './types';
 import { PRESETS, presetSettings, type TerrainSettings } from './presets';
+import { smoothElevation } from './elevation';
+import { MAX_LEVEL } from '../../shared/constants';
 
 export interface TerrainParams {
   seed: number;
@@ -50,6 +52,7 @@ const SALT = {
   dry: 32,
   outcrop: 33,
   river3: 34,
+  hills: 35,
 } as const;
 
 interface Point {
@@ -215,7 +218,35 @@ export function generateTerrain(settings: TerrainSettings): World {
   }
 
   placeDecor(world, decorRolls, distances, rocksN, flowersN);
+  raiseHills(world, settings, seed);
   return world;
+}
+
+/**
+ * Rolling hills from low-frequency noise (docs/specs/elevation.md). Islands also rise
+ * toward the middle. The smoothing pass pins water to 0 and keeps 4-neighbours within
+ * one level, so land climbs gently away from every shore.
+ */
+function raiseHills(world: World, settings: TerrainSettings, seed: number) {
+  const hills = clamp(settings.hills, 0, 1);
+  if (hills <= 0) return;
+  const n = world.width;
+  const noise = createNoise2D(subSeed(seed, SALT.hills));
+  // Hill features keep their size in tiles whatever the map size.
+  const f = 0.022;
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const i = y * n + x;
+      const base = clamp(0.5 + 0.6 * fbm(noise, x * f, y * f, 4), 0, 1);
+      let h = Math.pow(base, 1.6) * hills * MAX_LEVEL * 1.25;
+      if (settings.coastSides >= 4) {
+        const r = Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5) * 2;
+        h += Math.max(0, 1 - r) * hills * 8;
+      }
+      world.elevation[i] = Math.round(h);
+    }
+  }
+  smoothElevation(world);
 }
 
 /**

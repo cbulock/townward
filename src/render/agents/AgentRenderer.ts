@@ -6,6 +6,7 @@ import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
 import { STOP_ANCHOR } from '../atlas/stopArt';
 import type { TerrainTextures } from '../atlas/tiles';
 import { tileToWorld } from '../iso';
+import { liftView, tileLift } from '../view/lift';
 import type { ViewRef } from '../Renderer';
 
 /** Below these zoom levels agents are too small to read, so they're skipped entirely. */
@@ -44,7 +45,7 @@ export class AgentRenderer {
         const pose = agentPose(world, a);
         const vt = this.viewRef.current;
         const vp = vt.pointToView(pose.x, pose.y);
-        const p = tileToWorld(vp.x, vp.y);
+        const p = liftView(this.viewRef.ground, vp.x, vp.y);
         if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
 
         let s = this.pool[used];
@@ -79,6 +80,7 @@ export class AgentRenderer {
       const y = (stop.tile - x) / world.width;
       const vtile = vt.tileToView(x, y);
       const p = tileToWorld(vtile.x, vtile.y);
+      p.y -= tileLift(this.viewRef.ground, vtile.x, vtile.y);
       if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
       const side = vt.dir(stop.side);
       let s = this.stopPool[used];

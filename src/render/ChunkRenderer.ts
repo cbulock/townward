@@ -1,6 +1,9 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
-import { CHUNK_SIZE, HALF_H, HALF_W, TILE_H } from '../shared/constants';
-import { roadMask, RoadType, type BuildableRoad } from '../sim/roads';
+import { CHUNK_SIZE, HALF_H, HALF_W, HEIGHT_STEP, MAX_LEVEL, TILE_H } from '../shared/constants';
+import { BridgeAxis, roadMask, RoadType, type BuildableRoad } from '../sim/roads';
+import { cornerHeight } from '../sim/terrain/elevation';
+import { flushUVs, QuadBatch, setQuadTexture, shadeColor, tintColor, type QuadSlot, type Vec } from './ground/TileMesh';
+import { cellQuadPoints, tileLift, tileQuadPoints, tileShade } from './view/lift';
 import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { ViewWorld } from './view/ViewWorld';
 import type { Rect } from './Camera';
@@ -19,13 +22,15 @@ import { TREE_VARIANTS } from './atlas/treeArt';
 import { tileToWorld } from './iso';
 import { computeDualCell, isWaterTerrain } from './transitions';
 
+/** Ground cells over-draw their neighbours by this much (px), so the sloped meshes never seam. */
+const CELL_GROW = 1.5;
 /** Seconds per water animation frame. */
 const WATER_FRAME_TIME = 0.16;
 /** Height of the soil slab under the map's front edges (world px). */
 const SLAB_DEPTH = 26;
 
 interface WaterTile {
-  sprite: Sprite;
+  slot: QuadSlot;
   frames: Texture[];
   /** Per-cell phase offset so the shimmer doesn't pulse in lockstep. */
   offset: number;
@@ -119,7 +124,10 @@ export class ChunkRenderer {
     // Dual cells: the last chunk in each direction also owns the extra row/column (i = width).
     const i1 = x1 === w.width ? x1 + 1 : x1;
     const j1 = y1 === w.height ? y1 + 1 : y1;
-    for (let j = y0; j < j1; j++) for (let i = x0; i < i1; i++) this.buildDualCell(i, j, base, overlay, water);
+    const batches = { land: new QuadBatch(), water: new QuadBatch(), overlay: new QuadBatch() };
+    for (let j = y0; j < j1; j++) for (let i = x0; i < i1; i++) this.buildDualCell(i, j, batches, water);
+    base.addChild(batches.water.build(), batches.land.build());
+    overlay.addChild(batches.overlay.build());
 
 
     const top = tileToWorld(x0, y0);
@@ -130,7 +138,7 @@ export class ChunkRenderer {
     const bounds: Rect = {
       minX: left.x - HALF_W,
       maxX: right.x + HALF_W,
-      minY: top.y - TILE_H * 8,
+      minY: top.y - TILE_H * 8 - MAX_LEVEL * HEIGHT_STEP,
       maxY: bottom.y + HALF_H,
     };
 
@@ -147,34 +155,39 @@ export class ChunkRenderer {
   /** Zones, roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
   private fillRoadsAndObjects(c: Chunk) {
     const w = this.world;
+    const zones = new QuadBatch();
+    const roads = new QuadBatch();
     for (let y = c.y0; y < c.y1; y++) {
       for (let x = c.x0; x < c.x1; x++) {
         const i = w.index(x, y);
         const z = w.zone[i];
         if (!isZoned(z)) continue;
-        const p = tileToWorld(x, y);
-        const s = new Sprite(this.tex.zoneLot);
-        s.x = p.x - HALF_W - GROUND_PAD;
-        s.y = p.y - GROUND_PAD;
-        s.tint = ZONE_TINT[z];
         // Developed lots show only a faint tint around the building.
-        s.alpha = w.building[i] === -1 ? 0.75 : 0.35;
-        c.zones.addChild(s);
+        const color = tintColor(ZONE_TINT[z], w.building[i] === -1 ? 0.75 : 0.35);
+        zones.add({ texture: this.tex.zoneLot, points: tileQuadPoints(w, x, y), colors: [color, color, color, color, color], grow: 0 });
       }
     }
     for (let y = c.y0; y < c.y1; y++) {
       for (let x = c.x0; x < c.x1; x++) {
         const type = w.road[w.index(x, y)];
         if (type === RoadType.None) continue;
-        const p = tileToWorld(x, y);
         const bridge = w.bridge[w.index(x, y)];
-        const set = bridge ? this.tex.bridges : this.tex.roads;
-        const s = new Sprite(set[type as BuildableRoad][bridge || roadMask(w, x, y)]);
+        if (!bridge) {
+          const shade = shadeColor(tileShade(w, x, y));
+          const texture = this.tex.roads[type as BuildableRoad][roadMask(w, x, y)];
+          roads.add({ texture, points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
+          continue;
+        }
+        // Bridge decks are level, at the height of the land they start from.
+        const p = tileToWorld(x, y);
+        const s = new Sprite(this.tex.bridges[type as BuildableRoad][bridge]);
         s.x = p.x - HALF_W - GROUND_PAD;
-        s.y = p.y - GROUND_PAD - (bridge ? BRIDGE_HEADROOM : 0);
+        s.y = p.y - GROUND_PAD - BRIDGE_HEADROOM - this.deckLevel(x, y, bridge) * HEIGHT_STEP;
         c.roads.addChild(s);
       }
     }
+    if (!zones.empty) c.zones.addChild(zones.build());
+    if (!roads.empty) c.roads.addChildAt(roads.build(), 0);
     // Objects back-to-front by diagonal (x + y).
     for (let d = c.x0 + c.y0; d <= c.x1 - 1 + (c.y1 - 1); d++) {
       for (let x = c.x0; x < c.x1; x++) {
@@ -193,47 +206,60 @@ export class ChunkRenderer {
     for (const c of this.chunks) {
       const hit = rects.some((r) => !(c.x1 <= r.minX - 1 || c.x0 > r.maxX + 1 || c.y1 <= r.minY - 1 || c.y0 > r.maxY + 1));
       if (!hit) continue;
-      for (const layer of [c.zones, c.roads, c.objects]) layer.removeChildren().forEach((s) => s.destroy());
+      for (const layer of [c.zones, c.roads, c.objects]) layer.removeChildren().forEach((s) => s.destroy({ children: true }));
       this.fillRoadsAndObjects(c);
     }
   }
 
-  /** Ground for dual cell (i, j): a diamond centred on the top vertex of tile (i, j). */
-  private buildDualCell(i: number, j: number, base: Container, overlay: Container, water: WaterTile[]) {
+  /** Level of a bridge deck: the higher of the land tiles at its two ends (view space). */
+  private deckLevel(x: number, y: number, axis: number): number {
+    const w = this.world;
+    const [dx, dy] = axis === BridgeAxis.X ? [1, 0] : [0, 1];
+    let level = 0;
+    for (const dir of [-1, 1]) {
+      let tx = x;
+      let ty = y;
+      while (w.inBounds(tx, ty) && w.bridge[w.index(tx, ty)] !== BridgeAxis.None) {
+        tx += dx * dir;
+        ty += dy * dir;
+      }
+      if (w.inBounds(tx, ty)) level = Math.max(level, w.elevation[w.index(tx, ty)]);
+    }
+    return level;
+  }
+
+  /** Ground for dual cell (i, j): a sloped diamond centred on the top vertex of tile (i, j). */
+  private buildDualCell(i: number, j: number, b: { land: QuadBatch; water: QuadBatch; overlay: QuadBatch }, water: WaterTile[]) {
     const tex = this.tex;
-    const cell = computeDualCell(this.world, i, j);
+    const w = this.world;
+    const cell = computeDualCell(w, i, j);
     const hash = cellHash(i, j);
     const variant = hash % 4;
     const wobble = (hash >>> 3) % WOBBLE_VARIANTS;
-    const v = tileToWorld(i, j);
-    const sx = v.x - HALF_W - GROUND_PAD;
-    const sy = v.y - HALF_H - GROUND_PAD;
-
-    const add = (texture: Texture, into: Container) => {
-      const s = new Sprite(texture);
-      s.x = sx;
-      s.y = sy;
-      into.addChild(s);
-      return s;
-    };
+    const points = cellQuadPoints(w, i, j);
+    // Hill light from the 4 tiles at the corners; the centre takes their mean.
+    const corner = [tileShade(w, i - 1, j - 1), tileShade(w, i, j - 1), tileShade(w, i, j), tileShade(w, i - 1, j)];
+    const colors = [...corner, (corner[0] + corner[1] + corner[2] + corner[3]) / 4].map((k) => shadeColor(k));
+    const add = (texture: Texture, into: QuadBatch, onSlot?: (s: QuadSlot) => void) =>
+      into.add({ texture, points, colors, grow: CELL_GROW }, onSlot);
 
     if (isWaterTerrain(cell.base)) {
       const frames = (cell.base === Terrain.DeepWater ? tex.water.deep : tex.water.shallow)[variant];
       const offset = (hash >>> 6) % WATER_PHASES;
-      water.push({ sprite: add(frames[offset], base), frames, offset });
+      add(frames[offset], b.water, (slot) => water.push({ slot, frames, offset }));
     } else {
-      add(tex.ground[cell.base][variant], base);
+      add(tex.ground[cell.base][variant], b.land);
     }
 
     // Shallow water first, then the surf line, then land, so the land edge sits on the surf's inner side.
     let foamDrawn = cell.shore === 0;
     for (const o of cell.overlays) {
       if (!foamDrawn && !isWaterTerrain(o.terrain)) {
-        add(tex.foam[wobble][cell.shore], overlay);
+        add(tex.foam[wobble][cell.shore], b.overlay);
         foamDrawn = true;
       }
       const set = tex.overlays.get(o.terrain);
-      if (set) add(set[wobble][o.mask], overlay);
+      if (set) add(set[wobble][o.mask], b.overlay);
     }
   }
 
@@ -257,7 +283,7 @@ export class ChunkRenderer {
     const p = tileToWorld(x, y);
     const s = new Sprite(texture);
     s.x = p.x - HALF_W - GROUND_PAD;
-    s.y = p.y - GROUND_PAD - TREE_HEADROOM;
+    s.y = p.y - GROUND_PAD - TREE_HEADROOM - tileLift(w, x, y);
     objects.addChild(s);
   }
 
@@ -276,7 +302,8 @@ export class ChunkRenderer {
     const site = b.construction > 0 && (size.w === 1 || size.w === 2) ? size.w : null;
     const s = new Sprite(site ? this.tex.sites[site][constructionStage(b)] : this.tex.buildings[b.def][b.variant][r]);
     s.x = p.x - h * HALF_W - GROUND_PAD;
-    s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def));
+    // Footprints are flat (docs/specs/elevation.md), so the origin tile's level lifts the whole building.
+    s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def)) - tileLift(this.world, b.x, b.y);
     objects.addChild(s);
   }
 
@@ -290,20 +317,30 @@ export class ChunkRenderer {
     for (let y = y0; y < y1; y++) {
       for (let x = x0; x < x1; x++) {
         const t = this.world.terrain[this.world.index(x, y)] as TerrainId;
-        const a = tileToWorld(x, y);
-        const b = tileToWorld(x + 1, y);
-        const c = tileToWorld(x + 1, y + 1);
-        const d = tileToWorld(x, y + 1);
-        g.poly([a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y]).fill(hexToNumber(GROUND_BASE[t]));
+        const q = tileQuadPoints(this.world, x, y);
+        g.poly([q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y, q[3].x, q[3].y]).fill(hexToNumber(GROUND_BASE[t]));
       }
     }
     return g;
   }
 
-  private buildMapShape(g: Graphics): Graphics {
+  /** Points along the map border at tile corners, lifted by height: clockwise from the top corner. */
+  private borderPoints(): Vec[] {
     const { width: n, height: m } = this.world;
-    const pts = [tileToWorld(0, 0), tileToWorld(n, 0), tileToWorld(n, m), tileToWorld(0, m)];
-    return g.poly(pts.flatMap((p) => [p.x, p.y]));
+    const pts: Vec[] = [];
+    const at = (x: number, y: number) => {
+      const p = tileToWorld(x, y);
+      pts.push({ x: p.x, y: p.y - cornerHeight(this.world, x, y) * HEIGHT_STEP });
+    };
+    for (let x = 0; x < n; x++) at(x, 0);
+    for (let y = 0; y < m; y++) at(n, y);
+    for (let x = n; x > 0; x--) at(x, m);
+    for (let y = m; y > 0; y--) at(0, y);
+    return pts;
+  }
+
+  private buildMapShape(g: Graphics): Graphics {
+    return g.poly(this.borderPoints().flatMap((p) => [p.x, p.y]));
   }
 
   /**
@@ -316,23 +353,29 @@ export class ChunkRenderer {
     const n = w.width;
     const m = w.height;
     const g = new Graphics();
-    const face = (ax: number, ay: number, bx: number, by: number, color: number) =>
-      g.poly([ax, ay, bx, by, bx, by + SLAB_DEPTH, ax, ay + SLAB_DEPTH]).fill(color);
+    const lift = (x: number, y: number) => {
+      const p = tileToWorld(x, y);
+      return { x: p.x, y: p.y - cornerHeight(w, x, y) * HEIGHT_STEP };
+    };
+    // Each face runs from the (lifted) ground edge down to a level base under the map.
+    const face = (ax: number, ay: number, bx: number, by: number, color: number) => {
+      const a = lift(ax, ay);
+      const b = lift(bx, by);
+      const fa = tileToWorld(ax, ay);
+      const fb = tileToWorld(bx, by);
+      g.poly([a.x, a.y, b.x, b.y, fb.x, fb.y + SLAB_DEPTH, fa.x, fa.y + SLAB_DEPTH]).fill(color);
+    };
 
     // South-west face (along y = m) is lit, south-east face (along x = n) is in shade.
     for (let x = 0; x < n; x++) {
-      const a = tileToWorld(x, m);
-      const b = tileToWorld(x + 1, m);
       const water = isWaterTerrain(w.terrain[w.index(x, m - 1)]);
-      face(a.x, a.y, b.x, b.y, water ? 0x2f78c0 : 0x8a5a33);
+      face(x, m, x + 1, m, water ? 0x2f78c0 : 0x8a5a33);
     }
     for (let y = 0; y < m; y++) {
-      const a = tileToWorld(n, y);
-      const b = tileToWorld(n, y + 1);
       const water = isWaterTerrain(w.terrain[w.index(n - 1, y)]);
-      face(a.x, a.y, b.x, b.y, water ? 0x245f9e : 0x6b4426);
+      face(n, y, n, y + 1, water ? 0x245f9e : 0x6b4426);
     }
-    // Darker strata line and a grass lip along the top edge.
+    // Darker strata line along the level base, and a grass lip along the ground edge.
     const left = tileToWorld(0, m);
     const bottom = tileToWorld(n, m);
     const right = tileToWorld(n, 0);
@@ -340,10 +383,12 @@ export class ChunkRenderer {
       .lineTo(bottom.x, bottom.y + SLAB_DEPTH * 0.55)
       .lineTo(right.x, right.y + SLAB_DEPTH * 0.55)
       .stroke({ width: 2, color: 0x000000, alpha: 0.12 });
-    g.moveTo(left.x, left.y + 1.5)
-      .lineTo(bottom.x, bottom.y + 1.5)
-      .lineTo(right.x, right.y + 1.5)
-      .stroke({ width: 3, color: 0x3f8f2a, alpha: 0.9 });
+    const lip: Vec[] = [];
+    for (let x = 0; x <= n; x++) lip.push(lift(x, m));
+    for (let y = m - 1; y >= 0; y--) lip.push(lift(n, y));
+    g.moveTo(lip[0].x, lip[0].y + 1.5);
+    for (const p of lip.slice(1)) g.lineTo(p.x, p.y + 1.5);
+    g.stroke({ width: 3, color: 0x3f8f2a, alpha: 0.9 });
     return g;
   }
 
@@ -363,16 +408,15 @@ export class ChunkRenderer {
   }
 
   private buildGrid(c: Chunk): Container {
-    const grid = new Container({ isRenderGroup: true });
+    const batch = new QuadBatch();
+    const white = shadeColor(1);
     for (let y = c.y0; y < c.y1; y++) {
       for (let x = c.x0; x < c.x1; x++) {
-        const p = tileToWorld(x, y);
-        const s = new Sprite(this.tex.gridLine);
-        s.x = p.x - HALF_W - GROUND_PAD;
-        s.y = p.y - GROUND_PAD;
-        grid.addChild(s);
+        batch.add({ texture: this.tex.gridLine, points: tileQuadPoints(this.world, x, y), colors: [white, white, white, white, white], grow: 0 });
       }
     }
+    const grid = new Container({ isRenderGroup: true });
+    grid.addChild(batch.build());
     return grid;
   }
 
@@ -387,8 +431,10 @@ export class ChunkRenderer {
     this.waterTimer %= WATER_FRAME_TIME;
     this.waterPhase = (this.waterPhase + 1) % WATER_PHASES;
     for (const c of this.chunks) {
-      if (!c.visible) continue;
-      for (const wt of c.water) wt.sprite.texture = wt.frames[(this.waterPhase + wt.offset) % WATER_PHASES];
+      if (!c.visible || c.water.length === 0) continue;
+      for (const wt of c.water) setQuadTexture(wt.slot, wt.frames[(this.waterPhase + wt.offset) % WATER_PHASES]);
+      // All of a chunk's water shares one mesh (one atlas page).
+      flushUVs(c.water[0].slot.mesh);
     }
   }
 

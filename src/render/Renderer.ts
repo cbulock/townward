@@ -5,6 +5,9 @@ import type { TileRect } from './view/ViewTransform';
 import { ViewTransform, type Point, type Rotation } from './view/ViewTransform';
 import { ViewWorld } from './view/ViewWorld';
 import { Camera } from './Camera';
+import { releaseTileShaders } from './ground/TileMesh';
+import { HEIGHT_STEP } from '../shared/constants';
+import { surfaceHeight } from '../sim/terrain/elevation';
 import { ChunkRenderer } from './ChunkRenderer';
 import { buildTerrainTextures, type TerrainTextures } from './atlas/tiles';
 import { mapWorldBounds, tileToWorld, worldToTileFloat } from './iso';
@@ -14,9 +17,11 @@ import { Effects } from './fx/Effects';
 import { AgentRenderer } from './agents/AgentRenderer';
 import { Indicators } from './overlays/Indicators';
 
-/** Mutable handle to the current view rotation, shared with overlays, effects and agents. */
+/** Mutable handle to the current view, shared with overlays, effects and agents. */
 export interface ViewRef {
   current: ViewTransform;
+  /** The world re-laid out in view space (heights for lifting things onto the terrain). */
+  ground: World;
 }
 
 /** Seconds for the fade-in after a rotation. */
@@ -72,7 +77,7 @@ export class Renderer {
     private readonly world: World,
   ) {
     this.app = app;
-    this.viewRef = { current: new ViewTransform(world.width, world.height, 0) };
+    this.viewRef = { current: new ViewTransform(world.width, world.height, 0), ground: world };
     this.toolPreview = new ToolPreview(this.viewRef);
   }
 
@@ -116,7 +121,7 @@ export class Renderer {
     t0 = performance.now();
     this.buildTerrain();
     this.timings.chunks = performance.now() - t0;
-    this.overlay.addChild(this.toolPreview.container, this.hover.sprite, this.indicators.container);
+    this.overlay.addChild(this.toolPreview.container, this.hover.container, this.indicators.container);
 
     this.daylight.blendMode = 'multiply';
     this.daylight.visible = false;
@@ -136,6 +141,7 @@ export class Renderer {
     if (this.ground) this.ground.destroy();
     this.viewWorld = new ViewWorld(this.view, this.world.seed);
     this.viewWorld.sync(this.world);
+    this.viewRef.ground = this.viewWorld;
     this.ground = new ChunkRenderer(this.viewWorld, this.textures);
     this.terrain.addChild(
       this.ground.slab,
@@ -214,10 +220,21 @@ export class Renderer {
     this.ground.zonesRoot.alpha = on ? 1 : ZONE_ALPHA;
   }
 
-  /** World tile under a screen point (CSS px), clamped to the map. */
+  /**
+   * World tile under a screen point (CSS px), clamped to the map. On sloped ground this
+   * iterates: guess a height, project to a tile point at that height, read the surface
+   * there, repeat. It converges because slopes rise less than HALF_H per tile.
+   */
   screenToTile(sx: number, sy: number, clamp: boolean): Point | null {
     const w = this.camera.screenToWorld(sx, sy);
-    const t = worldToTileFloat(w.x, w.y);
+    let t = worldToTileFloat(w.x, w.y);
+    let h = 0;
+    for (let k = 0; k < 8; k++) {
+      t = worldToTileFloat(w.x, w.y + h * HEIGHT_STEP);
+      const next = surfaceHeight(this.viewWorld, t.x, t.y);
+      if (Math.abs(next - h) < 0.01) break;
+      h = next;
+    }
     const vx = Math.floor(t.x);
     const vy = Math.floor(t.y);
     const v = this.view;
@@ -277,6 +294,9 @@ export class Renderer {
   }
 
   destroy() {
+    // Shaders hold the atlas pages; let go of them before the textures are destroyed.
+    this.ground.destroy();
+    releaseTileShaders();
     this.app.destroy(true, { children: true, texture: true, textureSource: true });
   }
 }

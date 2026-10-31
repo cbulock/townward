@@ -17,7 +17,7 @@ export const activeToolAtom = atom<ToolId>('select');
 export const toolPreviewAtom = atom<ToolPreviewInfo | null>(null);
 export const noticesAtom = atom<readonly Notice[]>([]);
 export const mutedAtom = atom(false);
-export const buildingChoiceAtom = atom<BuildingId>('cottage');
+export const buildingChoiceAtom = atom<BuildingId>('park');
 export const cityAtom = atom<CityInfo | null>(null);
 export const inspectAtom = atom<InspectInfo | null>(null);
 /** Hour of day on the clock (0–24). */

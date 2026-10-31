@@ -1,21 +1,8 @@
 import { useAtomValue } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildingArt';
-import {
-  BUILDING_IDS,
-  BUILDINGS,
-  CATEGORY_ORDER,
-  type BuildingCategory,
-  type BuildingId,
-} from '../../sim/buildings/catalog';
+import { BUILDINGS, PLACEABLE_IDS, type BuildingId } from '../../sim/buildings/catalog';
 import { activeToolAtom, buildingChoiceAtom, fundsAtom, gameAtom } from '../atoms';
-
-const CATEGORY_LABEL: Readonly<Record<BuildingCategory, string>> = {
-  residential: 'Homes',
-  commercial: 'Shops & Offices',
-  industrial: 'Industry',
-  civic: 'Civic',
-};
 
 const THUMB = 64;
 
@@ -38,35 +25,20 @@ function BuildingThumb({ id }: { id: BuildingId }) {
   return <canvas ref={ref} className="building-thumb" style={{ width: THUMB, height: THUMB }} aria-hidden="true" />;
 }
 
-/** Panel above the toolbar while the Build tool is active. */
+/** Panel above the toolbar while the Build tool is active: civic buildings only. */
 export function BuildingPicker() {
   const game = useAtomValue(gameAtom);
   const tool = useAtomValue(activeToolAtom);
   const choice = useAtomValue(buildingChoiceAtom);
   const funds = useAtomValue(fundsAtom);
-  const [category, setCategory] = useState<BuildingCategory>(BUILDINGS[choice].category);
 
   if (tool !== 'build') return null;
-  const ids = BUILDING_IDS.filter((id) => BUILDINGS[id].category === category);
 
   return (
     <div className="panel building-picker" role="dialog" aria-label="Choose a building">
-      <div className="picker-tabs" role="tablist">
-        {CATEGORY_ORDER.map((c) => (
-          <button
-            key={c}
-            type="button"
-            role="tab"
-            aria-selected={c === category}
-            className={`picker-tab ${c === category ? 'is-active' : ''}`}
-            onClick={() => setCategory(c)}
-          >
-            {CATEGORY_LABEL[c]}
-          </button>
-        ))}
-      </div>
+      <p className="picker-note">Homes, shops and industry grow on zones (keys 1–3).</p>
       <div className="picker-grid">
-        {ids.map((id) => {
+        {PLACEABLE_IDS.map((id) => {
           const d = BUILDINGS[id];
           const affordable = d.cost <= funds;
           return (

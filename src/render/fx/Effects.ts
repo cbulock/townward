@@ -1,5 +1,5 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
-import { tileToWorld } from '../iso';
+import { liftWorld } from '../view/lift';
 import type { ViewRef } from '../Renderer';
 
 export type BurstKind = 'dust' | 'leaves' | 'rocks' | 'splash';
@@ -54,11 +54,9 @@ export class Effects {
     private readonly viewRef: ViewRef,
   ) {}
 
-  /** Centre of a world tile (fractional coords allowed) in world pixels of the current view. */
+  /** Centre of a world tile (fractional coords allowed) on the ground, in world pixels of the current view. */
   private tileCenter(x: number, y: number) {
-    const v = this.viewRef.current.pointToView(x + 0.5, y + 0.5);
-    const p = tileToWorld(v.x, v.y);
-    return { x: p.x, y: p.y };
+    return liftWorld(this.viewRef, x + 0.5, y + 0.5);
   }
 
   private sprite(texture: Texture): Sprite {

@@ -2,7 +2,7 @@ import { Container, Sprite, type Texture } from 'pixi.js';
 import { BUILDINGS } from '../../sim/buildings/catalog';
 import type { World } from '../../sim/World';
 import { buildingHeadroom } from '../atlas/buildingArt';
-import { tileToWorld } from '../iso';
+import { liftWorld } from '../view/lift';
 import type { ViewRef } from '../Renderer';
 
 /** Floating badges above buildings that need attention (for now: no road access). */
@@ -32,8 +32,7 @@ export class Indicators {
         this.container.addChild(s);
       }
       // Above the roof: footprint centre, raised by most of the building's height.
-      const centre = this.viewRef.current.pointToView(b.x + w / 2, b.y + h / 2);
-      const c = tileToWorld(centre.x, centre.y);
+      const c = liftWorld(this.viewRef, b.x + w / 2, b.y + h / 2);
       const y = c.y - Math.max(18, buildingHeadroom(b.def) - 14);
       s.position.set(c.x, y);
       this.bases.push(y);

@@ -4,6 +4,14 @@ export const TILE_H = 32;
 export const HALF_W = TILE_W / 2;
 export const HALF_H = TILE_H / 2;
 
+/**
+ * Screen pixels per elevation level. Kept below HALF_H so a slope (≤ 1 level per tile)
+ * can never hide the ground behind it (docs/specs/elevation.md).
+ */
+export const HEIGHT_STEP = 8;
+/** Highest elevation level on the map. */
+export const MAX_LEVEL = 16;
+
 /** Map is split into CHUNK_SIZE × CHUNK_SIZE tile chunks for rendering. */
 export const CHUNK_SIZE = 16;
 

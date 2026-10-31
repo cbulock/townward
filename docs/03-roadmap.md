@@ -136,11 +136,22 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 ---
 
+## Phase 6 — Elevation, Terraforming & Borderlands 🚧  → [specs/elevation.md](specs/elevation.md)
+
+- [ ] Height layer with the smoothness rule; `surfaceHeight`, flat-footprint checks
+- [ ] Generator: Hills slider and per-preset hills (River Valley terrain stays byte-identical)
+- [ ] Ground as sloped meshes with hill lighting (custom shader), animated water kept
+- [ ] Roads, zone lots, grid, previews, hover on slopes; objects, agents, badges and effects lifted
+- [ ] Height-aware picking
+- [ ] Raise / Lower / Level tools with the ripple to neighbours, previews and costs
+- [ ] Buildings and growth need flat footprints
+- [ ] Borderlands: decorative hills and mountains round the map, with fog and a border line
+- [ ] Minimap hill shading; tests; 60 FPS kept
+
 ## Later Phases (to be specced when we get there)
 
 | Phase | Theme |
 |---|---|
-| 6 | Elevation & terraforming (slopes, raise/lower, bridges) |
 | 7 | Core simulation: power grid, water, RCI demand, budget & taxes |
 | 8 | Services: police, fire, health, education, coverage overlays |
 | 9 | Traffic & pollution, data map overlays |

@@ -199,6 +199,7 @@ export function NewGameScreen({ onStart }: { onStart: (o: GameOptions) => void }
             <details className="ng-advanced">
               <summary>Advanced</summary>
               <Slider label="Water" value={terrain.water} min={0} max={1} step={0.05} format={pct} onChange={(water) => set({ water })} />
+              <Slider label="Hills" value={terrain.hills} min={0} max={1} step={0.05} format={pct} onChange={(hills) => set({ hills })} />
               <Slider label="Trees" value={terrain.trees} min={0} max={1} step={0.05} format={pct} onChange={(trees) => set({ trees })} />
               <Slider
                 label="Rivers"

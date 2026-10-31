@@ -35,6 +35,7 @@ export function readUrlOptions(): GameOptions | null {
       trees: num(q, 'trees', 0, 1) ?? base.trees,
       rivers: num(q, 'rivers', 0, 3) ?? base.rivers,
       coastSides: num(q, 'coast', 0, 4) ?? base.coastSides,
+      hills: num(q, 'hills', 0, 1) ?? base.hills,
     },
     name: q.get('name')?.trim() || PRESETS[preset].name,
     funds: num(q, 'funds', 0, 1e9),
@@ -53,6 +54,7 @@ export function writeUrlOptions(o: GameOptions) {
   if (t.trees !== def.trees) q.set('trees', String(t.trees));
   if (t.rivers !== def.rivers) q.set('rivers', String(t.rivers));
   if (t.coastSides !== def.coastSides) q.set('coast', String(t.coastSides));
+  if (t.hills !== def.hills) q.set('hills', String(t.hills));
   q.set('name', o.name);
   if (o.funds !== undefined) q.set('funds', String(o.funds));
   history.replaceState(null, '', `${location.pathname}?${q}`);

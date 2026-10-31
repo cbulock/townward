@@ -196,6 +196,16 @@ export const ART_VARIANTS = 3;
 
 export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
 
+/**
+ * What the Build tool may place: civic buildings only. Homes, shops and industry come from
+ * zoning (docs/decisions.md D-042). The sim itself can still place anything (tests use it).
+ */
+export const PLACEABLE_IDS: readonly BuildingId[] = BUILDING_IDS.filter((id) => BUILDINGS[id].category === 'civic');
+
+export function isPlaceable(id: BuildingId): boolean {
+  return PLACEABLE_IDS.includes(id);
+}
+
 export const CATEGORY_ORDER: readonly BuildingCategory[] = ['residential', 'commercial', 'industrial', 'civic'];
 
 export function buildingDef(id: BuildingId): BuildingDef {

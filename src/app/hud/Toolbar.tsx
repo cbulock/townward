@@ -60,7 +60,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'edit',
     label: 'Build',
     key: 'E',
-    hint: 'Place homes, shops, industry and civic buildings',
+    hint: 'Place parks and civic buildings',
     icon: (
       <g {...stroke}>
         <path d="M3 11l7-6 7 6" />

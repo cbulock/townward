@@ -10,7 +10,7 @@ import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { growDay, zoneDemand } from '../sim/growth';
 import { mulberry32, subSeed } from '../shared/rng';
-import type { BuildingInstance } from '../sim/buildings/catalog';
+import { isPlaceable, type BuildingInstance } from '../sim/buildings/catalog';
 import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/population';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Traffic } from '../sim/traffic';
@@ -71,7 +71,7 @@ export class Game {
   private simTick = 0;
   private hovered: TilePos | null = null;
   private toolId: ToolId = 'select';
-  private buildingChoice: BuildingId = 'cottage';
+  private buildingChoice: BuildingId = 'park';
   private speedIndex = 1;
   private dayTimer = 0;
   private inspected: number | null = null;
@@ -133,6 +133,7 @@ export class Game {
 
   /** Pick what the Build tool places (and switch to it). */
   setBuilding(id: BuildingId) {
+    if (!isPlaceable(id)) return;
     this.buildingChoice = id;
     this.events.emit('building', id);
     if (this.toolId !== 'build') this.setTool('build');
