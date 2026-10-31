@@ -123,3 +123,33 @@ Buildings are entities in a `Map<id, BuildingInstance>`:
 
 - Every world change (place road, zone, bulldoze) is a **command**. This gives one code path for validation, cost and (later) undo/redo and multiplayer/replay.
 - The world emits typed **events** (`tilesChanged`, `buildingAdded`, `moneyChanged`, …). The renderer marks chunks dirty and the UI store updates. Nothing polls.
+
+## Simulation Systems (D-058)
+
+The simulation is a set of **systems**, one per concern. Each is a module in `src/sim/systems/` with pure functions (easy to test) and a small class that implements `SimSystem` (`src/sim/core/System.ts`):
+
+| System | Module | Hooks | Owns |
+|---|---|---|---|
+| Access | `access.ts` | onWorldChanged | each building's entrance road tile |
+| Utilities | `utilities.ts` | onWorldChanged | power and water per road island; `powered` / `watered`; supply totals |
+| Coverage | `coverage.ts` | onWorldChanged | which services reach each building |
+| Growth | `growth.ts` | onDay | R/C/I demand; new lots, construction, level-ups |
+| Fire | `fire.ts` | onDay | fires outside fire coverage |
+| Population | `population.ts` | onDay | residents and workers |
+| Budget | `budget.ts` | onMonth | taxes, upkeep, the last report and the forecast |
+| Traffic | `traffic.ts` | onWorldChanged, onDay, onFrame | cars, people, buses, routes, bus stops |
+
+`Simulation` (`src/sim/core/Simulation.ts`) owns them and runs them in a fixed order:
+
+- **After an edit** (`worldChanged`): access → utilities → coverage → traffic.
+- **Each day** (`day()`): growth → fire → the edit refresh → population → traffic; budget on the last day of the month. It returns a `DayOutcome`: changed areas, sites started and finished, buildings burned, the budget.
+- **Each frame** (`frame(dt)`): the time-of-day clock and traffic movement.
+
+`Game` only calls these entry points and turns the outcome into effects, toasts and HUD updates. Tests and the `/demo` builder use the pure functions directly (`refreshCity` brings access, utilities and coverage up to date).
+
+**Adding a system** (needs, transit, libraries …):
+1. Create its module in `src/sim/systems/` with pure functions and a `SimSystem` class.
+2. Add it to `Simulation` at the right place in the order.
+3. Expose its report for the HUD.
+
+Systems never import the renderer or React, so the whole simulation can later move into a Web Worker (Phase 12).

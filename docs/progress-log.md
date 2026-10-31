@@ -2,6 +2,13 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Systems foundation (step 1 of the plan, D-057)
+- Decisions: order is foundation → traffic → needs → backend (D-057); no free starter utilities (D-056); "systems as services" means in-game modules (D-058); the product name is still open (D-001).
+- Split `population.ts` and `services.ts` into `systems/` modules (access, utilities, coverage, fire, population, budget); moved growth and traffic there.
+- New `SimSystem` interface and `Simulation` core that runs the systems in order. `Game` no longer orchestrates the sim itself.
+- No behaviour change: /demo builds the same city (about 26,000 residents, about 1.9 s), and the full play loop passes in the browser.
+- Tests: 111 (3 new core tests: the edit pipeline, the day outcome and month-end budget, determinism).
+
 ## 2026-11-01: Phase 7 — Core city
 - **Time:** days last 6 s, speeds are true 1×/2×/3×, and the clock opens a day/night menu (cycle / always day / always night, with `L` stepping through).
 - **Density (D-054):** zone tools 1–5 for Homes, Apartments, Shops, Offices and Industry, with darker tints for high density. Growth is density-aware.

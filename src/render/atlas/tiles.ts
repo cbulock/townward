@@ -301,6 +301,7 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('grid', W, H, paintGridLine);
 
   const tex = b.build();
+  console.warn('ATLAS_PROBE', b.pageCount, b.sources.map((s) => s.width + 'x' + s.height).join(','));
   const get = (name: string): Texture => {
     const t = tex.get(name);
     if (!t) throw new Error(`atlas frame missing: ${name}`);

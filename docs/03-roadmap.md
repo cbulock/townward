@@ -152,12 +152,27 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Civic panel tabs (Services / Utilities / Parks & Civic), coverage preview while placing
 - [x] Tests (107) and docs
 
+## Systems Foundation ✅  (D-058)
+
+- [x] Simulation split into systems (`src/sim/systems/`) behind one `SimSystem` interface, run in order by `Simulation` (`src/sim/core/`)
+- [x] `Game` drives the `Simulation` and only shows its outcome; no behaviour change (/demo is identical, all tests pass)
+- [x] Core tests (3 new, 111 total)
+
+## City Art Pass 🚧  → [specs/city-art.md](specs/city-art.md)
+
+- [ ] Building variants that change form (massing, height, roof, facade, rooftop, lot); 6 per zoned building
+- [ ] Shop, café, hotel and market names per variant; industrial equipment
+- [ ] Civic art: power plants, water towers, 6 parks, police/fire/clinic/school details
+- [ ] Streets with real footpaths, kerbs, crossings and stop lines; street trees, lamps and traffic lights
+- [ ] Highways with barriers, lane markings, foot overbridges and sign gantries
+- [ ] Pedestrians stay on footpaths (mitred route, cross at zebras, never on highways); lane offsets match the new roads
+
 ## Later Phases (to be specced when we get there)
 
 | Phase | Theme |
 |---|---|
-| 8 | More services: hospitals, universities, coverage map overlays |
-| 9 | Traffic & pollution, data map overlays |
+| 8 | Traffic overhaul: commuters with real jobs, road capacity and congestion, smarter routing, traffic lights, congestion overlay (next) |
+| 9 | Citizen needs: per-neighbourhood happiness (jobs, shopping, safety, health, school, commute, noise), speech bubbles and a "Citizens say…" feed |
 | 10 | Save/Load: Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
-| 11 | Disasters, events, achievements |
+| 11+ | Public transport (buses, trains), libraries and more services, pollution and data overlays |
 | 12 | Performance pass: sim in a Web Worker, 256×256+ maps |

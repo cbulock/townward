@@ -1,5 +1,5 @@
 import { HALF_W } from '../../shared/constants';
-import { IsoFrame, shade } from './buildingArt';
+import { IsoFrame, shade } from './isoPaint';
 import { GROUND_FRAME_H, GROUND_FRAME_W, GROUND_PAD } from './geometry';
 
 /** Bus stop shelters (docs/specs/simulation.md): one frame per pavement side, in view space. */

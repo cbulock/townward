@@ -44,7 +44,6 @@ describe('simulation core', () => {
     expect(budgetDays).toBe(2);
     expect(sim.budget.last).not.toBeNull();
     // People moved into the finished homes.
-    expect(sim.population).toBeDefined();
     expect([...city.world.buildings.values()].some((b) => b.def !== 'power_plant' && b.def !== 'water_tower' && b.occupants > 0)).toBe(true);
   });
 

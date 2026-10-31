@@ -8,7 +8,7 @@ work session, read **Current Status** below, then the relevant spec.
 | | |
 |---|---|
 | **Current phase** | Phases 0–7 built ✅ (latest: 7, core city: density, services, utilities, budget) plus the `/demo` city. Open: the 60 FPS check on real hardware |
-| **Next phase** | Phase 10 save/load (agreed design: D-034), or more services and data overlays (Phase 8) |
+| **Next phase** | Phase 8 — traffic overhaul (plan: foundation ✅ → traffic → needs → backend, D-057) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It

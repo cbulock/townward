@@ -1,633 +1,285 @@
 import { HALF_H, HALF_W } from '../../shared/constants';
 import { mulberry32 } from '../../shared/rng';
 import { ART_VARIANTS, BUILDINGS, type BuildingId } from '../../sim/buildings/catalog';
+import { ART, type BuildingArt, type CustomArtId, type Extra, type Facade, type RecipeId } from './buildingRecipes';
+import { CIVIC_ART } from './civicArt';
 import { GROUND_PAD } from './geometry';
-import { hexToRgb, INK } from './palette';
-import { paintPine } from './treeArt';
+import {
+  boxOut,
+  faceRef,
+  floorOut,
+  inFront,
+  IsoFrame,
+  Orient,
+  paintParkedCar,
+  paintRoundTree,
+  pOn,
+  shade,
+  wallOn,
+  type Box,
+  type BuildingRotation,
+  type FaceRef,
+  type Prop,
+  type Rng,
+  type Side,
+} from './isoPaint';
+
+export { BUILDING_ROTATIONS, type BuildingRotation } from './isoPaint';
 
 /**
- * Procedural building art (docs/specs/buildings.md).
+ * Procedural building art (docs/specs/buildings.md, docs/specs/city-art.md).
  *
- * Every building is an iso box (or a few) in its own frame. Tile space (u, v)
- * spans the footprint; z is height in px. The camera sees two walls:
- *   SW face (plane v = v1): lit,  on the left
- *   SE face (plane u = u1): shaded, on the right
- * Each building has a small recipe (BuildingArt) that the shared painter turns
- * into walls, windows, roof and extras. Recipes are written in *local* space with
- * the front at +v; the painter rotates them for each of the 4 view rotations, so
- * front details (doors, shopfronts, signs) appear only when the front faces the camera.
+ * Every building is a stack of iso boxes ("masses") in its own frame. Recipes
+ * (buildingRecipes.ts) are written in *local* space with the front at +v; the painter
+ * rotates them for each of the 4 view rotations, so front details (doors, shopfronts,
+ * signs) appear only when the front faces the camera. Parks, the town hall and the
+ * utilities have their own painters (civicArt.ts).
  */
 
+/** Most variants any building has; the sim picks a variant below this (catalog ART_VARIANTS). */
 export const BUILDING_VARIANTS = ART_VARIANTS;
 
-type Rng = () => number;
-type Face = 'sw' | 'se';
-type Roof = 'flat' | 'gable' | 'hip' | 'sawtooth';
-type Facade = 'punched' | 'bands' | 'curtain' | 'shopfront' | 'industrial' | 'townhouse' | 'brick';
-type Extra =
-  | 'chimney'
-  | 'porch'
-  | 'fence'
-  | 'awning'
-  | 'tables'
-  | 'balconies'
-  | 'watertank'
-  | 'acunits'
-  | 'loadingdock'
-  | 'crates'
-  | 'smokestack'
-  | 'canopy'
-  | 'crown'
-  | 'terraces'
-  | 'parking'
-  | 'garagedoor';
-type Ground = 'garden' | 'paved' | 'parking';
-
-interface BuildingArt {
-  floors: number;
-  floorH: number;
-  /** Body box in footprint tile units; defaults to the footprint inset by `inset`. */
-  inset: number;
-  body?: { u0: number; u1: number; v0: number; v1: number };
-  walls: readonly string[];
-  roof: Roof;
-  roofColors: readonly string[];
-  /** Extra roof height for pitched roofs (px). */
-  roofH?: number;
-  facade: Facade;
-  ground: Ground;
-  extras: readonly Extra[];
-  /** Text on a sign (shopfronts, rooftop sign). */
-  sign?: string;
-  signColors?: readonly string[];
+function isCustom(id: BuildingId): id is CustomArtId {
+  return id in CIVIC_ART;
 }
 
-const ART: Readonly<Record<Exclude<BuildingId, 'park' | 'town_hall'>, BuildingArt>> = {
-  cottage: {
-    floors: 1,
-    floorH: 11,
-    inset: 0.2,
-    walls: ['#f3e7cf', '#e8d4b4', '#f5efe4'],
-    roof: 'gable',
-    roofColors: ['#b8513d', '#5e6f86', '#8a5a3b'],
-    roofH: 9,
-    facade: 'punched',
-    ground: 'garden',
-    extras: ['chimney', 'fence'],
-  },
-  family_house: {
-    floors: 2,
-    floorH: 9,
-    inset: 0.16,
-    walls: ['#dfe7ee', '#f0dcc4', '#d8e4cf'],
-    roof: 'hip',
-    roofColors: ['#4f5d70', '#a2493a', '#6a4b3a'],
-    roofH: 8,
-    facade: 'punched',
-    ground: 'garden',
-    extras: ['porch', 'chimney'],
-  },
-  townhouses: {
-    floors: 3,
-    floorH: 8,
-    inset: 0.1,
-    walls: ['#c96f5a', '#d8b48a', '#8fa9b8'],
-    roof: 'flat',
-    roofColors: ['#6b6e74', '#5d6168', '#74767c'],
-    facade: 'townhouse',
-    ground: 'paved',
-    extras: ['acunits'],
-  },
-  walkup: {
-    floors: 4,
-    floorH: 8,
-    inset: 0.1,
-    walls: ['#b35a45', '#9c5040', '#c0785a'],
-    roof: 'flat',
-    roofColors: ['#5f6268', '#686b70', '#575a60'],
-    facade: 'brick',
-    ground: 'paved',
-    extras: ['balconies', 'acunits'],
-  },
-  apartment_block: {
-    floors: 8,
-    floorH: 8,
-    inset: 0.18,
-    walls: ['#e9e2d4', '#d9dfe6', '#efe0c8'],
-    roof: 'flat',
-    roofColors: ['#6a6d73', '#5e6167', '#717379'],
-    facade: 'punched',
-    ground: 'paved',
-    extras: ['balconies', 'watertank', 'acunits'],
-  },
-  condo_tower: {
-    floors: 15,
-    floorH: 7,
-    inset: 0.32,
-    walls: ['#7fa8c9', '#8bb3b0', '#9aa7c4'],
-    roof: 'flat',
-    roofColors: ['#4a5560', '#4f5a58', '#525a6b'],
-    facade: 'curtain',
-    ground: 'paved',
-    extras: ['terraces', 'crown'],
-  },
-  corner_shop: {
-    floors: 2,
-    floorH: 9,
-    inset: 0.12,
-    walls: ['#e7d9bd', '#d6e0d2', '#ead2c4'],
-    roof: 'flat',
-    roofColors: ['#6b6e74', '#62656b', '#707278'],
-    facade: 'shopfront',
-    ground: 'paved',
-    extras: ['awning'],
-    sign: 'SHOP',
-    signColors: ['#2f7d4a', '#b23a3a', '#2f5d9a'],
-  },
-  cafe: {
-    floors: 1,
-    floorH: 12,
-    inset: 0.22,
-    walls: ['#f2e6d0', '#e4efe9', '#f3dfe0'],
-    roof: 'flat',
-    roofColors: ['#7a5a43', '#5f6c63', '#7a4d4d'],
-    facade: 'shopfront',
-    ground: 'paved',
-    extras: ['awning', 'tables'],
-    sign: 'CAFE',
-    signColors: ['#7a4a2b', '#2f6d5a', '#8a3b4f'],
-  },
-  small_office: {
-    floors: 5,
-    floorH: 8,
-    inset: 0.14,
-    walls: ['#c9ced6', '#d8d2c6', '#bfc9cf'],
-    roof: 'flat',
-    roofColors: ['#5d6168', '#62666c', '#585c62'],
-    facade: 'bands',
-    ground: 'paved',
-    extras: ['acunits'],
-  },
-  supermarket: {
-    floors: 1,
-    floorH: 16,
-    inset: 0.12,
-    body: { u0: 0.12, u1: 1.88, v0: 0.12, v1: 1.15 },
-    walls: ['#e8e3d8', '#dfe6ea', '#ece2d3'],
-    roof: 'flat',
-    roofColors: ['#8a8d92', '#80858b', '#8d8a85'],
-    facade: 'shopfront',
-    ground: 'parking',
-    extras: ['parking', 'acunits'],
-    sign: 'MARKET',
-    signColors: ['#d2462f', '#2b7a3d', '#2c62b0'],
-  },
-  hotel: {
-    floors: 11,
-    floorH: 7,
-    inset: 0.22,
-    walls: ['#e9dcc6', '#d7d2e3', '#e6d0c0'],
-    roof: 'flat',
-    roofColors: ['#5c5f66', '#55585f', '#615d5a'],
-    facade: 'punched',
-    ground: 'paved',
-    extras: ['canopy', 'balconies'],
-    sign: 'HOTEL',
-    signColors: ['#d23b3b', '#2d63c8', '#c8902d'],
-  },
-  office_tower: {
-    floors: 18,
-    floorH: 7,
-    inset: 0.28,
-    walls: ['#5f8fb8', '#6e9aa6', '#7d8fb0'],
-    roof: 'flat',
-    roofColors: ['#3e4a56', '#3f4c50', '#444a5c'],
-    facade: 'curtain',
-    ground: 'paved',
-    extras: ['crown'],
-  },
-  workshop: {
-    floors: 1,
-    floorH: 13,
-    inset: 0.14,
-    walls: ['#b9b3a6', '#a9b4b9', '#c2b49a'],
-    roof: 'sawtooth',
-    roofColors: ['#7d8288', '#6f757b', '#858179'],
-    roofH: 6,
-    facade: 'industrial',
-    ground: 'paved',
-    extras: ['garagedoor', 'crates'],
-  },
-  warehouse: {
-    floors: 2,
-    floorH: 10,
-    inset: 0.14,
-    walls: ['#c7b48f', '#a8b0b8', '#b9a48a'],
-    roof: 'flat',
-    roofColors: ['#8b8f94', '#7f858b', '#90897f'],
-    facade: 'industrial',
-    ground: 'paved',
-    extras: ['loadingdock', 'crates'],
-  },
-  factory: {
-    floors: 3,
-    floorH: 9,
-    inset: 0.12,
-    body: { u0: 0.12, u1: 1.88, v0: 0.12, v1: 1.6 },
-    walls: ['#a9a296', '#9fa7ad', '#b0a28c'],
-    roof: 'sawtooth',
-    roofColors: ['#7a7f85', '#6d7379', '#82786d'],
-    roofH: 8,
-    facade: 'industrial',
-    ground: 'paved',
-    extras: ['smokestack', 'loadingdock'],
-  },
-  police_station: {
-    floors: 2,
-    floorH: 10,
-    inset: 0.13,
-    walls: ['#dfe6ef', '#e7e3da', '#d6dee8'],
-    roof: 'flat',
-    roofColors: ['#3c5a8c', '#45597a', '#36507e'],
-    facade: 'bands',
-    ground: 'paved',
-    extras: ['canopy', 'acunits'],
-    sign: 'POLICE',
-    signColors: ['#1f4fa8', '#1d3f86', '#2456b8'],
-  },
-  fire_station: {
-    floors: 2,
-    floorH: 11,
-    inset: 0.12,
-    walls: ['#b9483a', '#a9443a', '#c35241'],
-    roof: 'flat',
-    roofColors: ['#5d5f63', '#56585c', '#636567'],
-    facade: 'brick',
-    ground: 'paved',
-    extras: ['garagedoor'],
-    sign: 'FIRE',
-    signColors: ['#d23b2b', '#c8352b', '#e04a2b'],
-  },
-  clinic: {
-    floors: 2,
-    floorH: 10,
-    inset: 0.14,
-    walls: ['#f2f4f5', '#eef2ee', '#f4efed'],
-    roof: 'flat',
-    roofColors: ['#8b9196', '#848b90', '#8f9396'],
-    facade: 'bands',
-    ground: 'garden',
-    extras: ['canopy'],
-    sign: 'CLINIC',
-    signColors: ['#d4343a', '#c92f36', '#df3e44'],
-  },
-  school: {
-    floors: 2,
-    floorH: 10,
-    inset: 0.16,
-    body: { u0: 0.16, u1: 1.84, v0: 0.16, v1: 1.2 },
-    walls: ['#c8794f', '#c98a5c', '#b9704a'],
-    roof: 'hip',
-    roofColors: ['#6d4a3b', '#5e4637', '#734d3a'],
-    roofH: 9,
-    facade: 'punched',
-    ground: 'garden',
-    extras: ['fence'],
-    sign: 'SCHOOL',
-    signColors: ['#2f6d4a', '#2d5f8a', '#7a3b2f'],
-  },
-  power_plant: {
-    floors: 3,
-    floorH: 9,
-    inset: 0.12,
-    body: { u0: 0.12, u1: 1.6, v0: 0.12, v1: 1.6 },
-    walls: ['#9aa1a8', '#a7a092', '#9ea7a0'],
-    roof: 'sawtooth',
-    roofColors: ['#6a7076', '#6f6a63', '#66706a'],
-    roofH: 8,
-    facade: 'industrial',
-    ground: 'paved',
-    extras: ['smokestack', 'loadingdock'],
-    sign: 'POWER',
-    signColors: ['#d6a514', '#c9971a', '#e0b020'],
-  },
-  water_tower: {
-    floors: 2,
-    floorH: 9,
-    inset: 0.26,
-    walls: ['#bcd7ea', '#c5dde3', '#b5cfe6'],
-    roof: 'flat',
-    roofColors: ['#6f8291', '#6a7d86', '#728494'],
-    facade: 'punched',
-    ground: 'paved',
-    extras: ['watertank'],
-  },
-};
+/** How many distinct variants a building has; instance variants wrap round with `%`. */
+export function buildingVariantCount(id: BuildingId): number {
+  return isCustom(id) ? CIVIC_ART[id].variants : ART[id].length;
+}
 
-// ---------------------------------------------------------------- frames
+function recipe(id: RecipeId, variant: number): BuildingArt {
+  const list = ART[id];
+  return list[variant % list.length];
+}
+
+const totalHeight = (art: BuildingArt) => art.masses.reduce((s, m) => s + m.floors, 0) * art.floorH;
+
+/** Height above the top of the walls taken by rooftop and tall ground extras (px). */
+function extrasAbove(art: BuildingArt, H: number): number {
+  const ex = new Set(art.extras);
+  let up = art.roofH ?? 0;
+  if (ex.has('spire')) up = Math.max(up, 36);
+  if (ex.has('antenna')) up = Math.max(up, 22);
+  if (ex.has('crown') || ex.has('watertank') || ex.has('hosetower')) up = Math.max(up, 22);
+  if (ex.has('smokestack') || ex.has('smokestacks')) up = Math.max(up, 34);
+  // Silos stand on the ground, so only the part above the walls needs room.
+  if (ex.has('silo')) up = Math.max(up, 46 - H);
+  return up;
+}
 
 /** Extra space above the footprint for walls, roof and rooftop extras. */
-export function buildingHeadroom(id: BuildingId): number {
-  if (id === 'park') return 34;
-  if (id === 'town_hall') return 72;
-  const a = ART[id];
-  const tall = a.extras.includes('smokestack') ? 34 : 0;
-  return a.floors * a.floorH + (a.roofH ?? 0) + 26 + tall;
+export function buildingHeadroom(id: BuildingId, variant = 0): number {
+  if (isCustom(id)) return CIVIC_ART[id].headroom(variant % CIVIC_ART[id].variants);
+  const art = recipe(id, variant);
+  const H = totalHeight(art);
+  return H + extrasAbove(art, H) + 26;
 }
 
-export function buildingFrameSize(id: BuildingId): { w: number; h: number } {
+export function buildingFrameSize(id: BuildingId, variant = 0): { w: number; h: number } {
   const { w, h } = BUILDINGS[id].size;
-  return { w: (w + h) * HALF_W + GROUND_PAD * 2, h: (w + h) * HALF_H + GROUND_PAD * 2 + buildingHeadroom(id) };
-}
-
-// ---------------------------------------------------------------- iso helpers
-
-/** Projection for one building frame (also used for vehicles). */
-export class IsoFrame {
-  constructor(
-    readonly ctx: CanvasRenderingContext2D,
-    private readonly ox: number,
-    private readonly oy: number,
-  ) {}
-
-  p(u: number, v: number, z = 0): [number, number] {
-    return [this.ox + (u - v) * HALF_W, this.oy + (u + v) * HALF_H - z];
-  }
-
-  poly(points: readonly [number, number][], fill: string) {
-    const c = this.ctx;
-    c.beginPath();
-    c.moveTo(points[0][0], points[0][1]);
-    for (let k = 1; k < points.length; k++) c.lineTo(points[k][0], points[k][1]);
-    c.closePath();
-    c.fillStyle = fill;
-    c.fill();
-  }
-
-  /** Flat quad on the ground (or at height z). */
-  floor(u0: number, u1: number, v0: number, v1: number, z: number, fill: string) {
-    this.poly([this.p(u0, v0, z), this.p(u1, v0, z), this.p(u1, v1, z), this.p(u0, v1, z)], fill);
-  }
-
-  /**
-   * Rectangle on a wall. `a` runs along the wall (u on SW, v on SE), z is height.
-   * `at` is the wall's plane coordinate (v1 for SW, u1 for SE).
-   */
-  wall(face: Face, at: number, a0: number, a1: number, z0: number, z1: number, fill: string) {
-    const q = (a: number, z: number) => (face === 'sw' ? this.p(a, at, z) : this.p(at, a, z));
-    this.poly([q(a0, z0), q(a1, z0), q(a1, z1), q(a0, z1)], fill);
-  }
-
-  /** Axis box: back faces are hidden, so only the two visible walls and the top are drawn. */
-  box(u0: number, u1: number, v0: number, v1: number, z0: number, z1: number, lit: string, shaded: string, top: string) {
-    this.wall('sw', v1, u0, u1, z0, z1, lit);
-    this.wall('se', u1, v0, v1, z0, z1, shaded);
-    this.floor(u0, u1, v0, v1, z1, top);
-  }
-
-  /** Text lying on a wall plane (sheared to follow it). */
-  text(face: Face, at: number, a: number, z: number, str: string, size: number, color: string) {
-    const c = this.ctx;
-    const [x, y] = face === 'sw' ? this.p(a, at, z) : this.p(at, a, z);
-    c.save();
-    c.translate(x, y);
-    c.transform(1, face === 'sw' ? 0.5 : -0.5, 0, 1, 0, 0);
-    c.font = `bold ${size}px Inter, system-ui, sans-serif`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillStyle = color;
-    c.fillText(str, 0, 0);
-    c.restore();
-  }
-}
-
-/** Lighten (f > 0) or darken (f < 0) a hex colour. */
-export function shade(hex: string, f: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  const k = (c: number) => Math.round(Math.max(0, Math.min(255, f >= 0 ? c + (255 - c) * f : c * (1 + f))));
-  return `rgb(${k(r)}, ${k(g)}, ${k(b)})`;
+  return { w: (w + h) * HALF_W + GROUND_PAD * 2, h: (w + h) * HALF_H + GROUND_PAD * 2 + buildingHeadroom(id, variant) };
 }
 
 const GLASS = '#34506b';
 const GLASS_LIT = '#ffe39a';
 const FRAME = 'rgba(255, 255, 255, 0.35)';
-
-// ---------------------------------------------------------------- orientation
-
-/** Quarter turns of the view; matches render/view/ViewTransform's Rotation. */
-export type BuildingRotation = 0 | 1 | 2 | 3;
-export const BUILDING_ROTATIONS: readonly BuildingRotation[] = [0, 1, 2, 3];
-
-type Side = 'front' | 'right' | 'back' | 'left';
-const SIDES: readonly Side[] = ['front', 'right', 'back', 'left'];
-/** Outward normal of each side in local building space (the front faces +v). */
-const SIDE_DIR: Readonly<Record<Side, readonly [number, number]>> = {
-  front: [0, 1],
-  right: [1, 0],
-  back: [0, -1],
-  left: [-1, 0],
-};
-
-interface Box {
-  u0: number;
-  u1: number;
-  v0: number;
-  v1: number;
-}
-
-/**
- * Local building space (footprint w × h, front = +v) → view space after `r` quarter
- * turns, using the same mapping as ViewTransform so art and map rotate together.
- */
-class Orient {
-  constructor(
-    readonly r: BuildingRotation,
-    readonly w: number,
-    readonly h: number,
-  ) {}
-
-  get vw(): number {
-    return this.r % 2 === 0 ? this.w : this.h;
-  }
-
-  get vh(): number {
-    return this.r % 2 === 0 ? this.h : this.w;
-  }
-
-  point(u: number, v: number): [number, number] {
-    switch (this.r) {
-      case 0:
-        return [u, v];
-      case 1:
-        return [this.h - v, u];
-      case 2:
-        return [this.w - u, this.h - v];
-      case 3:
-        return [v, this.w - u];
-    }
-  }
-
-  rect(b: Box): Box {
-    const [a0, c0] = this.point(b.u0, b.v0);
-    const [a1, c1] = this.point(b.u1, b.v1);
-    return { u0: Math.min(a0, a1), u1: Math.max(a0, a1), v0: Math.min(c0, c1), v1: Math.max(c0, c1) };
-  }
-
-  private dir(dx: number, dy: number): [number, number] {
-    switch (this.r) {
-      case 0:
-        return [dx, dy];
-      case 1:
-        return [-dy, dx];
-      case 2:
-        return [-dx, -dy];
-      case 3:
-        return [dy, -dx];
-    }
-  }
-
-  /** The camera-facing wall that shows a local side, or null if that side faces away. */
-  faceOf(side: Side): Face | null {
-    const [dx, dy] = this.dir(SIDE_DIR[side][0], SIDE_DIR[side][1]);
-    if (dx === 0 && dy === 1) return 'sw';
-    if (dx === 1 && dy === 0) return 'se';
-    return null;
-  }
-
-  /** Which local side a camera-facing wall shows. */
-  sideOf(face: Face): Side {
-    for (const s of SIDES) if (this.faceOf(s) === face) return s;
-    return 'front';
-  }
-
-  /** Axis a local-u feature (ridge, sawtooth) runs along in the view. */
-  get uAxis(): 'u' | 'v' {
-    return this.r % 2 === 0 ? 'u' : 'v';
-  }
-}
-
-/** A camera-facing wall of a box: its plane coordinate and the range along it (view space). */
-interface FaceRef {
-  face: Face;
-  at: number;
-  a0: number;
-  a1: number;
-}
-
-function faceRef(face: Face, b: Box): FaceRef {
-  return face === 'sw' ? { face, at: b.v1, a0: b.u0, a1: b.u1 } : { face, at: b.u1, a0: b.v0, a1: b.v1 };
-}
-
-/** View-space (u, v) of a point `a` along a face, `d` out from it. */
-function onFace(f: FaceRef, a: number, d: number): [number, number] {
-  return f.face === 'sw' ? [a, f.at + d] : [f.at + d, a];
-}
-
-function wallOn(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number, fill: string, out = 0) {
-  iso.wall(f.face, f.at + out, a0, a1, z0, z1, fill);
-}
-
-function floorOut(iso: IsoFrame, f: FaceRef, a0: number, a1: number, d0: number, d1: number, z: number, fill: string) {
-  if (f.face === 'sw') iso.floor(a0, a1, f.at + d0, f.at + d1, z, fill);
-  else iso.floor(f.at + d0, f.at + d1, a0, a1, z, fill);
-}
-
-function boxOut(iso: IsoFrame, f: FaceRef, a0: number, a1: number, d0: number, d1: number, z0: number, z1: number, lit: string, dark: string, top: string) {
-  if (f.face === 'sw') iso.box(a0, a1, f.at + d0, f.at + d1, z0, z1, lit, dark, top);
-  else iso.box(f.at + d0, f.at + d1, a0, a1, z0, z1, lit, dark, top);
-}
-
-function pOn(iso: IsoFrame, f: FaceRef, a: number, d: number, z: number): [number, number] {
-  const [u, v] = onFace(f, a, d);
-  return iso.p(u, v, z);
-}
-
-/**
- * Something standing on the ground (parked car, crate, café table). Drawn before the
- * building if it's behind it in the view, after if it's in front, so overlaps are right.
- */
-interface Prop {
-  u: number;
-  v: number;
-  draw: () => void;
-}
-
-function inFront(p: Prop, b: Box): boolean {
-  return p.u >= b.u1 || p.v >= b.v1;
-}
+const LIT_CHANCE = 0.16;
 
 // ---------------------------------------------------------------- painter
+
+/** A mass resolved into local and view boxes and its z range. */
+interface MassBox {
+  local: Box;
+  view: Box;
+  z0: number;
+  z1: number;
+  floors: number;
+  facade: Facade;
+  wall: string;
+  top: boolean;
+}
+
+function resolveMasses(art: BuildingArt, o: Orient): MassBox[] {
+  let z = 0;
+  return art.masses.map((m, k) => {
+    const inset = m.inset ?? 0.15;
+    const local = m.box ?? { u0: inset, u1: o.w - inset, v0: inset, v1: o.h - inset };
+    const z0 = z;
+    z += m.floors * art.floorH;
+    return {
+      local,
+      view: o.rect(local),
+      z0,
+      z1: z,
+      floors: m.floors,
+      facade: m.facade ?? art.facade,
+      wall: m.wall ?? art.wall,
+      top: k === art.masses.length - 1,
+    };
+  });
+}
 
 export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, variant: number, rot: BuildingRotation = 0) {
   const { w, h } = BUILDINGS[id].size;
   const o = new Orient(rot, w, h);
-  const iso = new IsoFrame(ctx, GROUND_PAD + o.vh * HALF_W, GROUND_PAD + buildingHeadroom(id));
+  const iso = new IsoFrame(ctx, GROUND_PAD + o.vh * HALF_W, GROUND_PAD + buildingHeadroom(id, variant));
   const rng = mulberry32(8000 + variant * 101 + id.length * 7 + id.charCodeAt(0));
-  if (id === 'park') return paintPark(iso, o, rng, variant);
-  if (id === 'town_hall') return paintTownHall(iso, o, variant);
+  if (isCustom(id)) {
+    const c = CIVIC_ART[id];
+    c.paint(iso, o, rng, variant % c.variants);
+    return;
+  }
 
-  const art = ART[id];
-  const v = variant % BUILDING_VARIANTS;
-  const local: Box = art.body ?? { u0: art.inset, u1: w - art.inset, v0: art.inset, v1: h - art.inset };
-  const b = o.rect(local);
+  const art = recipe(id, variant);
+  const ms = resolveMasses(art, o);
+  const base = ms[0];
+  const top = ms[ms.length - 1];
+  const b = base.view;
   const lot: Box = { u0: 0, u1: o.vw, v0: 0, v1: o.vh };
-  const H = art.floors * art.floorH;
-  const wall = art.walls[v];
-  const roofColor = art.roofColors[v];
-  const front = o.faceOf('front');
+  const ex = new Set(art.extras);
 
-  paintGround(iso, o, art.ground, lot, local);
+  paintLot(iso, o, art, lot, base.local, rng);
   // Soft contact shadow on the ground to the lower right of the body.
   iso.poly(
     [iso.p(b.u1, b.v0 + 0.05), iso.p(b.u1 + 0.18, b.v0 + 0.2), iso.p(b.u1 + 0.18, b.v1 + 0.18), iso.p(b.u0 + 0.15, b.v1 + 0.18), iso.p(b.u0, b.v1)],
     'rgba(20, 50, 20, 0.22)',
   );
 
-  const props = groundProps(iso, o, art, local, v, rng);
+  const props = groundProps(iso, o, art, base.local, rng).sort((p, q) => p.u + p.v - (q.u + q.v));
   for (const p of props) if (!inFront(p, b)) p.draw();
 
-  // A smokestack behind the body is drawn first so the walls cover its base.
-  const stack = art.extras.includes('smokestack') ? o.point(local.u1 - 0.35, local.v0 + 0.25) : null;
-  const stackInFront = stack !== null && stack[0] + stack[1] > (b.u0 + b.u1 + b.v0 + b.v1) / 2;
-  if (stack && !stackInFront) paintSmokestack(iso, stack, H, v);
+  // Annex (garage) beside the body: drawn before or after it depending on which is nearer.
+  const annex = ex.has('garage') ? garageAnnex(iso, o, art, base.local) : null;
+  if (annex && !inFront(annex, b)) annex.draw();
 
-  // Walls and base plinth.
-  iso.wall('sw', b.v1, b.u0, b.u1, 0, H, wall);
-  iso.wall('se', b.u1, b.v0, b.v1, 0, H, shade(wall, -0.22));
-  iso.wall('sw', b.v1, b.u0, b.u1, 0, 2, shade(wall, -0.35));
-  iso.wall('se', b.u1, b.v0, b.v1, 0, 2, shade(wall, -0.45));
+  // Smokestacks behind the body are drawn first so the walls cover their base.
+  const stacks = stackPositions(art, base.local).map((s) => o.point(s[0], s[1]));
+  const stackFront = (s: readonly [number, number]) => s[0] + s[1] > (b.u0 + b.u1 + b.v0 + b.v1) / 2;
+  for (const s of stacks) if (!stackFront(s)) paintSmokestack(iso, s, top.z1, ex.has('smokestacks'));
 
-  for (const face of ['sw', 'se'] as const) paintFacade(iso, art, faceRef(face, b), o.sideOf(face), H, v, rng);
-  paintRoof(iso, art, b, o.uAxis, H, roofColor, wall);
-  paintExtras(iso, o, art, local, b, front, H, v, rng);
-  if (stack && stackInFront) paintSmokestack(iso, stack, H, v);
+  for (const m of ms) paintMass(iso, o, art, m, rng);
+  paintExtras(iso, o, art, ms, rng);
 
+  for (const s of stacks) if (stackFront(s)) paintSmokestack(iso, s, top.z1, ex.has('smokestacks'));
+  if (annex && inFront(annex, b)) annex.draw();
   for (const p of props) if (inFront(p, b)) p.draw();
-  if (art.extras.includes('fence')) paintFence(iso, lot);
+  if (ex.has('fence')) paintFence(iso, lot);
 }
 
-function paintGround(iso: IsoFrame, o: Orient, ground: Ground, lot: Box, local: Box) {
-  if (ground === 'garden') {
-    iso.floor(lot.u0 + 0.04, lot.u1 - 0.04, lot.v0 + 0.04, lot.v1 - 0.04, 0, '#6cc444');
-    // Path from the front door to the lot edge.
-    const mid0 = local.u0 + (local.u1 - local.u0) * 0.35;
-    const mid1 = local.u0 + (local.u1 - local.u0) * 0.65;
-    // Local space: the lot's front edge is always at v = h.
+/** Walls, plinth, facade on both visible faces, and the roof (or a terrace if a mass sits on it). */
+function paintMass(iso: IsoFrame, o: Orient, art: BuildingArt, m: MassBox, rng: Rng) {
+  const b = m.view;
+  iso.wall('sw', b.v1, b.u0, b.u1, m.z0, m.z1, m.wall);
+  iso.wall('se', b.u1, b.v0, b.v1, m.z0, m.z1, shade(m.wall, -0.22));
+  if (m.z0 === 0) {
+    iso.wall('sw', b.v1, b.u0, b.u1, 0, 2, shade(m.wall, -0.35));
+    iso.wall('se', b.u1, b.v0, b.v1, 0, 2, shade(m.wall, -0.45));
+  }
+  for (const face of ['sw', 'se'] as const) paintFacade(iso, art, m, faceRef(face, b), o.sideOf(face), rng);
+  if (m.top) paintRoof(iso, art, b, art.ridge === 'v' ? (o.uAxis === 'u' ? 'v' : 'u') : o.uAxis, m.z1, art.roofColor, m.wall);
+  else paintTerrace(iso, b, m.z1, art.roofColor, m.wall);
+}
+
+/** Flat roof of a lower mass, with a parapet; the next mass stands on it. */
+function paintTerrace(iso: IsoFrame, b: Box, z: number, roofColor: string, wall: string) {
+  iso.floor(b.u0, b.u1, b.v0, b.v1, z, shade(wall, -0.1));
+  iso.floor(b.u0 + 0.03, b.u1 - 0.03, b.v0 + 0.03, b.v1 - 0.03, z, shade(roofColor, 0.12));
+  iso.wall('sw', b.v1, b.u0, b.u1, z, z + 1.5, shade(wall, 0.1));
+  iso.wall('se', b.u1, b.v0, b.v1, z, z + 1.5, shade(wall, -0.15));
+}
+
+// ---------------------------------------------------------------- lot
+
+function paintLot(iso: IsoFrame, o: Orient, art: BuildingArt, lot: Box, local: Box, rng: Rng) {
+  const inner = (d: number, fill: string) => iso.floor(lot.u0 + d, lot.u1 - d, lot.v0 + d, lot.v1 - d, 0, fill);
+  if (art.ground === 'garden' || art.ground === 'field') {
+    inner(0.03, '#5fb53a');
+    inner(0.05, '#6cc444');
+    // Mown stripes.
+    for (let a = lot.u0 + 0.1; a < lot.u1 - 0.05; a += 0.2) iso.floor(a, a + 0.1, lot.v0 + 0.05, lot.v1 - 0.05, 0, 'rgba(255,255,255,0.05)');
+    // Path from the front door to the lot edge (local space: the front edge is at v = h).
+    const mid0 = local.u0 + (local.u1 - local.u0) * 0.4;
+    const mid1 = local.u0 + (local.u1 - local.u0) * 0.6;
     const path = o.rect({ u0: mid0, u1: mid1, v0: local.v1, v1: o.h - 0.02 });
     iso.floor(path.u0, path.u1, path.v0, path.v1, 0, '#d9cfb8');
-  } else {
-    iso.floor(lot.u0 + 0.03, lot.u1 - 0.03, lot.v0 + 0.03, lot.v1 - 0.03, 0, '#b9b6ae');
-    iso.floor(lot.u0 + 0.06, lot.u1 - 0.06, lot.v0 + 0.06, lot.v1 - 0.06, 0, ground === 'parking' ? '#6f737a' : '#cfccc3');
+    // Flowers along the walls.
+    const flowers = ['#f2d33c', '#f3f1e8', '#e8576a', '#c77dde'];
+    for (let k = 0; k < 10; k++) {
+      const [fu, fv] = o.point(local.u0 + rng() * (local.u1 - local.u0), local.v1 + 0.03 + rng() * 0.05);
+      const [fx, fy] = iso.p(fu, fv, 0);
+      iso.ctx.fillStyle = flowers[k % flowers.length];
+      iso.ctx.fillRect(Math.round(fx), Math.round(fy) - 1, 1.5, 1.5);
+    }
+    if (art.ground === 'field') paintField(iso, o, local);
+    return;
   }
+  if (art.ground === 'parking') {
+    inner(0.03, '#b9b6ae');
+    inner(0.06, '#6f737a');
+    return;
+  }
+  inner(0.03, '#b9b6ae');
+  inner(0.06, art.ground === 'plaza' ? '#e0dacd' : '#cfccc3');
+  // Paving joints.
+  const step = art.ground === 'plaza' ? 0.16 : 0.25;
+  const line = 'rgba(0, 0, 0, 0.06)';
+  for (let a = lot.u0 + step; a < lot.u1 - 0.05; a += step) iso.floor(a, a + 0.008, lot.v0 + 0.06, lot.v1 - 0.06, 0, line);
+  for (let a = lot.v0 + step; a < lot.v1 - 0.05; a += step) iso.floor(lot.u0 + 0.06, lot.u1 - 0.06, a, a + 0.008, 0, line);
 }
 
-/** Ground-level props in local space (parking, crates, tables), mapped into the view. */
-function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, v: number, rng: Rng): Prop[] {
+/** School playing field on the free strip in front of the building. */
+function paintField(iso: IsoFrame, o: Orient, local: Box) {
+  const f = o.rect({ u0: 0.18, u1: o.w - 0.18, v0: local.v1 + 0.12, v1: o.h - 0.1 });
+  if (f.u1 - f.u0 < 0.3 || f.v1 - f.v0 < 0.3) return;
+  iso.floor(f.u0, f.u1, f.v0, f.v1, 0, '#c0603c');
+  iso.floor(f.u0 + 0.05, f.u1 - 0.05, f.v0 + 0.05, f.v1 - 0.05, 0, '#4fae3a');
+  const line = 'rgba(255,255,255,0.85)';
+  const g = 0.012;
+  iso.floor(f.u0 + 0.05, f.u1 - 0.05, f.v0 + 0.05, f.v0 + 0.05 + g, 0, line);
+  iso.floor(f.u0 + 0.05, f.u1 - 0.05, f.v1 - 0.05 - g, f.v1 - 0.05, 0, line);
+  iso.floor(f.u0 + 0.05, f.u0 + 0.05 + g, f.v0 + 0.05, f.v1 - 0.05, 0, line);
+  iso.floor(f.u1 - 0.05 - g, f.u1 - 0.05, f.v0 + 0.05, f.v1 - 0.05, 0, line);
+  const mu = (f.u0 + f.u1) / 2;
+  const mv = (f.v0 + f.v1) / 2;
+  if (f.u1 - f.u0 >= f.v1 - f.v0) iso.floor(mu - g / 2, mu + g / 2, f.v0 + 0.05, f.v1 - 0.05, 0, line);
+  else iso.floor(f.u0 + 0.05, f.u1 - 0.05, mv - g / 2, mv + g / 2, 0, line);
+  iso.disc(mu, mv, 0.09, 0, line);
+  iso.disc(mu, mv, 0.075, 0, '#4fae3a');
+}
+
+/** Ground-level props in local space (trees, cars, crates, tables), mapped into the view. */
+function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, rng: Rng): Prop[] {
   const props: Prop[] = [];
   const ex = new Set(art.extras);
+  const ctx = iso.ctx;
   /** Local front edge of the lot. */
   const lotV1 = o.h;
+  const at = (lu: number, lv: number, draw: (u: number, v: number) => void) => {
+    const [u, v] = o.point(lu, lv);
+    props.push({ u, v, draw: () => draw(u, v) });
+  };
 
+  if (art.trees) {
+    // Lot corners and edges that the body doesn't cover.
+    const m = 0.1;
+    const spots: [number, number][] = [
+      [o.w - m, o.h - m],
+      [m, o.h - m],
+      [o.w - m, m],
+      [m, m],
+      [o.w / 2, o.h - m],
+      [o.w - m, o.h / 2],
+    ];
+    const free = spots.filter(([u, v]) => u < local.u0 - 0.02 || u > local.u1 + 0.02 || v < local.v0 - 0.02 || v > local.v1 + 0.02);
+    const size = o.w > 1 ? 0.95 : 0.7;
+    free.slice(0, art.trees).forEach(([lu, lv], k) =>
+      at(lu, lv, (u, v) => {
+        const [x, y] = iso.p(u, v, 0);
+        paintRoundTree(ctx, x, y, size, k + Math.floor(rng() * 4));
+      }),
+    );
+  }
   if (ex.has('parking')) {
     const CAR_COLORS = ['#d64545', '#3d7dd8', '#f0c43a', '#ececec', '#3a3f47', '#4bb36b'];
     for (let k = 0; k < 7; k++) {
@@ -638,33 +290,43 @@ function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, v: 
         const c = CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)];
         const cv = local.v1 + 0.25 + rng() * 0.2;
         const car = o.rect({ u0: u + 0.05, u1: u + 0.18, v0: cv, v1: cv + 0.32 });
-        props.push({
-          u: car.u0,
-          v: car.v0,
-          draw: () => {
-            iso.box(car.u0, car.u1, car.v0, car.v1, 0, 3, c, shade(c, -0.3), shade(c, 0.15));
-            const g = 0.02;
-            iso.floor(car.u0 + g, car.u1 - g, car.v0 + g * 3, car.v1 - g * 3, 4.5, 'rgba(40, 60, 80, 0.85)');
-          },
-        });
+        props.push({ u: car.u0, v: car.v0, draw: () => paintParkedCar(iso, car.u0, car.v0, car.u1 - car.u0 > car.v1 - car.v0, c) });
       }
+    }
+  }
+  if (ex.has('patrolcars')) {
+    for (let k = 0; k < 2; k++) {
+      const lu = local.u0 + 0.06 + k * 0.22;
+      const car = o.rect({ u0: lu, u1: lu + 0.15, v0: local.v1 + 0.04, v1: local.v1 + 0.34 });
+      if (car.u1 > o.vw || car.v1 > o.vh) continue;
+      props.push({
+        u: car.u0,
+        v: car.v0,
+        draw: () => {
+          paintParkedCar(iso, car.u0, car.v0, car.u1 - car.u0 > car.v1 - car.v0, '#f4f6f8');
+          const [x, y] = iso.p((car.u0 + car.u1) / 2, (car.v0 + car.v1) / 2, 5);
+          ctx.fillStyle = '#2456d8';
+          ctx.fillRect(x - 2, y - 1.5, 2, 1.5);
+          ctx.fillStyle = '#e8343a';
+          ctx.fillRect(x, y - 1.5, 2, 1.5);
+        },
+      });
     }
   }
   if (ex.has('crates')) {
     const colors = ['#a87a45', '#7a8a4a', '#3d6e9e'];
     for (let k = 0; k < 3; k++) {
-      const cu = local.u1 + 0.05 + (k % 2) * 0.12;
+      const cu = Math.min(local.u1 + 0.02 + (k % 2) * 0.1, o.w - 0.12);
       const cv = local.v1 - 0.35 + k * 0.12;
-      const r = o.rect({ u0: cu, u1: cu + 0.1, v0: cv, v1: cv + 0.1 });
-      const c = colors[(k + v) % colors.length];
-      props.push({ u: r.u0, v: r.v0, draw: () => iso.box(r.u0, r.u1, r.v0, r.v1, 0, 3.5, c, shade(c, -0.3), shade(c, 0.15)) });
+      const r = o.rect({ u0: cu, u1: cu + 0.09, v0: cv, v1: cv + 0.09 });
+      const c = colors[k % colors.length];
+      props.push({ u: r.u0, v: r.v0, draw: () => iso.solid(r, 0, 3.5, c) });
     }
   }
   if (ex.has('tables')) {
-    for (const [tu, tv] of [
-      [local.u0 + 0.12, local.v1 + 0.2],
-      [local.u0 + 0.42, local.v1 + 0.24],
-    ] as const) {
+    const umbrellas = [art.awning ?? '#e9554a', '#f2c84b'];
+    for (const [k, tu] of [local.u0 + 0.12, local.u0 + 0.42].entries()) {
+      const tv = Math.min(local.v1 + 0.2 + k * 0.04, o.h - 0.06);
       const r = o.rect({ u0: tu, u1: tu + 0.04, v0: tv, v1: tv + 0.04 });
       props.push({
         u: r.u0,
@@ -672,8 +334,7 @@ function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, v: 
         draw: () => {
           iso.box(r.u0, r.u1, r.v0, r.v1, 0, 5, '#7a7f86', '#5c6168', '#7a7f86');
           const [x, y] = iso.p((r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2, 7);
-          const ctx = iso.ctx;
-          ctx.fillStyle = v === 0 ? '#e9554a' : '#f2c84b';
+          ctx.fillStyle = umbrellas[k];
           ctx.beginPath();
           ctx.ellipse(x, y, 6, 2.5, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -685,7 +346,81 @@ function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, v: 
       });
     }
   }
+  if (ex.has('planters')) {
+    for (const lu of [local.u0 + 0.04, local.u1 - 0.12]) {
+      const r = o.rect({ u0: lu, u1: lu + 0.08, v0: local.v1 + 0.03, v1: local.v1 + 0.11 });
+      props.push({
+        u: r.u0,
+        v: r.v0,
+        draw: () => {
+          iso.solid(r, 0, 2.5, '#8a6a4a');
+          const [x, y] = iso.p((r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2, 3);
+          ctx.fillStyle = '#3f9a45';
+          ctx.beginPath();
+          ctx.arc(x, y - 1.5, 2.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#e8576a';
+          ctx.fillRect(x - 1.5, y - 3, 1.2, 1.2);
+          ctx.fillStyle = '#f2d33c';
+          ctx.fillRect(x + 0.6, y - 2.2, 1.2, 1.2);
+        },
+      });
+    }
+  }
+  if (ex.has('tanks')) {
+    const lu = Math.min(local.u1 + 0.02, o.w - 0.32);
+    const lv = Math.min(local.v1 + 0.08, o.h - 0.32);
+    const cool = ['#dfe3e7', '#cfd5da'];
+    [
+      [lu + 0.12, lv + 0.12],
+      [lu + 0.12 - 0.2, lv + 0.2],
+    ].forEach(([tu, tv], k) => {
+      if (tu < 0.12) return;
+      at(tu, tv, (u, v) => iso.round(u, v, 0, 14, () => 0.1, cool[k], shade(cool[k], 0.1)));
+    });
+  }
+  if (ex.has('silo')) {
+    const lu = Math.min(local.u1 + 0.02, o.w - 0.2);
+    const lv = Math.max(local.v0 + 0.15, Math.min(local.v1 - 0.15, o.h - 0.2));
+    at(lu + 0.08, lv, (u, v) => {
+      iso.round(u, v, 0, 40, () => 0.13, '#c9ccd0', null);
+      iso.round(u, v, 40, 46, (t) => 0.13 * (1 - t * 0.85), '#b8bcc1', '#d8dbde');
+      for (let z = 8; z < 40; z += 8) {
+        const [x, y] = iso.p(u, v, z);
+        const { rx, ry } = IsoFrame.ellipse(0.13);
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI);
+        ctx.stroke();
+      }
+    });
+  }
   return props;
+}
+
+/** A single-storey garage on the body's local right side, door facing the street. */
+function garageAnnex(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box): Prop {
+  const g = o.rect({ u0: local.u1, u1: Math.min(o.w - 0.05, local.u1 + 0.28), v0: local.v1 - 0.38, v1: local.v1 });
+  const front = o.faceOf('front');
+  return {
+    u: g.u0,
+    v: g.v0,
+    draw: () => {
+      const H = 7;
+      iso.solid(g, 0, H, shade(art.wall, -0.05));
+      iso.floor(g.u0, g.u1, g.v0, g.v1, H, shade(art.roofColor, -0.1));
+      if (front) {
+        const f = faceRef(front, g);
+        const m = (f.a1 - f.a0) * 0.14;
+        wallOn(iso, f, f.a0 + m, f.a1 - m, 0, 5.5, '#e9e6df');
+        for (let z = 1; z < 5.5; z += 1.2) wallOn(iso, f, f.a0 + m, f.a1 - m, z, z + 0.3, 'rgba(0,0,0,0.12)');
+        // Driveway.
+        const edge = f.face === 'sw' ? o.vh : o.vw;
+        floorOut(iso, f, f.a0 + m, f.a1 - m, 0, edge - f.at - 0.03, 0.05, 'rgba(120,120,120,0.35)');
+      }
+    },
+  };
 }
 
 /** Picket fence along the two lot edges nearest the camera. */
@@ -696,114 +431,218 @@ function paintFence(iso: IsoFrame, lot: Box) {
   iso.wall('se', lot.u1 - 0.04, lot.v0 + 0.06, lot.v1 - 0.06, 2.5, 3.3, '#e3ddcf');
 }
 
-function glazing(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number, lit: boolean) {
-  wallOn(iso, f, a0, a1, z0, z1, lit ? GLASS_LIT : f.face === 'sw' ? GLASS : shade(GLASS, -0.25));
+// ---------------------------------------------------------------- facades
+
+function glazing(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number, lit: boolean, glass = GLASS) {
+  wallOn(iso, f, a0, a1, z0, z1, lit ? GLASS_LIT : f.face === 'sw' ? glass : shade(glass, -0.25));
   wallOn(iso, f, a0, a1, z1 - 0.8, z1, FRAME);
+  wallOn(iso, f, a0 - 0.008, a1 + 0.008, z0 - 0.6, z0, 'rgba(255,255,255,0.4)');
 }
 
-/** Windows and doors on one camera-facing wall. Front-only details go on the front side only. */
-function paintFacade(iso: IsoFrame, art: BuildingArt, f: FaceRef, side: Side, H: number, v: number, rng: Rng) {
+const lit = (rng: Rng, k = 1) => rng() < LIT_CHANCE * k;
+
+/** Windows and doors on one camera-facing wall of a mass. Front-only details go on the front side only. */
+function paintFacade(iso: IsoFrame, art: BuildingArt, m: MassBox, f: FaceRef, side: Side, rng: Rng) {
   const fh = art.floorH;
   const { a0, a1 } = f;
   const len = a1 - a0;
   const isFront = side === 'front';
-  const cols = Math.max(2, Math.round(len * (art.facade === 'brick' ? 4 : 3.4)));
+  const ground = m.z0 === 0;
+  const H = m.z1;
+  const glass = art.glass ?? GLASS;
+  const dark = f.face === 'se';
+  const facade = m.facade;
+  const cols = Math.max(2, Math.round(len * (facade === 'brick' ? 4 : 3.4)));
   const step = len / cols;
 
-  if (art.facade === 'curtain') {
-    wallOn(iso, f, a0 + 0.01, a1 - 0.01, 2, H, f.face === 'sw' ? shade(art.walls[v], -0.05) : shade(art.walls[v], -0.3));
-    for (let k = 1; k < art.floors; k++) wallOn(iso, f, a0, a1, k * fh, k * fh + 0.7, 'rgba(255,255,255,0.28)');
-    for (let c = 1; c < cols; c++) wallOn(iso, f, a0 + c * step, a0 + c * step + 0.012, 2, H, 'rgba(20,40,60,0.35)');
-    if (f.face === 'sw') {
-      // Diagonal reflection streak on the lit side.
-      iso.poly([pOn(iso, f, a0 + len * 0.15, 0, H * 0.9), pOn(iso, f, a0 + len * 0.3, 0, H * 0.9), pOn(iso, f, a0 + len * 0.55, 0, H * 0.25), pOn(iso, f, a0 + len * 0.4, 0, H * 0.25)], 'rgba(255,255,255,0.14)');
-    }
-    for (let k = 0; k < art.floors; k++) {
-      if (rng() < 0.25) {
-        const c = Math.floor(rng() * cols);
-        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, k * fh + 1.5, (k + 1) * fh - 1, 'rgba(255, 228, 150, 0.55)');
+  if (facade === 'curtain') {
+    wallOn(iso, f, a0 + 0.01, a1 - 0.01, m.z0 + (ground ? 2 : 0), H, dark ? shade(m.wall, -0.3) : shade(m.wall, -0.05));
+    for (let k = 1; k < m.floors; k++) wallOn(iso, f, a0, a1, m.z0 + k * fh, m.z0 + k * fh + 0.7, 'rgba(255,255,255,0.28)');
+    for (let c = 1; c < cols; c++) {
+      const a = a0 + c * step;
+      if (art.fins) {
+        wallOn(iso, f, a - 0.012, a + 0.012, m.z0, H, dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.4)');
+        wallOn(iso, f, a + 0.006, a + 0.012, m.z0, H, 'rgba(0,0,0,0.18)');
+      } else {
+        wallOn(iso, f, a, a + 0.012, m.z0, H, 'rgba(20,40,60,0.35)');
       }
     }
-    return;
-  }
-
-  if (art.facade === 'bands') {
-    for (let k = 0; k < art.floors; k++) {
-      wallOn(iso, f, a0 + 0.03, a1 - 0.03, k * fh + 2, k * fh + fh - 1.5, f.face === 'sw' ? '#3f5f7d' : '#2e475e');
-      for (let c = 1; c < cols; c++) wallOn(iso, f, a0 + c * step, a0 + c * step + 0.012, k * fh + 2, k * fh + fh - 1.5, 'rgba(230,236,242,0.5)');
+    if (!dark) {
+      // Diagonal reflection streak on the lit side.
+      const h = H - m.z0;
+      iso.poly(
+        [
+          pOn(iso, f, a0 + len * 0.15, 0, m.z0 + h * 0.9),
+          pOn(iso, f, a0 + len * 0.3, 0, m.z0 + h * 0.9),
+          pOn(iso, f, a0 + len * 0.55, 0, m.z0 + h * 0.25),
+          pOn(iso, f, a0 + len * 0.4, 0, m.z0 + h * 0.25),
+        ],
+        'rgba(255,255,255,0.14)',
+      );
+    }
+    for (let k = 0; k < m.floors; k++) {
       if (rng() < 0.3) {
         const c = Math.floor(rng() * cols);
-        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, k * fh + 2.5, k * fh + fh - 2, 'rgba(255, 228, 150, 0.7)');
+        const z = m.z0 + k * fh;
+        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, z + 1.5, z + fh - 1, 'rgba(255, 228, 150, 0.55)');
       }
     }
+    if (ground && isFront) entrance(iso, f, fh);
     return;
   }
 
-  if (art.facade === 'industrial') {
-    for (let c = 0; c < cols; c++) {
-      const s0 = a0 + c * step + step * 0.25;
-      glazing(iso, f, s0, s0 + step * 0.5, H - 6, H - 2.5, false);
+  if (facade === 'grid') {
+    wallOn(iso, f, a0, a1, m.z0, H, dark ? shade(glass, -0.35) : glass);
+    for (let k = 0; k < m.floors; k++) {
+      const z = m.z0 + k * fh;
+      for (let c = 0; c < cols; c++) if (lit(rng, 1.2)) wallOn(iso, f, a0 + c * step, a0 + (c + 1) * step, z + 1.4, z + fh, GLASS_LIT);
+      wallOn(iso, f, a0, a1, z, z + 1.4, dark ? shade(m.wall, -0.22) : m.wall);
+    }
+    for (let c = 0; c <= cols; c++) {
+      const a = a0 + c * step;
+      wallOn(iso, f, Math.max(a0, a - 0.025), Math.min(a1, a + 0.025), m.z0, H, dark ? shade(m.wall, -0.18) : shade(m.wall, 0.06));
+    }
+    if (ground && isFront) entrance(iso, f, fh);
+    return;
+  }
+
+  if (facade === 'bands' || facade === 'ribbon') {
+    const ribbon = facade === 'ribbon';
+    const band = ribbon ? (dark ? '#22343f' : '#2f4a58') : dark ? '#2e475e' : '#3f5f7d';
+    for (let k = 0; k < m.floors; k++) {
+      const z = m.z0 + k * fh;
+      const z0 = z + (ribbon ? 2.6 : 2);
+      const z1 = z + fh - (ribbon ? 1.4 : 1.5);
+      wallOn(iso, f, a0 + 0.03, a1 - 0.03, z0, z1, band);
+      for (let c = 1; c < cols; c++) wallOn(iso, f, a0 + c * step, a0 + c * step + 0.012, z0, z1, ribbon ? 'rgba(255,255,255,0.6)' : 'rgba(230,236,242,0.5)');
+      if (lit(rng, 1.8)) {
+        const c = Math.floor(rng() * cols);
+        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, z0 + 0.5, z1 - 0.5, 'rgba(255, 228, 150, 0.7)');
+      }
+      if (ribbon) wallOn(iso, f, a0 + 0.02, a1 - 0.02, z1, z1 + 0.6, 'rgba(255,255,255,0.5)');
+    }
+    if (ground && isFront) entrance(iso, f, fh);
+    return;
+  }
+
+  if (facade === 'lobby') {
+    // Double-height glass with mullions, a trim band on top, and the main door at the front.
+    wallOn(iso, f, a0 + 0.02, a1 - 0.02, m.z0 + 1.5, H - 1.5, dark ? '#3d5368' : '#56738c');
+    wallOn(iso, f, a0 + 0.02, a1 - 0.02, m.z0 + 1.5, H - 1.5, 'rgba(255, 236, 190, 0.18)');
+    for (let c = 1; c < cols * 2; c++) wallOn(iso, f, a0 + (c * step) / 2, a0 + (c * step) / 2 + 0.01, m.z0 + 1.5, H - 1.5, 'rgba(255,255,255,0.45)');
+    wallOn(iso, f, a0, a1, H - 1.5, H, art.trim ?? shade(m.wall, -0.15));
+    if (isFront) {
+      const mid = (a0 + a1) / 2;
+      wallOn(iso, f, mid - 0.1, mid + 0.1, m.z0, m.z0 + 8, '#2a3440');
+      wallOn(iso, f, mid - 0.002, mid + 0.002, m.z0, m.z0 + 8, 'rgba(255,255,255,0.4)');
     }
     return;
   }
 
-  if (art.facade === 'townhouse' && isFront) {
+  if (facade === 'industrial') {
+    for (let a = a0 + 0.03; a < a1 - 0.01; a += 0.035) wallOn(iso, f, a, a + 0.008, m.z0, H, 'rgba(0,0,0,0.07)');
+    for (let c = 0; c < cols; c++) {
+      const s0 = a0 + c * step + step * 0.25;
+      glazing(iso, f, s0, s0 + step * 0.5, H - 6, H - 2.5, false, '#5d7f99');
+    }
+    return;
+  }
+
+  if (facade === 'townhouse' && isFront) {
+    const unitColors = art.units ?? [m.wall];
     const units = 3;
     const uw = len / units;
     const doorColors = ['#c0392b', '#2e6fb5', '#2f8f4e', '#e0a12d'];
     for (let k = 0; k < units; k++) {
       const s0 = a0 + k * uw;
-      const unitWall = art.walls[(v + k) % 3];
-      wallOn(iso, f, s0, s0 + uw, 2, H, f.face === 'sw' ? shade(unitWall, 0.05 * k) : shade(unitWall, -0.2 + 0.05 * k));
+      const unitWall = unitColors[k % unitColors.length];
+      wallOn(iso, f, s0, s0 + uw, 2, H, dark ? shade(unitWall, -0.2) : unitWall);
       wallOn(iso, f, s0 + uw - 0.01, s0 + uw, 2, H, 'rgba(0,0,0,0.25)');
-      wallOn(iso, f, s0 + uw * 0.15, s0 + uw * 0.45, 2, 9, doorColors[(k + v) % doorColors.length]);
+      wallOn(iso, f, s0 + uw * 0.15, s0 + uw * 0.45, 2, 9, doorColors[k % doorColors.length]);
+      wallOn(iso, f, s0 + uw * 0.12, s0 + uw * 0.48, 9, 10, '#f4f1ea');
       glazing(iso, f, s0 + uw * 0.55, s0 + uw * 0.85, 4, 8, false);
-      for (let fl = 1; fl < art.floors; fl++) {
-        glazing(iso, f, s0 + uw * 0.18, s0 + uw * 0.45, fl * fh + 2, fl * fh + fh - 2, rng() < 0.2);
-        glazing(iso, f, s0 + uw * 0.55, s0 + uw * 0.82, fl * fh + 2, fl * fh + fh - 2, rng() < 0.2);
+      for (let fl = 1; fl < m.floors; fl++) {
+        glazing(iso, f, s0 + uw * 0.18, s0 + uw * 0.45, fl * fh + 2, fl * fh + fh - 2, lit(rng));
+        glazing(iso, f, s0 + uw * 0.55, s0 + uw * 0.82, fl * fh + 2, fl * fh + fh - 2, lit(rng));
       }
       wallOn(iso, f, s0, s0 + uw, H - 1.5, H, shade(unitWall, -0.3));
     }
     return;
   }
 
-  if (art.facade === 'brick') {
-    for (let k = 0; k < art.floors; k++) wallOn(iso, f, a0, a1, k * fh, k * fh + 0.6, 'rgba(0,0,0,0.12)');
+  if (facade === 'siding') {
+    for (let z = m.z0 + 2.5; z < H - 0.5; z += 1.6) wallOn(iso, f, a0, a1, z, z + 0.4, 'rgba(0,0,0,0.07)');
+  }
+  if (facade === 'brick') {
+    for (let k = 0; k < m.floors; k++) wallOn(iso, f, a0, a1, m.z0 + k * fh, m.z0 + k * fh + 0.6, 'rgba(0,0,0,0.12)');
+    // Brick texture: faint staggered courses.
+    for (let z = m.z0 + 3; z < H - 1; z += 2.2) wallOn(iso, f, a0, a1, z, z + 0.3, 'rgba(255,255,255,0.05)');
   }
 
-  const shop = art.facade === 'shopfront';
-  for (let k = 0; k < art.floors; k++) {
-    const z0 = k * fh;
-    if (shop && k === 0) {
+  const shop = facade === 'shopfront';
+  const lintel = facade === 'brick' ? (art.trim ?? '#e8dcc8') : null;
+  const shutters = facade === 'siding';
+  for (let k = 0; k < m.floors; k++) {
+    const z0 = m.z0 + k * fh;
+    if (shop && k === 0 && ground) {
       if (isFront) {
-        // Big shop window plus a door.
-        glazing(iso, f, a0 + 0.06, a1 - len * 0.32, 2, fh - 2.5, false);
-        wallOn(iso, f, a1 - len * 0.26, a1 - len * 0.1, 2, fh - 2.5, '#5b3a26');
+        // Big shop window, a kick plate, and the door.
+        wallOn(iso, f, a0 + 0.04, a1 - 0.04, 1, 2.2, shade(m.wall, -0.4));
+        glazing(iso, f, a0 + 0.06, a1 - len * 0.32, 2.2, fh - 2.5, false, '#4a6f8a');
+        wallOn(iso, f, a0 + 0.08, a1 - len * 0.34, 3, 5, 'rgba(255, 240, 200, 0.35)');
+        wallOn(iso, f, a1 - len * 0.26, a1 - len * 0.1, 1.5, fh - 2.5, '#5b3a26');
+        wallOn(iso, f, a1 - len * 0.24, a1 - len * 0.12, 3, fh - 4, 'rgba(160, 200, 230, 0.6)');
       } else {
-        glazing(iso, f, a0 + 0.08, a1 - 0.08, 2, fh - 2.5, false);
+        glazing(iso, f, a0 + 0.08, a1 - 0.08, 2.2, fh - 2.5, false, '#4a6f8a');
       }
       continue;
     }
-    if (isFront && k === 0 && art.floors <= 4) {
+    const door = isFront && k === 0 && ground;
+    if (door && m.floors <= 4) {
       const mid = a0 + len * 0.5;
-      wallOn(iso, f, mid - 0.07, mid + 0.07, 1.5, Math.min(fh - 1, 9), '#6b4428');
+      wallOn(iso, f, mid - 0.08, mid + 0.08, 1.5, Math.min(fh, 10), '#efe9dc');
+      wallOn(iso, f, mid - 0.065, mid + 0.065, 1.5, Math.min(fh - 1, 9), '#6b4428');
       for (let c = 0; c < cols; c++) {
         const s0 = a0 + c * step + step * 0.22;
         if (Math.abs(s0 + step * 0.28 - mid) < step * 0.6) continue;
-        glazing(iso, f, s0, s0 + step * 0.56, z0 + 3, z0 + fh - 2.5, rng() < 0.15);
+        glazing(iso, f, s0, s0 + step * 0.56, z0 + 3, z0 + fh - 2.5, lit(rng), glass);
       }
+      continue;
+    }
+    if (door) {
+      entrance(iso, f, fh);
       continue;
     }
     for (let c = 0; c < cols; c++) {
       const s0 = a0 + c * step + step * 0.22;
-      glazing(iso, f, s0, s0 + step * 0.56, z0 + 2.5, z0 + fh - 2, rng() < 0.18);
+      const s1 = s0 + step * 0.56;
+      glazing(iso, f, s0, s1, z0 + 2.5, z0 + fh - 2, lit(rng), glass);
+      if (lintel) wallOn(iso, f, s0 - 0.01, s1 + 0.01, z0 + fh - 2, z0 + fh - 1.2, lintel);
+      if (shutters) {
+        wallOn(iso, f, s0 - 0.04, s0 - 0.005, z0 + 2.5, z0 + fh - 2, '#3f6b4f');
+        wallOn(iso, f, s1 + 0.005, s1 + 0.04, z0 + 2.5, z0 + fh - 2, '#3f6b4f');
+      }
     }
   }
+  // Cornice.
+  if (m.top && art.roof === 'flat') wallOn(iso, f, a0, a1, H - 1.4, H, art.trim ?? shade(m.wall, -0.12));
 }
 
+/** Ground-floor entrance of a tall building: a glazed lobby with a dark door in the middle. */
+function entrance(iso: IsoFrame, f: FaceRef, fh: number) {
+  const mid = (f.a0 + f.a1) / 2;
+  const half = Math.min(0.22, (f.a1 - f.a0) * 0.2);
+  wallOn(iso, f, mid - half, mid + half, 0, fh - 1, '#4c6378');
+  wallOn(iso, f, mid - half, mid + half, 0, fh - 1, 'rgba(255, 236, 190, 0.22)');
+  wallOn(iso, f, mid - 0.06, mid + 0.06, 0, 7, '#26303a');
+  wallOn(iso, f, mid - half, mid + half, fh - 1, fh, 'rgba(255,255,255,0.6)');
+}
+
+// ---------------------------------------------------------------- roofs
+
 /**
- * Roofs drawn in view space. Pitched and sawtooth roofs run along `axis`
- * (the local u axis after rotation); each case draws its far planes first.
+ * Roofs drawn in view space. Pitched and sawtooth roofs run along `axis`; each case draws its
+ * far planes first.
  */
 function paintRoof(iso: IsoFrame, art: BuildingArt, b: Box, axis: 'u' | 'v', H: number, roofColor: string, wall: string) {
   const rh = art.roofH ?? 0;
@@ -811,6 +650,8 @@ function paintRoof(iso: IsoFrame, art: BuildingArt, b: Box, axis: 'u' | 'v', H: 
   if (art.roof === 'flat') {
     iso.floor(b.u0, b.u1, b.v0, b.v1, H, shade(wall, -0.1));
     iso.floor(b.u0 + 0.04, b.u1 - 0.04, b.v0 + 0.04, b.v1 - 0.04, H, roofColor);
+    // Membrane seams.
+    for (let a = b.u0 + 0.2; a < b.u1 - 0.1; a += 0.2) iso.floor(a, a + 0.006, b.v0 + 0.05, b.v1 - 0.05, H, 'rgba(255,255,255,0.05)');
     iso.wall('sw', b.v1, b.u0, b.u1, H, H + 1.5, shade(wall, 0.1));
     iso.wall('se', b.u1, b.v0, b.v1, H, H + 1.5, shade(wall, -0.15));
     return;
@@ -827,23 +668,30 @@ function paintRoof(iso: IsoFrame, art: BuildingArt, b: Box, axis: 'u' | 'v', H: 
   if (art.roof === 'gable') {
     iso.poly([P(A0 - o, C0 - o, H), P(A1 + o, C0 - o, H), P(A1 + o, cm, H + rh), P(A0 - o, cm, H + rh)], farSlope);
     iso.poly([P(A1, C0, H), P(A1, C1, H), P(A1, cm, H + rh)], endWall);
+    // Gable-end window.
+    const [wx, wy] = P(A1, cm, H + rh * 0.35);
+    iso.ctx.fillStyle = shade(GLASS, axis === 'u' ? -0.25 : 0);
+    iso.ctx.fillRect(wx - 1.2, wy - 1.5, 2.4, 2.4);
     iso.poly([P(A0 - o, C1 + o, H - 1), P(A1 + o, C1 + o, H - 1), P(A1 + o, cm, H + rh), P(A0 - o, cm, H + rh)], nearSlope);
-    for (let t = 0.25; t < 1; t += 0.25) {
+    for (let t = 0.2; t < 1; t += 0.2) {
       const cc = C1 + o - (C1 + o - cm) * t;
       const z = H - 1 + (rh + 1) * t;
-      iso.poly([P(A0 - o, cc, z), P(A1 + o, cc, z), P(A1 + o, cc, z + 1), P(A0 - o, cc, z + 1)], shade(roofColor, axis === 'u' ? -0.15 : -0.27));
+      iso.poly([P(A0 - o, cc, z), P(A1 + o, cc, z), P(A1 + o, cc, z + 0.7), P(A0 - o, cc, z + 0.7)], shade(roofColor, axis === 'u' ? -0.15 : -0.27));
     }
     iso.poly([P(A0 - o, cm, H + rh), P(A1 + o, cm, H + rh), P(A1 + o, cm, H + rh + 1), P(A0 - o, cm, H + rh + 1)], shade(roofColor, 0.25));
     return;
   }
   if (art.roof === 'hip') {
     const d = (C1 - C0) / 2;
-    const r0 = A0 + d;
-    const r1 = A1 - d;
+    // Square plans meet in a point (a pyramid roof).
+    const r0 = Math.min(A0 + d, (A0 + A1) / 2);
+    const r1 = Math.max(A1 - d, (A0 + A1) / 2);
     iso.poly([P(A0 - o, C0 - o, H), P(A1 + o, C0 - o, H), P(r1, cm, H + rh), P(r0, cm, H + rh)], farSlope);
     iso.poly([P(A1 + o, C0 - o, H), P(A1 + o, C1 + o, H), P(r1, cm, H + rh)], axis === 'u' ? shade(roofColor, -0.18) : roofColor);
     iso.poly([P(A0 - o, C1 + o, H), P(A1 + o, C1 + o, H), P(r1, cm, H + rh), P(r0, cm, H + rh)], nearSlope);
-    iso.poly([P(r0, cm, H + rh), P(r1, cm, H + rh), P(r1, cm, H + rh + 1), P(r0, cm, H + rh + 1)], shade(roofColor, 0.25));
+    if (r1 - r0 > 0.01) {
+      iso.poly([P(r0, cm, H + rh), P(r1, cm, H + rh), P(r1, cm, H + rh + 1), P(r0, cm, H + rh + 1)], shade(roofColor, 0.25));
+    }
     return;
   }
   // Sawtooth: teeth along the axis, glazed faces toward the camera.
@@ -859,43 +707,78 @@ function paintRoof(iso: IsoFrame, art: BuildingArt, b: Box, axis: 'u' | 'v', H: 
   }
 }
 
-function paintSmokestack(iso: IsoFrame, at: readonly [number, number], H: number, v: number) {
-  const top = H + 30;
-  const [cx, cyBase] = iso.p(at[0], at[1], 0);
-  const ctx = iso.ctx;
-  const r = 4.5;
-  ctx.fillStyle = '#8a4a3a';
-  ctx.fillRect(cx - r, cyBase - top, r * 2, top);
-  ctx.fillStyle = '#6e3a2e';
-  ctx.fillRect(cx, cyBase - top, r, top);
-  for (const z of [top - 6, top - 14]) {
-    ctx.fillStyle = v === 1 ? '#e8e8e8' : '#f0f0f0';
-    ctx.fillRect(cx - r, cyBase - z, r * 2, 3);
+// ---------------------------------------------------------------- extras
+
+/** Local positions of smokestacks (they stand on the ground behind or through the roof). */
+function stackPositions(art: BuildingArt, local: Box): [number, number][] {
+  const ex = new Set<Extra>(art.extras);
+  if (ex.has('smokestacks')) {
+    return [
+      [local.u1 - 0.3, local.v0 + 0.22],
+      [local.u1 - 0.62, local.v0 + 0.22],
+    ];
   }
-  ctx.fillStyle = '#3a3a3a';
-  ctx.beginPath();
-  ctx.ellipse(cx, cyBase - top, r, r * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (ex.has('smokestack')) return [[local.u1 - 0.35, local.v0 + 0.25]];
+  return [];
 }
 
-function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: Box, front: Face | null, H: number, v: number, rng: Rng) {
+function paintSmokestack(iso: IsoFrame, at: readonly [number, number], H: number, slim: boolean) {
+  const top = H + (slim ? 26 : 30);
+  const r = slim ? 0.07 : 0.09;
+  iso.round(at[0], at[1], 0, top, (t) => r * (1 - t * 0.2), '#a8543f', null);
+  for (const z of [top - 6, top - 13]) {
+    const [x, y] = iso.p(at[0], at[1], z);
+    const { rx } = IsoFrame.ellipse(r * 0.85);
+    iso.ctx.fillStyle = 'rgba(245, 245, 245, 0.92)';
+    iso.ctx.fillRect(x - rx, y - 2.5, rx * 2, 2.5);
+  }
+}
+
+/** Where rooftop items go: local positions inside the top mass, mapped to view. */
+function roofSpot(o: Orient, top: MassBox, fu: number, fv: number): [number, number] {
+  const l = top.local;
+  return o.point(l.u0 + (l.u1 - l.u0) * fu, l.v0 + (l.v1 - l.v0) * fv);
+}
+
+function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, ms: readonly MassBox[], rng: Rng) {
   const fh = art.floorH;
   const ex = new Set(art.extras);
+  const ctx = iso.ctx;
+  const base = ms[0];
+  const top = ms[ms.length - 1];
+  const b = base.view;
+  const tb = top.view;
+  const H = top.z1;
+  const front = o.faceOf('front');
   const lf = front ? faceRef(front, b) : null;
+  const flat = art.roof === 'flat';
 
   if (ex.has('chimney')) {
-    const [cu, cv] = o.point(local.u0 + (local.u1 - local.u0) * 0.72, local.v0 + (local.v1 - local.v0) * 0.3);
+    const [cu, cv] = roofSpot(o, top, 0.75, 0.3);
     iso.box(cu - 0.05, cu + 0.05, cv - 0.05, cv + 0.05, H - 2, H + (art.roofH ?? 0) + 4, '#9b4b3c', '#7a3a2f', '#5a2c24');
   }
   if (ex.has('porch') && lf) {
     const mid = (lf.a0 + lf.a1) / 2;
     floorOut(iso, lf, mid - 0.2, mid + 0.2, 0, 0.14, 1.5, '#cdbfa6');
-    boxOut(iso, lf, mid - 0.2, mid + 0.2, 0, 0.14, 8.5, 9.5, '#efe6d6', '#cfc4b0', '#a7493a');
+    boxOut(iso, lf, mid - 0.2, mid + 0.2, 0, 0.14, 8.5, 9.5, '#efe6d6', '#cfc4b0', shade(art.roofColor, 0.05));
     for (const a of [mid - 0.19, mid + 0.17]) wallOn(iso, lf, a, a + 0.02, 1.5, 8.5, '#f6f1e6', 0.13);
   }
+  if (ex.has('firedoors') && lf) {
+    const edge = lf.face === 'sw' ? o.vh : o.vw;
+    floorOut(iso, lf, lf.a0, lf.a1, 0, edge - lf.at - 0.04, 0.1, 'rgba(210, 205, 195, 0.9)');
+    const doors = 2;
+    const span = (lf.a1 - lf.a0) / doors;
+    for (let k = 0; k < doors; k++) {
+      const a = lf.a0 + k * span + span * 0.12;
+      const a2 = a + span * 0.76;
+      wallOn(iso, lf, a - 0.015, a2 + 0.015, 0, 9.5, '#f0ebe0');
+      wallOn(iso, lf, a, a2, 0, 8.5, '#c8352b');
+      for (let z = 1.2; z < 8.5; z += 1.6) wallOn(iso, lf, a, a2, z, z + 0.35, 'rgba(0,0,0,0.18)');
+      wallOn(iso, lf, a + 0.02, a2 - 0.02, 5.5, 7, 'rgba(180, 220, 240, 0.7)');
+    }
+  }
   if (ex.has('awning') && lf) {
-    const colors = ['#d94a3d', '#2e8a5a', '#2d6fc4'];
-    const c = colors[v % colors.length];
+    const c = art.awning ?? '#d94a3d';
     const z = fh - 1.5;
     const stripes = 8;
     const len = lf.a1 - lf.a0;
@@ -906,89 +789,192 @@ function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: 
     }
     wallOn(iso, lf, lf.a0, lf.a1, z - 5.5, z - 4, shade(c, -0.2), 0.16);
   }
-  if (art.sign && art.facade === 'shopfront' && lf) {
-    const sc = art.signColors?.[v] ?? '#333';
+  const shopSign = art.sign && base.facade === 'shopfront';
+  if (shopSign && lf && art.sign) {
+    const sc = art.signColor ?? '#333';
     const mid = (lf.a0 + lf.a1) / 2;
-    if (art.floors === 1) {
-      wallOn(iso, lf, lf.a0 + 0.1, lf.a1 - 0.1, H, H + 7, sc, -0.02);
-      iso.text(lf.face, lf.at - 0.02, mid, H + 3.6, art.sign, 5.5, '#ffffff');
+    const size = art.sign.length > 6 ? 4 : 5;
+    if (base.floors === 1 && top === base) {
+      wallOn(iso, lf, lf.a0 + 0.08, lf.a1 - 0.08, H, H + 7, sc, -0.02);
+      wallOn(iso, lf, lf.a0 + 0.08, lf.a1 - 0.08, H + 6.3, H + 7, 'rgba(255,255,255,0.4)', -0.02);
+      iso.text(lf.face, lf.at - 0.02, mid, H + 3.6, art.sign, size + 0.5, '#ffffff');
     } else {
-      wallOn(iso, lf, lf.a0 + 0.06, lf.a1 - 0.06, fh + 1.5, fh + 6.5, sc);
-      iso.text(lf.face, lf.at, mid, fh + 4.1, art.sign, 4.5, '#ffffff');
+      wallOn(iso, lf, lf.a0 + 0.06, lf.a1 - 0.06, fh + 1.2, fh + 6.5, sc);
+      iso.text(lf.face, lf.at, mid, fh + 3.9, art.sign, size, '#ffffff');
     }
   }
   if (ex.has('balconies')) {
-    // Balconies on every visible side, so the building reads the same from any angle.
-    for (const face of ['sw', 'se'] as const) {
-      const f = faceRef(face, b);
-      const len = f.a1 - f.a0;
-      const cols = Math.max(2, Math.round(len * 3.4));
-      const step = len / cols;
-      for (let k = 1; k < art.floors; k++) {
-        for (let c = 0; c < cols; c += 2) {
-          const a = f.a0 + c * step + step * 0.12;
-          const z = k * fh + 0.5;
-          floorOut(iso, f, a, a + step * 0.76, 0, 0.08, z, '#d8d4cc');
-          wallOn(iso, f, a, a + step * 0.76, z, z + 3, 'rgba(70, 76, 84, 0.75)', 0.08);
+    // Balconies on every visible side of the residential masses, so the building reads the same from any angle.
+    for (const m of ms) {
+      if (m.facade === 'shopfront' || m.facade === 'lobby') continue;
+      for (const face of ['sw', 'se'] as const) {
+        const f = faceRef(face, m.view);
+        const len = f.a1 - f.a0;
+        const cols = Math.max(2, Math.round(len * 3.4));
+        const step = len / cols;
+        for (let k = 1; k < m.floors; k++) {
+          for (let c = 0; c < cols; c += 2) {
+            const a = f.a0 + c * step + step * 0.12;
+            const z = m.z0 + k * fh + 0.5;
+            floorOut(iso, f, a, a + step * 0.76, 0, 0.08, z, '#d8d4cc');
+            wallOn(iso, f, a, a + step * 0.76, z, z + 3, 'rgba(70, 76, 84, 0.75)', 0.08);
+          }
         }
       }
     }
   }
+  if (ex.has('fireescape')) {
+    // Zig-zag stairs on the right side.
+    const right = o.faceOf('right') ?? o.faceOf('left');
+    if (right) {
+      const f = faceRef(right, b);
+      const a0 = f.a0 + (f.a1 - f.a0) * 0.3;
+      const a1 = f.a0 + (f.a1 - f.a0) * 0.75;
+      for (let k = 1; k < base.floors; k++) {
+        const z = k * fh;
+        floorOut(iso, f, a0, a1, 0, 0.07, z, 'rgba(40, 40, 44, 0.8)');
+        wallOn(iso, f, a0, a1, z, z + 2.5, 'rgba(30, 30, 34, 0.55)', 0.07);
+        const [s0, s1] = k % 2 ? [a0, a1] : [a1, a0];
+        iso.poly([pOn(iso, f, s0, 0.05, z), pOn(iso, f, s0, 0.05, z + 0.8), pOn(iso, f, s1, 0.05, z - fh + 0.8), pOn(iso, f, s1, 0.05, z - fh)], 'rgba(30, 30, 34, 0.7)');
+      }
+    }
+  }
   if (ex.has('terraces')) {
-    for (let k = 3; k < art.floors; k += 3) {
-      iso.wall('sw', b.v1 + 0.06, b.u0 - 0.02, b.u1 + 0.02, k * fh, k * fh + 2.5, 'rgba(230, 240, 245, 0.7)');
-      iso.wall('se', b.u1 + 0.06, b.v0 - 0.02, b.v1 + 0.02, k * fh, k * fh + 2.5, 'rgba(200, 212, 220, 0.7)');
+    for (let k = 3; k < top.floors; k += 3) {
+      const z = top.z0 + k * fh;
+      iso.wall('sw', tb.v1 + 0.06, tb.u0 - 0.02, tb.u1 + 0.02, z, z + 2.5, 'rgba(230, 240, 245, 0.7)');
+      iso.wall('se', tb.u1 + 0.06, tb.v0 - 0.02, tb.v1 + 0.02, z, z + 2.5, 'rgba(200, 212, 220, 0.7)');
+    }
+  }
+  if (ex.has('redcross')) {
+    for (const face of ['sw', 'se'] as const) {
+      const f = faceRef(face, top.view);
+      const mid = (f.a0 + f.a1) / 2;
+      const z = H - 7;
+      wallOn(iso, f, mid - 0.09, mid + 0.09, z - 4.5, z + 4.5, '#ffffff');
+      wallOn(iso, f, mid - 0.025, mid + 0.025, z - 3.5, z + 3.5, '#d4343a');
+      wallOn(iso, f, mid - 0.07, mid + 0.07, z - 1, z + 1, '#d4343a');
     }
   }
   if (ex.has('canopy') && lf) {
     const mid = (lf.a0 + lf.a1) / 2;
     floorOut(iso, lf, mid - 0.3, mid + 0.3, 0, 0.3, 9, '#2c2f36');
-    wallOn(iso, lf, mid - 0.3, mid + 0.3, 7.5, 9, '#c9a447', 0.3);
-    for (const a of [mid - 0.28, mid + 0.26]) wallOn(iso, lf, a, a + 0.02, 0, 7.5, '#c9a447', 0.28);
+    wallOn(iso, lf, mid - 0.3, mid + 0.3, 7.5, 9, art.trim ?? '#c9a447', 0.3);
+    for (const a of [mid - 0.28, mid + 0.26]) wallOn(iso, lf, a, a + 0.02, 0, 7.5, art.trim ?? '#c9a447', 0.28);
   }
-  if (ex.has('acunits')) {
-    for (let k = 0; k < 2; k++) {
-      const lu = local.u0 + 0.15 + rng() * Math.max(0.05, local.u1 - local.u0 - 0.4);
-      const lv = local.v0 + 0.12 + rng() * Math.max(0.05, local.v1 - local.v0 - 0.35);
-      const r = o.rect({ u0: lu, u1: lu + 0.14, v0: lv, v1: lv + 0.12 });
-      iso.box(r.u0, r.u1, r.v0, r.v1, H, H + 3.5, '#c9cdd2', '#a2a7ad', '#e2e5e8');
+
+  // Rooftop: only on flat roofs.
+  if (flat) {
+    if (ex.has('solar')) {
+      const l = top.local;
+      for (let lv = l.v0 + 0.1; lv < l.v1 - 0.18; lv += 0.16) {
+        const r = o.rect({ u0: l.u0 + 0.1, u1: l.u1 - 0.1, v0: lv, v1: lv + 0.11 });
+        iso.floor(r.u0, r.u1, r.v0, r.v1, H + 1.5, '#2c3e66');
+        iso.floor(r.u0 + 0.01, r.u1 - 0.01, r.v0 + 0.01, r.v1 - 0.01, H + 1.6, '#3e5c94');
+        for (let a = r.u0 + 0.08; a < r.u1; a += 0.08) iso.floor(a, a + 0.006, r.v0, r.v1, H + 1.7, 'rgba(255,255,255,0.25)');
+      }
+    }
+    if (ex.has('roofgarden')) {
+      const d = 0.08;
+      iso.floor(tb.u0 + d, tb.u1 - d, tb.v0 + d, tb.v1 - d, H + 0.5, '#6cbf45');
+      iso.floor(tb.u0 + d + 0.05, tb.u0 + d + 0.12, tb.v0 + d, tb.v1 - d, H + 0.6, '#d9cfb8');
+      for (let k = 0; k < 5; k++) {
+        const [x, y] = iso.p(tb.u0 + d + 0.18 + rng() * (tb.u1 - tb.u0 - 0.36), tb.v0 + d + 0.08 + rng() * (tb.v1 - tb.v0 - 0.26), H);
+        ctx.fillStyle = '#3f8f2c';
+        ctx.beginPath();
+        ctx.arc(x, y - 2, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6fc14a';
+        ctx.beginPath();
+        ctx.arc(x - 0.6, y - 2.8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (ex.has('pool')) {
+      const [pu, pv] = roofSpot(o, top, 0.5, 0.55);
+      const hw = Math.min(0.24, (tb.u1 - tb.u0) * 0.3);
+      const hv = Math.min(0.16, (tb.v1 - tb.v0) * 0.22);
+      iso.floor(pu - hw - 0.04, pu + hw + 0.04, pv - hv - 0.04, pv + hv + 0.04, H + 0.5, '#e9e3d6');
+      iso.floor(pu - hw, pu + hw, pv - hv, pv + hv, H + 0.6, '#3fb4e0');
+      iso.floor(pu - hw, pu + hw * 0.2, pv - hv, pv - hv * 0.4, H + 0.7, 'rgba(255,255,255,0.3)');
+    }
+    if (ex.has('acunits')) {
+      for (let k = 0; k < 2; k++) {
+        const [cu, cv] = roofSpot(o, top, 0.15 + rng() * 0.55, 0.12 + rng() * 0.55);
+        iso.box(cu, cu + 0.14, cv, cv + 0.12, H, H + 3.5, '#c9cdd2', '#a2a7ad', '#e2e5e8');
+        iso.disc(cu + 0.07, cv + 0.06, 0.035, H + 3.6, '#7d838a');
+      }
+    }
+    if (ex.has('helipad')) {
+      const [cu, cv] = roofSpot(o, top, 0.5, 0.5);
+      const r = Math.min(tb.u1 - tb.u0, tb.v1 - tb.v0) * 0.36;
+      iso.disc(cu, cv, r, H + 0.8, '#3b3f46');
+      iso.disc(cu, cv, r * 0.88, H + 0.9, '#f2c43a');
+      iso.disc(cu, cv, r * 0.8, H + 1, '#3b3f46');
+      const s = r * 0.35;
+      const t = r * 0.08;
+      iso.floor(cu - s, cu - s + t, cv - s, cv + s, H + 1.1, '#f4f4f0');
+      iso.floor(cu + s - t, cu + s, cv - s, cv + s, H + 1.1, '#f4f4f0');
+      iso.floor(cu - s, cu + s, cv - t / 2, cv + t / 2, H + 1.1, '#f4f4f0');
+    }
+    if (ex.has('watertank')) {
+      const [tu, tv] = roofSpot(o, top, 0.3, 0.3);
+      const [x, y] = iso.p(tu, tv, H);
+      ctx.fillStyle = '#5a4a3a';
+      for (const dx of [-4, 3]) ctx.fillRect(x + dx, y - 6, 1.5, 6);
+      iso.round(tu, tv, H + 6, H + 15, () => 0.12, '#8b6a4a', '#6b5038');
+      ctx.fillStyle = '#4a3a2c';
+      ctx.beginPath();
+      ctx.moveTo(x - 6, y - 15);
+      ctx.lineTo(x, y - 20);
+      ctx.lineTo(x + 6, y - 15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      for (const z of [9, 12]) ctx.fillRect(x - 5.4, y - z, 10.8, 0.6);
+    }
+    if (ex.has('hosetower')) {
+      const [cu, cv] = roofSpot(o, top, 0.12, 0.12);
+      iso.box(cu - 0.02, cu + 0.16, cv - 0.02, cv + 0.16, H, H + 16, art.wall, shade(art.wall, -0.25), shade(art.wall, -0.1));
+      iso.box(cu - 0.04, cu + 0.18, cv - 0.04, cv + 0.18, H + 16, H + 18, '#5d5f63', '#45474b', '#6d6f73');
+    }
+    if (ex.has('crown')) {
+      const d = 0.1;
+      const wall = top.wall;
+      iso.box(tb.u0 + d, tb.u1 - d, tb.v0 + d, tb.v1 - d, H, H + 6, shade(wall, -0.15), shade(wall, -0.4), '#4a535c');
+      iso.wall('sw', tb.v1 - d, tb.u0 + d, tb.u1 - d, H + 4.5, H + 6, 'rgba(255, 240, 190, 0.9)');
+      iso.wall('se', tb.u1 - d, tb.v0 + d, tb.v1 - d, H + 4.5, H + 6, 'rgba(255, 230, 170, 0.7)');
+      mast(iso, (tb.u0 + tb.u1) / 2, (tb.v0 + tb.v1) / 2, H + 6, 12);
+    }
+    if (ex.has('antenna')) {
+      const [au, av] = roofSpot(o, top, 0.65, 0.35);
+      mast(iso, au, av, H, 20);
+      const [bu, bv] = roofSpot(o, top, 0.3, 0.6);
+      mast(iso, bu, bv, H, 11);
+    }
+    if (ex.has('spire')) {
+      const cu = (tb.u0 + tb.u1) / 2;
+      const cv = (tb.v0 + tb.v1) / 2;
+      const s = Math.min(tb.u1 - tb.u0, tb.v1 - tb.v0) * 0.2;
+      iso.box(cu - s, cu + s, cv - s, cv + s, H, H + 5, shade(top.wall, -0.1), shade(top.wall, -0.35), shade(top.wall, 0.1));
+      const [x, y] = iso.p(cu + s, cv + s, H + 5);
+      const [x0] = iso.p(cu - s, cv + s, H + 5);
+      const [x1] = iso.p(cu + s, cv - s, H + 5);
+      const tipY = y - 34;
+      iso.poly([[x0, y - (HALF_H * 2 * s)], [x, y], [x, tipY]], '#dfe6ec');
+      iso.poly([[x, y], [x1, y - HALF_H * 2 * s], [x, tipY]], '#9aa6b2');
+      ctx.fillStyle = '#ff5a4a';
+      ctx.fillRect(x - 1, tipY - 2, 2, 2);
     }
   }
-  if (ex.has('watertank')) {
-    const [tu, tv] = o.point(local.u0 + (local.u1 - local.u0) * 0.3, local.v0 + (local.v1 - local.v0) * 0.3);
-    const [x, y] = iso.p(tu, tv, H);
-    const ctx = iso.ctx;
-    ctx.fillStyle = '#5a4a3a';
-    for (const dx of [-4, 3]) ctx.fillRect(x + dx, y - 6, 1.5, 6);
-    ctx.fillStyle = '#8b6a4a';
-    ctx.fillRect(x - 6, y - 16, 12, 10);
-    ctx.fillStyle = '#6b5038';
-    ctx.fillRect(x, y - 16, 6, 10);
-    ctx.fillStyle = '#4a3a2c';
-    ctx.beginPath();
-    ctx.moveTo(x - 7, y - 16);
-    ctx.lineTo(x, y - 21);
-    ctx.lineTo(x + 7, y - 16);
-    ctx.closePath();
-    ctx.fill();
-  }
-  if (ex.has('crown')) {
-    const d = 0.12;
-    iso.box(b.u0 + d, b.u1 - d, b.v0 + d, b.v1 - d, H, H + 5, shade(art.walls[v], -0.15), shade(art.walls[v], -0.4), '#4a535c');
-    iso.wall('sw', b.v1 - d, b.u0 + d, b.u1 - d, H + 3.5, H + 5, 'rgba(255, 240, 190, 0.9)');
-    iso.wall('se', b.u1 - d, b.v0 + d, b.v1 - d, H + 3.5, H + 5, 'rgba(255, 230, 170, 0.7)');
-    const [x, y] = iso.p((b.u0 + b.u1) / 2, (b.v0 + b.v1) / 2, H + 5);
-    iso.ctx.fillStyle = '#5b6169';
-    iso.ctx.fillRect(x - 0.5, y - 12, 1.5, 12);
-    iso.ctx.fillStyle = '#ff5a4a';
-    iso.ctx.fillRect(x - 1, y - 13, 2.5, 2);
-  }
-  if (art.sign && art.facade !== 'shopfront') {
+
+  if (art.sign && !shopSign) {
     // Rooftop sign parallel to the front; it faces whichever camera-facing wall shares its axis.
-    const sc = art.signColors?.[v] ?? '#c33';
-    const mid = (local.u0 + local.u1) / 2;
-    const half = (local.u1 - local.u0) * 0.38;
-    const vv = local.v0 + (local.v1 - local.v0) * 0.55;
+    const l = top.local;
+    const sc = art.signColor ?? '#c33';
+    const mid = (l.u0 + l.u1) / 2;
+    const half = (l.u1 - l.u0) * 0.38;
+    const vv = l.v0 + (l.v1 - l.v0) * 0.55;
     const [pu0, pv0] = o.point(mid - half, vv);
     const [pu1, pv1] = o.point(mid + half, vv);
     const sf: FaceRef =
@@ -996,10 +982,11 @@ function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: 
         ? { face: 'sw', at: pv0, a0: Math.min(pu0, pu1), a1: Math.max(pu0, pu1) }
         : { face: 'se', at: pu0, a0: Math.min(pv0, pv1), a1: Math.max(pv0, pv1) };
     const smid = (sf.a0 + sf.a1) / 2;
-    for (const a of [sf.a0 + 0.05, sf.a1 - 0.07]) wallOn(iso, sf, a, a + 0.02, H, H + 4, '#4a4f56');
-    wallOn(iso, sf, sf.a0, sf.a1, H + 4, H + 12, sc);
-    wallOn(iso, sf, sf.a0, sf.a1, H + 11.2, H + 12, 'rgba(255,255,255,0.5)');
-    iso.text(sf.face, sf.at, smid, H + 8, art.sign, 6.5, '#fff7d6');
+    const z0 = H + (flat ? 0 : (art.roofH ?? 0) * 0.5);
+    for (const a of [sf.a0 + 0.05, sf.a1 - 0.07]) wallOn(iso, sf, a, a + 0.02, z0, z0 + 4, '#4a4f56');
+    wallOn(iso, sf, sf.a0, sf.a1, z0 + 4, z0 + 12, sc);
+    wallOn(iso, sf, sf.a0, sf.a1, z0 + 11.2, z0 + 12, 'rgba(255,255,255,0.5)');
+    iso.text(sf.face, sf.at, smid, z0 + 8, art.sign, art.sign.length > 5 ? 5.5 : 6.5, '#fff7d6');
   }
   const right = o.faceOf('right');
   if (ex.has('loadingdock') && right) {
@@ -1010,6 +997,7 @@ function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: 
       const a = f.a0 + k * step + step * 0.18;
       wallOn(iso, f, a, a + step * 0.64, 0, 9, '#4f555c');
       for (let z = 1.5; z < 9; z += 2) wallOn(iso, f, a, a + step * 0.64, z, z + 0.6, 'rgba(255,255,255,0.18)');
+      boxOut(iso, f, a - 0.03, a + step * 0.64 + 0.03, 0, 0.04, 9, 10, '#7d8288', '#62676d', '#8c9197');
     }
     floorOut(iso, f, f.a0, f.a1, 0, 0.18, 0.5, 'rgba(242, 196, 58, 0.55)');
   }
@@ -1020,155 +1008,13 @@ function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: 
   }
 }
 
-// ---------------------------------------------------------------- civic
-
-/** Hedge with a gap in the middle of each camera-facing lot edge (the park entrances). */
-function paintHedges(iso: IsoFrame, lot: Box) {
-  const e = 0.07;
-  const span = (a0: number, a1: number): [number, number][] => [
-    [a0 + e, a0 + (a1 - a0) * 0.42],
-    [a0 + (a1 - a0) * 0.58, a1 - e],
-  ];
-  for (const [s0, s1] of span(lot.u0, lot.u1)) {
-    iso.wall('sw', lot.v1 - e, s0, s1, 0, 3.5, '#3f8f2c');
-    iso.floor(s0, s1, lot.v1 - e - 0.03, lot.v1 - e, 3.5, '#5cb53c');
-  }
-  for (const [s0, s1] of span(lot.v0, lot.v1)) {
-    iso.wall('se', lot.u1 - e, s0, s1, 0, 3.5, '#2f7322');
-    iso.floor(lot.u1 - e - 0.03, lot.u1 - e, s0, s1, 3.5, '#5cb53c');
-  }
+/** Thin mast with a red light on top. */
+function mast(iso: IsoFrame, u: number, v: number, z: number, h: number) {
+  const [x, y] = iso.p(u, v, z);
+  iso.ctx.fillStyle = '#5b6169';
+  iso.ctx.fillRect(x - 0.5, y - h, 1.2, h);
+  iso.ctx.fillRect(x - 2, y - h * 0.6, 4, 0.8);
+  iso.ctx.fillStyle = '#ff5a4a';
+  iso.ctx.fillRect(x - 1, y - h - 1.5, 2.2, 2);
 }
 
-function paintPark(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
-  const lot: Box = { u0: 0, u1: o.vw, v0: 0, v1: o.vh };
-  // Paved edge, then a clipped hedge, so the park reads as a park against plain grass.
-  iso.floor(0.02, 0.98, 0.02, 0.98, 0, '#d8d0bd');
-  iso.floor(0.07, 0.93, 0.07, 0.93, 0, '#7bd552');
-  iso.floor(0.44, 0.56, 0.04, 0.96, 0.1, '#e2d6b8');
-  iso.floor(0.04, 0.96, 0.44, 0.56, 0.1, '#e2d6b8');
-  const ctx = iso.ctx;
-  // Flower bed in the local front-left corner.
-  const flowers = ['#f2d33c', '#f3f1e8', '#e8576a'];
-  for (let k = 0; k < 10; k++) {
-    const [fu, fv] = o.point(0.12 + rng() * 0.25, 0.68 + rng() * 0.25);
-    const [fx, fy] = iso.p(fu, fv, 0);
-    ctx.fillStyle = flowers[(k + variant) % flowers.length];
-    ctx.fillRect(Math.round(fx), Math.round(fy) - 1, 2, 2);
-  }
-  // Everything that stands up, drawn back to front.
-  const items: { depth: number; draw: () => void }[] = [];
-  const [cx, cy] = iso.p(0.5, 0.5, 0);
-  items.push({
-    depth: 1,
-    draw: () => {
-      ctx.fillStyle = '#b9b4a8';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, 9, 4.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#5aa8e0';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 0.5, 7, 3.3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#d6f1ff';
-      ctx.fillRect(cx - 0.75, cy - 7, 1.5, 6);
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 7, 2.5, 1.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-    },
-  });
-  for (const bench of [
-    { u0: 0.2, u1: 0.34, v0: 0.6, v1: 0.66 },
-    { u0: 0.62, u1: 0.76, v0: 0.6, v1: 0.66 },
-  ]) {
-    const r = o.rect(bench);
-    items.push({ depth: r.u0 + r.v0, draw: () => iso.box(r.u0, r.u1, r.v0, r.v1, 0, 2.5, '#8a5a34', '#6b4426', '#a8744a') });
-  }
-  [
-    [0.22, 0.2],
-    [0.78, 0.22],
-    [0.8, 0.78],
-  ].forEach(([u, v], k) => {
-    const [tu, tv] = o.point(u, v);
-    const [tx, ty] = iso.p(tu, tv, 0);
-    items.push({ depth: tu + tv, draw: () => paintPine(ctx, Math.round(tx), Math.round(ty), 0.8, variant + k) });
-  });
-  items.sort((a, b) => a.depth - b.depth);
-  for (const it of items) it.draw();
-  paintHedges(iso, lot);
-}
-
-function paintTownHall(iso: IsoFrame, o: Orient, variant: number) {
-  const stone = ['#efe7d6', '#e6e2da', '#f1e4d2'][variant % 3];
-  const dark = shade(stone, -0.22);
-  // Plaza.
-  iso.floor(0.03, 1.97, 0.03, 1.97, 0, '#c9c3b5');
-  iso.floor(0.08, 1.92, 0.08, 1.92, 0, '#ddd6c6');
-  for (let a = 0.2; a < 1.9; a += 0.25) iso.floor(a, a + 0.01, 0.1, 1.9, 0.1, 'rgba(0,0,0,0.06)');
-  const b = o.rect({ u0: 0.25, u1: 1.75, v0: 0.25, v1: 1.35 });
-  const H = 26;
-  const front = o.faceOf('front');
-
-  const [fu, fv] = o.point(1.85, 1.85);
-  const flagInFront = fu >= b.u1 || fv >= b.v1;
-  const flag = () => {
-    const [fx, fy] = iso.p(fu, fv, 0);
-    iso.ctx.fillStyle = '#6b7079';
-    iso.ctx.fillRect(fx, fy - 30, 1.2, 30);
-    iso.ctx.fillStyle = INK.grassDark;
-    iso.ctx.fillRect(fx + 1.2, fy - 30, 8, 5);
-  };
-  if (!flagInFront) flag();
-
-  iso.box(b.u0, b.u1, b.v0, b.v1, 0, H, stone, dark, shade(stone, -0.08));
-  // Windows on the camera-facing sides that aren't the portico front.
-  for (const face of ['sw', 'se'] as const) {
-    if (face === front) continue;
-    const f = faceRef(face, b);
-    const n = Math.max(3, Math.round((f.a1 - f.a0) * 3.5));
-    const step = (f.a1 - f.a0) / n;
-    for (let k = 0; k < n; k++) glazing(iso, f, f.a0 + k * step + step * 0.25, f.a0 + k * step + step * 0.75, 8, 18, false);
-  }
-  if (front) {
-    const f = faceRef(front, b);
-    const mid = (f.a0 + f.a1) / 2;
-    for (let k = 0; k < 3; k++) boxOut(iso, f, f.a0 + 0.35, f.a1 - 0.35, 0, 0.08 + k * 0.05, 0, 3 - k, shade(stone, 0.05), dark, shade(stone, 0.1));
-    const cols = 6;
-    for (let k = 0; k < cols; k++) {
-      const a = f.a0 + 0.4 + k * ((f.a1 - f.a0 - 0.8) / (cols - 1));
-      wallOn(iso, f, a - 0.025, a + 0.025, 3, H - 6, '#fbf8f1', 0.12);
-      wallOn(iso, f, a + 0.01, a + 0.025, 3, H - 6, 'rgba(0,0,0,0.12)', 0.12);
-    }
-    boxOut(iso, f, f.a0 + 0.3, f.a1 - 0.3, 0, 0.16, H - 6, H - 2, shade(stone, 0.05), dark, stone);
-    iso.poly([pOn(iso, f, f.a0 + 0.3, 0.16, H - 2), pOn(iso, f, f.a1 - 0.3, 0.16, H - 2), pOn(iso, f, mid, 0.16, H + 7)], shade(stone, 0.06));
-  }
-  // Dome with clock.
-  const [dx, dy] = iso.p((b.u0 + b.u1) / 2, (b.v0 + b.v1) / 2, H);
-  const ctx = iso.ctx;
-  ctx.fillStyle = dark;
-  ctx.fillRect(dx - 11, dy - 10, 22, 10);
-  ctx.fillStyle = stone;
-  ctx.fillRect(dx - 11, dy - 10, 11, 10);
-  ctx.fillStyle = '#4f8a7a';
-  ctx.beginPath();
-  ctx.ellipse(dx, dy - 10, 11, 12, 0, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#6fb39f';
-  ctx.beginPath();
-  ctx.ellipse(dx - 3, dy - 15, 4, 5, -0.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#c9a447';
-  ctx.fillRect(dx - 0.75, dy - 28, 1.5, 7);
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(dx - 4, dy - 5, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(dx - 4, dy - 5);
-  ctx.lineTo(dx - 4, dy - 7);
-  ctx.moveTo(dx - 4, dy - 5);
-  ctx.lineTo(dx - 2.6, dy - 5);
-  ctx.stroke();
-  if (flagInFront) flag();
-}
