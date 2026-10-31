@@ -11,9 +11,10 @@ export interface DebugStats {
   drawCalls: number;
   visibleChunks: number;
   totalChunks: number;
-  visibleTiles: number;
+  visibleSprites: number;
   zoom: number;
   mapSize: number;
+  seed: number;
   simTick: number;
 }
 

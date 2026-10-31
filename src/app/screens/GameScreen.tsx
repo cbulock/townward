@@ -1,35 +1,58 @@
 import { useStore } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
-import { Game } from '../../game/Game';
+import { Game, type GameOptions } from '../../game/Game';
 import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { connectGameToStore } from '../bridge';
 import { ControlsHint } from '../hud/ControlsHint';
 import { DebugOverlay } from '../hud/DebugOverlay';
 
-/** Phase 1: map size and seed come from the URL (`?size=256&seed=42`) until the New Game screen exists. */
-function readOptions() {
+/** Until the New Game screen exists, map size and seed live in the URL (`?size=256&seed=42`). */
+function readOptions(): GameOptions {
   const q = new URLSearchParams(location.search);
   const size = Number(q.get('size'));
   const seed = Number(q.get('seed'));
   return {
     size: (MAP_SIZES as readonly number[]).includes(size) ? size : DEFAULT_MAP_SIZE,
-    seed: Number.isFinite(seed) && q.has('seed') ? seed : 1337,
+    seed: q.has('seed') && Number.isInteger(seed) ? seed : randomSeed(),
   };
+}
+
+function randomSeed(): number {
+  return Math.floor(Math.random() * 1_000_000);
+}
+
+function writeSeedToUrl(seed: number) {
+  const url = new URL(location.href);
+  url.searchParams.set('seed', String(seed));
+  history.replaceState(null, '', url);
 }
 
 export function GameScreen() {
   const hostRef = useRef<HTMLDivElement>(null);
   const store = useStore();
+  const [options, setOptions] = useState(readOptions);
   const [ready, setReady] = useState(false);
 
+  // N: roll a new map.
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyN' || e.repeat || e.metaKey || e.ctrlKey) return;
+      setReady(false);
+      setOptions((o) => ({ ...o, seed: randomSeed() }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    writeSeedToUrl(options.seed);
     const host = hostRef.current!;
     let game: Game | null = null;
     let disconnect: (() => void) | null = null;
     let cancelled = false;
 
     // Game.create is async; handle unmount-before-ready (React StrictMode mounts twice in dev).
-    Game.create(host, readOptions()).then((g) => {
+    Game.create(host, options).then((g) => {
       if (cancelled) {
         g.destroy();
         return;
@@ -44,7 +67,7 @@ export function GameScreen() {
       disconnect?.();
       game?.destroy();
     };
-  }, [store]);
+  }, [store, options]);
 
   return (
     <div className="game-screen">

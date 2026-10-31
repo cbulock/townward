@@ -32,17 +32,32 @@ Goal: an empty isometric world you can fly around smoothly.
 
 ---
 
-## Phase 2 — Terrain ⬜  → [specs/terrain.md](specs/terrain.md)
+## Phase 2a — River Valley terrain, done perfectly 🚧 (looks approved on seed 42; awaiting 60 FPS check)  → [specs/terrain.md](specs/terrain.md)
 
-- [ ] Seeded RNG + noise utilities
-- [ ] Terrain generator (height/moisture noise → terrain types, rivers, lakes, coast)
-- [ ] Terrain presets: Plains, Coastal, Island, River Valley, Lakes, Forested
-- [ ] Atlas: water (animated shimmer), shallow water, sand, grass, dry grass, dirt, rock; shoreline transition tiles
-- [ ] Trees as objects (3 densities, seeded variety)
+We focus on **one** terrain and make it look great before adding presets or menus.
+
+- [x] Seeded simplex noise + fBm utilities (no dependency)
+- [x] River Valley generator: winding narrow river, tributary, lakes, cleanup, sand rims, forest clumps
+- [x] Generator tests: deterministic, river crosses the map, no 1-tile specks, speed budget
+- [x] Pixel-art ground for all 7 terrain types (bright palette from the user's reference)
+- [x] Dual-grid terrain transitions: rounded marching-squares contours, no staircase edges, no seams
+- [x] Shoreline surf band and animated water shimmer
+- [x] Chunky outlined pines (cluster sprites, 3 densities × 6 variants), depth-sorted, with shadows
+- [x] Decorations: rocks (meadows, forest edges, riverbanks), boulders, flowers, tall grass
+- [x] Diorama soil slab along the map edge
+- [x] Grid as a separate layer (works over every terrain)
+- [x] `N` key: new random seed (seed shown in debug overlay and kept in the URL)
+- [ ] 60 FPS confirmed on real hardware at 128×128
+
+**DoD:** any seed produces a natural-looking river valley with no visual seams or hard tile edges, and it holds 60 FPS on 128×128.
+
+## Phase 2b — More terrains + New Game screen ⬜
+
+- [ ] Presets: Plains, Coastal, Island, Lakes, Forested
 - [ ] **New Game screen:** preset cards, seed field + 🎲, map size, sliders (water, trees, …), live minimap preview, "Start" button
 - [ ] Minimap component (reused in HUD later)
 
-**DoD:** the player picks a preset, tweaks sliders, sees the preview update in under 100 ms and starts a game on that terrain. The same seed always gives the same map.
+**DoD:** the player picks a preset, tweaks sliders, sees the preview update in under 100 ms and starts a game on that terrain.
 
 ---
 

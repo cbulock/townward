@@ -2,7 +2,7 @@ import { Application, Container } from 'pixi.js';
 import type { World } from '../sim/World';
 import { Camera } from './Camera';
 import { ChunkRenderer } from './ChunkRenderer';
-import { buildTileTextures } from './atlas/tiles';
+import { buildTerrainTextures } from './atlas/tiles';
 import { mapWorldBounds } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
 
@@ -10,8 +10,10 @@ import { HoverHighlight } from './overlays/HoverHighlight';
  * Owns the Pixi application and the world scene graph:
  *   stage
  *   └─ worldRoot (camera transform)
- *      ├─ ground   (chunked tiles)
- *      ├─ objects  (trees/buildings, later phases)
+ *      ├─ slab     (soil edge under the map)
+ *      ├─ ground   (dual-grid terrain, masked to the map shape)
+ *      ├─ grid     (optional tile outlines)
+ *      ├─ objects  (trees; buildings in later phases)
  *      └─ overlay  (hover, ghosts, zone tint)
  */
 export class Renderer {
@@ -50,12 +52,20 @@ export class Renderer {
   }
 
   private setup(world: World) {
-    const tex = buildTileTextures();
+    const tex = buildTerrainTextures();
     this.ground = new ChunkRenderer(world, tex);
     this.hover = new HoverHighlight(tex.hover);
     this.overlay.addChild(this.hover.sprite);
+    this.objects.addChild(this.ground.objectsRoot);
 
-    this.worldRoot.addChild(this.ground.root, this.objects, this.overlay);
+    this.worldRoot.addChild(
+      this.ground.slab,
+      this.ground.groundMask,
+      this.ground.groundRoot,
+      this.ground.gridRoot,
+      this.objects,
+      this.overlay,
+    );
     this.app.stage.addChild(this.worldRoot);
 
     const b = mapWorldBounds(world.width, world.height);
@@ -92,6 +102,7 @@ export class Renderer {
     this.worldRoot.position.set(cam.screenW / 2 - cam.x * cam.zoom, cam.screenH / 2 - cam.y * cam.zoom);
 
     this.ground.cull(cam.viewRect());
+    this.ground.update(dt);
     this.hover.update(dt);
 
     this.drawCallCounter = 0;

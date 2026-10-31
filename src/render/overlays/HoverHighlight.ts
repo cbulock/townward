@@ -1,6 +1,6 @@
 import { Sprite, type Texture } from 'pixi.js';
 import { HALF_W } from '../../shared/constants';
-import { GROUND_PAD } from '../atlas/tiles';
+import { GROUND_PAD } from '../atlas/geometry';
 import { tileToWorld } from '../iso';
 
 /** Gently pulsing diamond over the tile under the cursor. */

@@ -22,7 +22,7 @@ export class AtlasBuilder {
   private readonly frames: PendingFrame[] = [];
 
   /** Atlas is painted at `resolution`× so tiles stay crisp when zoomed in. */
-  constructor(private readonly resolution = 2) {}
+  constructor(readonly resolution = 2) {}
 
   add(name: string, w: number, h: number, paint: FramePainter): this {
     this.frames.push({ name, w, h, paint });

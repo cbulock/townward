@@ -3,6 +3,7 @@ const HINTS: [string, string][] = [
   ['WASD', 'Pan'],
   ['Wheel', 'Zoom'],
   ['G', 'Grid'],
+  ['N', 'New map'],
   ['F3', 'Debug'],
 ];
 

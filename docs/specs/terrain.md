@@ -1,82 +1,69 @@
-# Spec — Terrain
+# Spec: Terrain
 
-Status: **Draft** (implemented in Phase 2)
+Status: **Phase 2a: River Valley implemented.** Other presets come in Phase 2b.
 
-## Goals
+## Art Direction
 
-- The player chooses the terrain for a new city through **presets plus tweakable parameters**.
-- Generation is **deterministic** (`seed + params → identical map`) and **fast** (<100 ms for 128×128, so the preview can update live).
-- Terrain looks natural: coastlines, rivers, lakes, forests and beaches.
+Bright, saturated pixel-art look. The user-approved reference is a top-down pixel map with:
+- narrow winding rivers with a light surf edge and a thin sand rim
+- dense clumps of chunky outlined pines with open meadows between them
+- grey rock clusters and flower patches in the grass
 
-## Terrain Types (Phase 2)
+We render it in our isometric view (D-002). **Reference map: `?seed=42`** (approved by the user on 2026-10-31). Check every terrain change against it.
 
-| Id | Type | Buildable | Roads | Notes |
+## Terrain Types
+
+| Id | Type | Buildable | Roads | Used by River Valley |
 |---|---|---|---|---|
-| 0 | Deep water | ❌ | ❌ (bridges later) | Animated shimmer |
-| 1 | Shallow water | ❌ | ❌ (bridges later) | Lighter, near shore |
-| 2 | Sand / beach | ✅ | ✅ | Between water and land |
-| 3 | Grass | ✅ | ✅ | Default land |
-| 4 | Dry grass | ✅ | ✅ | Low-moisture areas, visual variety |
-| 5 | Dirt | ✅ | ✅ | Patches, visual variety |
-| 6 | Rock | ❌ | ❌ | Outcrops (until terraforming exists) |
+| 0 | Deep water | ❌ | ❌ (bridges later) | middle of lakes |
+| 1 | Shallow water | ❌ | ❌ (bridges later) | rivers, lake edges |
+| 2 | Sand | ✅ | ✅ | thin rim on almost every shore |
+| 3 | Grass | ✅ | ✅ | everything else |
+| 4 | Dry grass | ✅ | ✅ | (other presets) |
+| 5 | Dirt | ✅ | ✅ | (other presets) |
+| 6 | Rock | ❌ | ❌ | (other presets) |
 
-**Trees** are a separate layer (density 0–3) on grass and dry grass. They are
-buildable: placing something on a tree clears it for a small cost.
+**Trees** (`World.tree`, density 0–3) and **decorations** (`World.decor`) are separate layers. Both are buildable: placing something clears them (trees for a small cost).
 
-**Elevation** is not part of Phase 2. Every tile has height 0. Hills and slopes
-arrive in Phase 6 and need slope tiles, so we keep the `height` layer ready but
-unused.
+| Decor | Where it appears |
+|---|---|
+| Rocks (stone cluster) | rocky meadow patches, forest edges, and on sand along rivers |
+| Boulder (big pile, sometimes mossy) | rocky meadow patches, occasionally at forest edges |
+| Flowers (white / yellow) | grouped patches in open grass |
+| Tall grass | scattered |
 
-## Generation Pipeline
+Elevation is not part of Phase 2. Hills and slopes come in Phase 6.
 
-1. **RNG:** seeded `mulberry32(seed)` gives every noise field its own sub-seed.
-2. **Elevation field `e`:** fractal simplex noise (4–5 octaves), then a **preset mask** is applied:
-   - *Island:* radial falloff toward the edges
-   - *Coastal:* gradient falling toward 1–2 chosen edges
-   - *Plains:* almost no water
-   - *Lakes:* extra low-frequency "dips"
-3. **Water:** `e < waterLevel`. Deep water is `e < waterLevel − δ`.
-4. **Rivers** (River Valley preset, or `riverCount > 0`): pick an edge source, run a noise-perturbed walk downhill toward water or the opposite edge, then carve a width of 1–3 tiles.
-5. **Moisture field `m`:** independent noise, boosted near water.
-6. **Classify land:** sand within 1–2 tiles of water; rock on the highest `e` peaks (rare); dry grass where `m` is low; dirt patches from a high-freq noise threshold; otherwise grass.
-7. **Trees:** density from `m` plus a forest noise field, scaled by the `treeDensity` slider. No trees on sand or rock.
-8. **Cleanup:** remove single-tile water specks and single-tile islands (cellular smoothing pass).
-9. **Visual variant:** `variant[i] = rng() * N` so tiles don't look repeated.
+## River Valley Generator (`src/sim/terrain/riverValley.ts`)
 
-## Presets
+Deterministic: the same `seed + size` gives a byte-identical world. 128×128 generates in well under 100 ms.
 
-| Preset | Water level | Mask | Rivers | Trees |
-|---|---|---|---|---|
-| Plains | very low | none | 0 | low |
-| Coastal | medium | 1–2 edges | 0–1 | medium |
-| Island | medium-high | radial | 0 | medium |
-| River Valley | low | none | 1–2 | medium |
-| Lakes | medium | dips | 0 | medium |
-| Forested | low | none | 0–1 | high |
+1. **Main river:** a meandering walk across the map along a random axis. The heading eases toward a noise-driven target, capped below 90° so it never doubles back, and it stays out of the outer 15% of the map. It's stamped 2–3 tiles wide.
+2. **Tributary (60%):** a narrower river from the far side that stops when it reaches the main river.
+3. **Lakes:** 1–3 noisy blobs, half of them hugging the river like oxbow lakes.
+4. **Cleanup:** cellular passes remove 1-tile water specks and land notches.
+5. **Depth:** water ≥ 3 tiles from land is deep, so rivers stay one bright blue.
+6. **Sand rim:** shore tiles (distance 1) are sand unless a noise field opts out. Occasional 2-wide beaches.
+7. **Forests:** low-frequency noise, slightly wetter near water. Thresholds give density 1–3 trees per tile. Lone trees appear at 1.5%.
+8. **Decorations:** a second pass after trees, so it can find forest edges (see table above).
 
-## Parameters (exposed in New Game screen)
+All tuning knobs are constants at the top of the file (`RIVER`, `LAKES`). Each feature has its own random stream (`SALT`), so changing one doesn't reshuffle the others.
 
-```ts
-interface TerrainParams {
-  seed: number;
-  size: 64 | 128 | 256;
-  preset: 'plains' | 'coastal' | 'island' | 'river' | 'lakes' | 'forested';
-  waterLevel: number;   // 0..1 slider, overrides preset default
-  treeDensity: number;  // 0..1
-  riverCount: number;   // 0..3
-  coastSides: number;   // 1..2 (Coastal only)
-}
-```
+## Rendering
 
-## Rendering Notes
-
-- **Shorelines:** land tiles next to water get an edge overlay picked by a neighbour mask (foam or sand edge), so water isn't drawn as hard diamonds.
-- **Water animation:** a subtle shimmer done with UV offset or palette cycling on water tiles only. It must not invalidate cached ground chunks, so water lives on its own layer or uses a shader.
-- **Trees:** sprites in the `objects` layer, depth-sorted, with 3–4 seeded shapes and colour jitter.
+- **Dual grid (D-019).** Ground is drawn on a grid offset by half a tile. Each cell's 4 corners sit on 4 tile centres. A cell draws the lowest terrain among its corners as a base, then an overlay for each higher terrain, masked by a rounded marching-squares contour. This gives smooth diagonals and rounded corners, with no staircase edges.
+- **Two passes.** All bases are drawn first, then all overlays, so overlays cover each base's seam-hiding over-draw.
+- **Shores.** A solid light-cyan surf band hugs the land contour (same wobble as the land mask). Grass edges get a darker green rim.
+- **Water animation.** 8 shimmer frames are swapped every 0.16 s, only in visible chunks.
+- **Objects.** Trees (one cluster sprite per tile, 6 variants × 3 densities) and decorations are depth-sorted per chunk.
+- **Map edge.** A soil slab sits under the front edges, with blue where water meets the edge. The ground is masked to the map diamond.
+- All art is painted in code at boot into one atlas texture (`src/render/atlas/`).
 
 ## Tests
 
-- Same seed and params give byte-identical layers.
-- Island preset: all edge tiles are water.
-- No isolated 1-tile water or land after cleanup.
-- 128×128 generation stays under the 100 ms budget (perf test, warning only).
+- `tests/riverValley.test.ts`: determinism, a river crossing the map, no 1-tile specks, terrain mix, decor placement, speed budget.
+- `tests/transitions.test.ts`: dual-cell corner bits, base and overlay ordering, shore masks, border clamping.
+
+## Later (Phase 2b)
+
+Presets: Plains, Coastal, Island, Lakes, Forested. These will reuse the same rendering, and Dry grass, Dirt and Rock will be used there. Then the New Game screen and minimap.

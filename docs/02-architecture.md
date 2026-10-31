@@ -82,6 +82,7 @@ serialization:
 | `height` | `Uint8Array` | Elevation level (all 0 until Phase 6) |
 | `variant` | `Uint8Array` | Random visual variant per tile (seeded) |
 | `tree` | `Uint8Array` | Tree density 0–3 (0 = none) |
+| `decor` | `Uint8Array` | Decoration (rocks, boulder, flowers, tall grass); visual only |
 | `road` | `Uint8Array` | 0 = none, else road type; connection mask is computed |
 | `zone` | `Uint8Array` | 0 none, 1 R, 2 C, 3 I (with density bits later) |
 | `building` | `Int32Array` | Building instance id covering this tile, −1 if none |

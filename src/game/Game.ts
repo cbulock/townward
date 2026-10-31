@@ -1,7 +1,8 @@
 import { worldToTile } from '../render/iso';
 import { Renderer } from '../render/Renderer';
 import { SIM_TICK_HZ } from '../shared/constants';
-import { World } from '../sim/World';
+import { generateRiverValley } from '../sim/terrain/riverValley';
+import type { World } from '../sim/World';
 import { EventBus, type GameEventMap } from './events';
 import { InputController } from './input/InputController';
 import { GameLoop } from './loop';
@@ -43,7 +44,7 @@ export class Game {
   }
 
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
-    const world = World.flat(opts.size, opts.seed);
+    const world = generateRiverValley({ seed: opts.seed, size: opts.size });
     const renderer = await Renderer.create(host, world);
     const game = new Game(world, renderer);
     game.loop.start();
@@ -69,9 +70,10 @@ export class Game {
         drawCalls: r.drawCalls,
         visibleChunks: r.ground.visibleChunks,
         totalChunks: r.ground.totalChunks,
-        visibleTiles: r.ground.visibleTiles,
+        visibleSprites: r.ground.visibleSprites,
         zoom: r.camera.zoom,
         mapSize: this.world.width,
+        seed: this.world.seed,
         simTick: this.simTick,
       });
       this.statsTimer = 0;

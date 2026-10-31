@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 1 — Engine foundation 🚧 (built; verify 60 FPS on real hardware) |
-| **Next phase** | Phase 2 — Terrain |
+| **Current phase** | Phase 2a — River Valley terrain 🚧 (look approved on `?seed=42`; verify 60 FPS on real hardware) |
+| **Next phase** | Phase 2b — More terrains + New Game screen, or Phase 3 — Roads (user's call) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It

@@ -14,5 +14,5 @@ export const DEFAULT_MAP_SIZE: MapSize = 128;
 /** Simulation ticks per second at 1× speed. */
 export const SIM_TICK_HZ = 10;
 
-export const ZOOM_MIN = 0.25;
+export const ZOOM_MIN = 0.2;
 export const ZOOM_MAX = 4;

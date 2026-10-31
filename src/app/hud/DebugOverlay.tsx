@@ -38,14 +38,16 @@ export function DebugOverlay() {
         <dd>
           {stats.visibleChunks}/{stats.totalChunks}
         </dd>
-        <dt>Tiles drawn</dt>
-        <dd>{stats.visibleTiles.toLocaleString()}</dd>
+        <dt>Sprites</dt>
+        <dd>{stats.visibleSprites.toLocaleString()}</dd>
         <dt>Zoom</dt>
         <dd>{stats.zoom.toFixed(2)}×</dd>
         <dt>Map</dt>
         <dd>
           {stats.mapSize}×{stats.mapSize}
         </dd>
+        <dt>Seed</dt>
+        <dd>{stats.seed}</dd>
         <dt>Tile</dt>
         <dd>{hovered ? `${hovered.x}, ${hovered.y}` : '—'}</dd>
         <dt>Grid</dt>
