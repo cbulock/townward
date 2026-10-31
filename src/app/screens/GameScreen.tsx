@@ -9,6 +9,7 @@ import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
 import { InfoPanel } from '../hud/InfoPanel';
 import { BudgetPanel } from '../hud/BudgetPanel';
+import { TrafficLegend } from '../hud/TrafficLegend';
 import { Minimap } from '../hud/Minimap';
 import { Notices } from '../hud/Notices';
 import { Toolbar } from '../hud/Toolbar';
@@ -74,6 +75,7 @@ export function GameScreen({ options, onReroll, onNewCity }: GameScreenProps) {
       <BuildingPicker />
       <Toolbar />
       <Minimap />
+      <TrafficLegend />
       <Notices />
       <CostLabel />
       <ControlsHint />

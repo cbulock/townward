@@ -2,6 +2,7 @@ import type { BuildingId } from '../sim/buildings/catalog';
 import type { ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
 import type { UtilityTotals } from '../sim/systems/utilities';
+import type { CommuteReport } from '../sim/systems/commute';
 import type { ServiceKind } from '../sim/buildings/catalog';
 import type { ToolId } from './tools';
 
@@ -23,6 +24,7 @@ export interface GameEventMap {
   /** Hour of day on the clock (0–24), a few times a second. */
   clock: number;
   dayNight: DayNightMode;
+  trafficView: boolean;
   /** Version counter, bumped when tiles or buildings change (minimap repaint). */
   worldChanged: number;
   budget: BudgetInfo;
@@ -48,6 +50,8 @@ export interface CityInfo {
   demand: ZoneDemand;
   power: UtilityTotals;
   water: UtilityTotals;
+  /** Commuters, average commute and jammed road tiles (docs/specs/traffic.md). */
+  traffic: CommuteReport;
 }
 
 export interface BudgetInfo {
@@ -90,6 +94,8 @@ export interface InspectInfo {
   provides: Provides | null;
   /** Monthly running cost. */
   upkeep: number;
+  /** Homes: average commute of its workers (minutes), null if unknown. */
+  commuteMinutes: number | null;
 }
 
 export interface ToolPreviewInfo {

@@ -59,7 +59,7 @@ describe('queuing', () => {
     expect(lead.t - back.t).toBeGreaterThanOrEqual(TRAFFIC.gap - 1e-9);
   });
 
-  it('crossing traffic takes turns through a junction box', () => {
+  it('crossing traffic takes turns at a traffic light', () => {
     const { w } = grid();
     const traffic = new Traffic(w, 1);
     const ew = car(findRoute(w, w.index(8, 10), w.index(14, 10))!, 0);

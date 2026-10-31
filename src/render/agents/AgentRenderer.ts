@@ -1,5 +1,5 @@
 import { Container, Sprite } from 'pixi.js';
-import { agentPose, type Agent, type BusStop } from '../../sim/systems/traffic';
+import { agentPose, type Agent, type BusStop, type TrafficLight } from '../../sim/systems/traffic';
 import type { World } from '../../sim/World';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
@@ -27,6 +27,7 @@ export class AgentRenderer {
   readonly container = new Container({ sortableChildren: true });
   private readonly pool: Sprite[] = [];
   private readonly stopPool: Sprite[] = [];
+  private readonly lampPool: Sprite[] = [];
   visible = 0;
 
   constructor(
@@ -34,8 +35,9 @@ export class AgentRenderer {
     private readonly viewRef: ViewRef,
   ) {}
 
-  update(world: World, agents: readonly Agent[], stops: readonly BusStop[], view: Rect, zoom: number) {
+  update(world: World, agents: readonly Agent[], stops: readonly BusStop[], lights: readonly TrafficLight[], view: Rect, zoom: number) {
     this.drawStops(world, zoom >= MIN_ZOOM_VEHICLES ? stops : [], view);
+    this.drawLights(world, zoom >= MIN_ZOOM_PEOPLE ? lights : [], view);
     let used = 0;
     if (zoom >= MIN_ZOOM_VEHICLES) {
       const people = zoom >= MIN_ZOOM_PEOPLE;
@@ -69,6 +71,40 @@ export class AgentRenderer {
     }
     for (let k = used; k < this.pool.length; k++) this.pool[k].visible = false;
     this.visible = used;
+  }
+
+  /**
+   * Traffic lights: two poles per junction on opposite corners, one for each axis, tinted
+   * green or red. Positions are in world tiles, so the colours stay right in every rotation.
+   */
+  private drawLights(world: World, lights: readonly TrafficLight[], view: Rect) {
+    let used = 0;
+    for (const l of lights) {
+      const x = l.tile % world.width;
+      const y = (l.tile - x) / world.width;
+      // Axis 0 (traffic along y) on one corner, axis 1 (along x) on the opposite one.
+      for (const [axis, ox, oy] of [
+        [0, 0.88, 0.12],
+        [1, 0.12, 0.88],
+      ] as const) {
+        const vp = this.viewRef.current.pointToView(x + ox, y + oy);
+        const p = liftView(this.viewRef.ground, vp.x, vp.y);
+        if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
+        let s = this.lampPool[used];
+        if (!s) {
+          s = new Sprite(this.tex.lamp);
+          s.anchor.set(0.5, 0.94);
+          this.lampPool.push(s);
+          this.container.addChild(s);
+        }
+        used++;
+        s.position.set(p.x, p.y);
+        s.tint = l.greenAxis === axis ? 0x4ade80 : 0xf87171;
+        s.zIndex = vp.x + vp.y;
+        s.visible = true;
+      }
+    }
+    for (let k = used; k < this.lampPool.length; k++) this.lampPool[k].visible = false;
   }
 
   /** Shelters sort with the agents (by their spot on the pavement), so cars pass in front or behind correctly. */

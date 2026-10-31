@@ -1,6 +1,7 @@
 import { mulberry32 } from '../../shared/rng';
 import { BUILDINGS } from '../buildings/catalog';
 import { isActive } from './access';
+import { speedFactor, type CommuteTrip } from './commute';
 import { roadMask, RoadType } from '../roads';
 import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
@@ -56,8 +57,12 @@ export const TRAFFIC = {
   carSpeed: 1.7,
   highwaySpeedFactor: 1.9,
   personSpeed: 0.45,
-  /** Cars drive on the right, this far from the road's centre line (tile units). */
-  laneOffset: 0.17,
+  /** Cars drive on the right, this far from the road's centre line (tile units). Matches render/atlas/roadArt STREET. */
+  laneOffset: 0.13,
+  /** Highways have two lanes each way: cars mostly inside, trucks and buses outside. */
+  highwayInnerLane: 0.12,
+  highwayOuterLane: 0.32,
+  /** Pedestrians walk down the middle of the right-hand footpath. */
   sidewalkOffset: 0.37,
   /** Share of a segment over which a car eases from the previous lane offset into the new one. */
   laneBlend: 0.35,
@@ -65,9 +70,14 @@ export const TRAFFIC = {
   /** Gap kept to the car ahead (tile units); more behind long vehicles. */
   gap: 0.42,
   longGap: 0.55,
-  /** Seconds before a car stops waiting for a junction box, and before a stuck car gives up. */
-  junctionPatience: 4,
-  giveUpAfter: 25,
+  /** Seconds a car may stand still before it gives up and fades out. */
+  giveUpAfter: 20,
+  /** Visible cars per road tile at most (docs/specs/traffic.md). */
+  carsPerRoadTile: 0.35,
+  /** Car trips started per sim second, per commuter (scaled by the rush-hour curve). */
+  carTripsPerCommuter: 1 / 400,
+  /** Seconds each traffic-light phase stays green. */
+  lightPhase: 5,
   /** Bus stops (docs/specs/simulation.md). */
   busDwell: 2,
   busMinPopulation: 150,
@@ -116,14 +126,6 @@ export function outboundShare(hour: number): number {
 
 function isLong(a: Agent): boolean {
   return a.kind === 'bus' || a.kind === 'truck';
-}
-
-/** Movement through the junction at path[k + 1]: the straight axis (0 = along y, 1 = along x), or −1 for a turn. */
-function movement(path: Int32Array, k: number): number {
-  if (k + 2 >= path.length) return -1;
-  const din = stepDir(path[k], path[k + 1]);
-  const dout = stepDir(path[k + 1], path[k + 2]);
-  return din === dout ? din % 2 : -1;
 }
 
 /**
@@ -213,28 +215,73 @@ function rightOf(dir: number): [number, number] {
   return [-dy, dx];
 }
 
+/** Lane offset of a vehicle on a tile: highways have an inner and an outer lane. */
+function laneOffset(world: World, a: Agent, tile: number): number {
+  if (world.road[tile] !== RoadType.Highway) return TRAFFIC.laneOffset;
+  return isLong(a) || a.variant % 3 === 0 ? TRAFFIC.highwayOuterLane : TRAFFIC.highwayInnerLane;
+}
+
+/**
+ * A pedestrian's waypoint at path index k: the tile centre pushed onto the right-hand footpath.
+ * At a turn the offsets of the two legs add up (a mitre), so the corner lands on the footpath
+ * corner: right turns stay on the inside, left turns and straight-on cross the side road at
+ * the zebra crossing (docs/specs/city-art.md).
+ */
+export function walkPoint(world: World, path: Int32Array, k: number): [number, number] {
+  const w = world.width;
+  const i = path[k];
+  const din = k > 0 ? stepDir(path[k - 1], i) : -1;
+  const dout = k < path.length - 1 ? stepDir(i, path[k + 1]) : -1;
+  const o = TRAFFIC.sidewalkOffset;
+  let ox = 0;
+  let oy = 0;
+  const add = (d: number) => {
+    const [rx, ry] = rightOf(d);
+    ox += rx * o;
+    oy += ry * o;
+  };
+  if (din >= 0) add(din);
+  // Straight on (same heading) or a dead-end reversal keeps the incoming side.
+  if (dout >= 0 && (din < 0 || (dout !== din && (dout + 2) % 4 !== din))) add(dout);
+  return [(i % w) + 0.5 + ox, Math.floor(i / w) + 0.5 + oy];
+}
+
+/** Length of a pedestrian's current leg (between two waypoints), so they walk at a steady pace. */
+function walkLength(world: World, a: Agent): number {
+  const k = Math.min(a.seg, a.path.length - 2);
+  const [x0, y0] = walkPoint(world, a.path, k);
+  const [x1, y1] = walkPoint(world, a.path, k + 1);
+  return Math.max(0.2, Math.hypot(x1 - x0, y1 - y0));
+}
+
 export function agentPose(world: World, a: Agent): AgentPose {
   const p = a.path;
   const i0 = p[a.seg];
   const i1 = p[Math.min(a.seg + 1, p.length - 1)];
+  const dir = i0 === i1 ? 1 : stepDir(i0, i1);
+  if (a.kind === 'person') {
+    const [x0, y0] = walkPoint(world, p, a.seg);
+    const [x1, y1] = i0 === i1 ? [x0, y0] : walkPoint(world, p, a.seg + 1);
+    return { x: x0 + (x1 - x0) * a.t, y: y0 + (y1 - y0) * a.t, dir };
+  }
   const w = world.width;
   const x0 = (i0 % w) + 0.5;
   const y0 = Math.floor(i0 / w) + 0.5;
   const x1 = (i1 % w) + 0.5;
   const y1 = Math.floor(i1 / w) + 0.5;
-  const dir = i0 === i1 ? 1 : stepDir(i0, i1);
-  const offset = a.kind === 'person' ? TRAFFIC.sidewalkOffset : TRAFFIC.laneOffset;
+  const offset = laneOffset(world, a, i0);
   const [rx, ry] = rightOf(dir);
   let ox = rx * offset;
   let oy = ry * offset;
-  // Ease in from the previous segment's lane so turns don't jump.
+  // Ease in from the previous segment's lane so turns and lane changes don't jump.
   if (a.seg > 0 && a.t < TRAFFIC.laneBlend) {
     const pd = stepDir(p[a.seg - 1], i0);
-    if (pd !== dir) {
+    const prevOffset = laneOffset(world, a, p[a.seg - 1]);
+    if (pd !== dir || prevOffset !== offset) {
       const [px, py] = rightOf(pd);
       const k = a.t / TRAFFIC.laneBlend;
-      ox = px * offset * (1 - k) + ox * k;
-      oy = py * offset * (1 - k) + oy * k;
+      ox = px * prevOffset * (1 - k) + ox * k;
+      oy = py * prevOffset * (1 - k) + oy * k;
     }
   }
   return { x: x0 + (x1 - x0) * a.t + ox, y: y0 + (y1 - y0) * a.t + oy, dir };
@@ -245,6 +292,19 @@ export function agentPose(world: World, a: Agent): AgentPose {
  * to job buildings, shops and parks; pedestrians stroll a few tiles along the
  * pavement near homes and shops. Density follows population.
  */
+/** A junction's light: which axis has green (0 = along y, 1 = along x). */
+export interface TrafficLight {
+  tile: number;
+  greenAxis: 0 | 1;
+}
+
+/** Where the visible cars get their trips and road speeds from (the commute model). */
+export interface CommuteSource {
+  readonly trips: readonly CommuteTrip[];
+  readonly congestion: Float32Array;
+  readonly report: { readonly commuters: number };
+}
+
 export class Traffic {
   readonly agents: Agent[] = [];
   private readonly rng: () => number;
@@ -258,13 +318,21 @@ export class Traffic {
   /** Bus stops, recomputed with demand. */
   stops: readonly BusStop[] = [];
   private stopTiles = new Set<number>();
-  /** Road tiles with 3–4 connections (junction boxes); rebuilt when roads change. */
+  /** Road tiles with 3–4 connections (traffic lights); rebuilt when roads change. */
   private junction: Uint8Array;
+  private junctions: number[] = [];
+  private roadTiles = 0;
   private readonly lanes = new Map<number, Agent[]>();
+  /** Sim seconds elapsed (drives the traffic lights). */
+  private clock = 0;
+  /** Running totals of trip weights, for picking a trip in proportion to its flow. */
+  private tripCumulative: number[] = [];
+  private readonly reversed = new WeakMap<CommuteTrip, Int32Array>();
 
   constructor(
     private readonly world: World,
     seed = 1,
+    private readonly commute: CommuteSource | null = null,
   ) {
     this.rng = mulberry32(seed);
     this.scratch = new Int32Array(world.width * world.height);
@@ -274,13 +342,34 @@ export class Traffic {
 
   private findJunctions() {
     const w = this.world;
+    this.junctions = [];
+    this.roadTiles = 0;
     for (let y = 0; y < w.height; y++) {
       for (let x = 0; x < w.width; x++) {
+        const i = w.index(x, y);
+        if (w.road[i] !== RoadType.None) this.roadTiles++;
         const m = roadMask(w, x, y);
         const links = (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
-        this.junction[w.index(x, y)] = links >= 3 ? 1 : 0;
+        this.junction[i] = links >= 3 ? 1 : 0;
+        if (links >= 3) this.junctions.push(i);
       }
     }
+  }
+
+  /** Which axis has green at a junction now. Junctions are offset so they don't all switch together. */
+  private greenAxis(tile: number): 0 | 1 {
+    const offset = (tile * 7919) % (TRAFFIC.lightPhase * 2);
+    return Math.floor((this.clock + offset) / TRAFFIC.lightPhase) % 2 === 0 ? 0 : 1;
+  }
+
+  /** Every junction's light right now (for drawing). */
+  lights(): TrafficLight[] {
+    return this.junctions.map((tile) => ({ tile, greenAxis: this.greenAxis(tile) }));
+  }
+
+  /** At most this many cars on screen: a share of the road network, so roads never overfill. */
+  private maxCars(): number {
+    return Math.min(TRAFFIC.maxCars, Math.ceil(this.roadTiles * TRAFFIC.carsPerRoadTile));
   }
 
   /** Call after buildings or populations change (e.g. once a day). */
@@ -300,6 +389,8 @@ export class Traffic {
     }
     this.stops = this.population >= TRAFFIC.busMinPopulation ? computeBusStops(this.world) : [];
     this.stopTiles = new Set(this.stops.map((s) => s.tile));
+    let sum = 0;
+    this.tripCumulative = (this.commute?.trips ?? []).map((t) => (sum += t.weight));
   }
 
   /** Roads changed: forget cached routes and drop agents whose path is now broken. */
@@ -331,6 +422,35 @@ export class Traffic {
     return list[Math.floor(this.rng() * list.length)];
   }
 
+  /** A commute trip picked in proportion to its flow, in the direction of the rush hour. */
+  private commuteTrip(hour: number): Int32Array | null {
+    const trips = this.commute?.trips ?? [];
+    const total = this.tripCumulative[this.tripCumulative.length - 1] ?? 0;
+    if (trips.length === 0 || total <= 0) return null;
+    const r = this.rng() * total;
+    let lo = 0;
+    let hi = this.tripCumulative.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.tripCumulative[mid] < r) lo = mid + 1;
+      else hi = mid;
+    }
+    const trip = trips[lo];
+    if (this.rng() < outboundShare(hour)) return trip.path;
+    let back = this.reversed.get(trip);
+    if (!back) {
+      back = trip.path.slice().reverse();
+      this.reversed.set(trip, back);
+    }
+    return back;
+  }
+
+  /** Room for a new car at the start of a path (nobody right at the start of its first lane). */
+  private hasRoom(path: Int32Array): boolean {
+    const lane = this.lanes.get(path[0] * this.junction.length + path[1]);
+    return !lane || lane.every((a) => a.seg > 0 || a.t > TRAFFIC.gap * 1.5);
+  }
+
   private spawnCar(hour: number) {
     if (this.homes.length === 0 || this.destinations.length === 0) return;
     const roll = this.rng();
@@ -338,11 +458,14 @@ export class Traffic {
       this.spawnBus();
       return;
     }
-    const home = this.pick(this.homes);
-    const dest = this.pick(this.destinations);
-    const out = this.rng() < outboundShare(hour);
-    const path = out ? this.route(home, dest) : this.route(dest, home);
-    if (!path || path.length < 3) return;
+    let path = this.commuteTrip(hour);
+    if (!path) {
+      // No commute model (or nothing reachable yet): a random trip, as before.
+      const home = this.pick(this.homes);
+      const dest = this.pick(this.destinations);
+      path = this.rng() < outboundShare(hour) ? this.route(home, dest) : this.route(dest, home);
+    }
+    if (!path || path.length < 3 || !this.hasRoom(path)) return;
     const kind: AgentKind = roll < 0.14 ? 'truck' : roll < 0.22 ? 'taxi' : 'car';
     const speed = TRAFFIC.carSpeed * (kind === 'truck' ? 0.8 : 0.9 + this.rng() * 0.25);
     this.addVehicle(kind, path, speed);
@@ -368,12 +491,13 @@ export class Traffic {
     this.agents.push({ kind, path, seg: 0, t: 0, speed, variant: Math.floor(this.rng() * 6), age: 0, wait: 0, dwell: 0, stopSeg: -1 });
   }
 
-  /** A short stroll: a random walk along connected road tiles from a home or shop. */
+  /** A short stroll on the footpaths: a random walk along connected streets (never highways or bridges) from a home or shop. */
   private spawnPerson() {
     const pool = this.rng() < 0.6 ? this.homes : this.destinations;
     if (pool.length === 0) return;
     const w = this.world;
     const start = this.pick(pool);
+    if (w.road[start] !== RoadType.Road || w.bridge[start] !== 0) return;
     const steps = 3 + Math.floor(this.rng() * 6);
     const path = [start];
     let cur = start;
@@ -386,7 +510,7 @@ export class Traffic {
       for (let d = 0; d < 4; d++) {
         if (!(mask & (1 << d))) continue;
         const j = w.index(x + DIRS[d][0], y + DIRS[d][1]);
-        if (j !== prev && w.bridge[j] === 0) options.push(j);
+        if (j !== prev && w.bridge[j] === 0 && w.road[j] === RoadType.Road) options.push(j);
       }
       if (options.length === 0) break;
       prev = cur;
@@ -417,10 +541,14 @@ export class Traffic {
       if (a.kind === 'person') people++;
       else cars++;
     }
-    this.carBudget = Math.min(4, this.carBudget + this.population * TRAFFIC.carTripsPerResident * tripRate(hour) * dt);
+    this.clock += dt;
+    // Car trips follow the commuters when the commute model is running, else population.
+    const rate = this.commute && this.commute.trips.length > 0 ? this.commute.report.commuters * TRAFFIC.carTripsPerCommuter : this.population * TRAFFIC.carTripsPerResident;
+    this.carBudget = Math.min(4, this.carBudget + rate * tripRate(hour) * dt);
+    const maxCars = this.maxCars();
     while (this.carBudget >= 1) {
       this.carBudget -= 1;
-      if (cars < TRAFFIC.maxCars) {
+      if (cars < maxCars) {
         this.spawnCar(hour);
         cars++;
       }
@@ -439,7 +567,7 @@ export class Traffic {
     for (const a of this.agents) {
       if (a.kind !== 'person') continue;
       a.age += dt;
-      a.t += dt * a.speed;
+      a.t += (dt * a.speed) / walkLength(this.world, a);
       while (a.t >= 1 && a.seg < a.path.length - 1) {
         a.t -= 1;
         a.seg++;
@@ -459,8 +587,9 @@ export class Traffic {
   }
 
   /**
-   * Move cars with queuing: keep a gap to the car ahead in the lane (including the
-   * next lane's last car), take turns through junction boxes, and dwell at bus stops.
+   * Move cars: keep a gap to the car ahead in the lane (including the next lane's last car),
+   * stop at red lights and don't enter a junction with no room beyond it, slow down on
+   * congested roads, and dwell at bus stops.
    */
   private moveVehicles(dt: number) {
     const w = this.world;
@@ -473,15 +602,7 @@ export class Traffic {
       if (lane) lane.push(a);
       else lanes.set(key, [a]);
     }
-    // Junction boxes in use: tile → straight axis shared by everyone inside, or −1 (exclusive).
-    const boxes = new Map<number, number>();
-    for (const lane of lanes.values()) {
-      lane.sort((p, q) => q.t - p.t);
-      for (const a of lane) {
-        const box = this.boxOf(a);
-        if (box) boxes.set(box.tile, boxes.has(box.tile) && boxes.get(box.tile) !== box.axis ? -1 : box.axis);
-      }
-    }
+    for (const lane of lanes.values()) lane.sort((p, q) => q.t - p.t);
 
     for (const lane of lanes.values()) {
       for (let k = 0; k < lane.length; k++) {
@@ -500,24 +621,25 @@ export class Traffic {
           const tail = next?.[next.length - 1];
           if (tail && tail !== a) limit = 1 + tail.t - (isLong(tail) ? TRAFFIC.longGap : TRAFFIC.gap);
         }
-        // Junction box ahead: enter halfway along the approach, if the box is free or shares our straight axis.
+        // Junction ahead: stop at the line (halfway along the approach) on red, or when the
+        // road beyond is full, so nobody blocks the junction. Cars already past the line go on.
         const j = p[a.seg + 1];
-        let entering = -2;
         if (a.seg + 1 < last && this.junction[j] && a.t < 0.5) {
-          const mv = movement(p, a.seg);
-          const used = boxes.get(j);
-          if (used !== undefined && !(used >= 0 && used === mv) && a.wait < TRAFFIC.junctionPatience) limit = Math.min(limit, 0.48);
-          else entering = mv;
+          const axis = stepDir(p[a.seg], j) % 2;
+          const exit = lanes.get(j * this.junction.length + p[a.seg + 2]);
+          const exitFull = !!exit && exit.some((b) => b !== a && b.t < TRAFFIC.gap + 0.25);
+          if (axis !== this.greenAxis(j) || exitFull) limit = Math.min(limit, 0.46);
         }
         if (a.dwell > 0) {
           a.dwell -= dt;
           limit = Math.min(limit, a.t);
         }
 
-        const step = dt * a.speed * (w.road[p[a.seg]] === RoadType.Highway ? TRAFFIC.highwaySpeedFactor : 1);
+        // Congested roads slow everyone down (but never to a stop).
+        const slow = this.commute ? speedFactor(this.commute.congestion[p[a.seg]]) : 1;
+        const step = dt * a.speed * slow * (w.road[p[a.seg]] === RoadType.Highway ? TRAFFIC.highwaySpeedFactor : 1);
         const t = Math.max(a.t, Math.min(a.t + step, limit));
         a.wait = a.dwell <= 0 && t - a.t < step * 0.5 ? a.wait + dt : 0;
-        if (entering !== -2 && t >= 0.5) boxes.set(j, boxes.has(j) && boxes.get(j) !== entering ? -1 : entering);
         a.t = t;
         while (a.t >= 1 && a.seg < last) {
           a.t -= 1;
@@ -533,14 +655,6 @@ export class Traffic {
     }
   }
 
-  /** The junction box a car is inside right now, and its movement through it. */
-  private boxOf(a: Agent): { tile: number; axis: number } | null {
-    const p = a.path;
-    if (a.t >= 0.5 && a.seg + 1 < p.length - 1 && this.junction[p[a.seg + 1]]) return { tile: p[a.seg + 1], axis: movement(p, a.seg) };
-    if (a.t < 0.5 && a.seg > 0 && this.junction[p[a.seg]]) return { tile: p[a.seg], axis: movement(p, a.seg - 1) };
-    return null;
-  }
-
   clear() {
     this.agents.length = 0;
   }
@@ -550,8 +664,8 @@ export class Traffic {
 export class TrafficSystem implements SimSystem {
   readonly name = 'traffic';
   readonly traffic: Traffic;
-  constructor(world: World) {
-    this.traffic = new Traffic(world, world.seed);
+  constructor(world: World, commute: CommuteSource) {
+    this.traffic = new Traffic(world, world.seed, commute);
   }
   onWorldChanged(change: WorldChange) {
     this.traffic.refreshDemand();

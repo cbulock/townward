@@ -65,54 +65,120 @@ function isStraight(mask: number) {
   return mask === 0b0101 || mask === 0b1010;
 }
 
+/**
+ * Street cross-section (tile units from the centre line), docs/specs/city-art.md. Agents use
+ * matching offsets in sim/systems/traffic.ts: cars at 0.13, pedestrians on the footpath at 0.37.
+ */
+export const STREET = {
+  /** Carriageway half-width. */
+  road: 0.26,
+  /** Outer edge of the kerb stone. */
+  kerb: 0.285,
+  /** Outer edge of the footpath. */
+  footpath: 0.48,
+  /** Zebra crossings span this range along each arm (centred on the footpath line). */
+  zebra: [0.3, 0.44] as const,
+} as const;
+
+/** Paint only where something is already drawn (keeps joints on the footpath). */
+function onTop(ctx: CanvasRenderingContext2D, paint: () => void) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  paint();
+  ctx.restore();
+}
+
+/** Lateral sign (along the arm's p axis) of the lane that drives in toward the junction on arm `b`. */
+function incomingSide(b: number): number {
+  const { d, p } = ARMS[b];
+  // Heading in is −d; drivers keep right, and right of heading (hx, hy) is (−hy, hx).
+  const right: [number, number] = [d[1], -d[0]];
+  return Math.sign(right[0] * p[0] + right[1] * p[1]);
+}
+
 function paintStreet(ctx: CanvasRenderingContext2D, mask: number) {
-  const hw = 0.3;
+  const { road, kerb, footpath, zebra } = STREET;
   const arms = bits(mask);
   const junction = arms.length >= 3;
-  body(ctx, mask, hw + 0.1, '#9d978b'); // curb shadow
-  body(ctx, mask, hw + 0.08, '#cfc9bc'); // sidewalk
-  body(ctx, mask, hw, '#4b4f57'); // asphalt
+  // Footpath: an edge, then paving with joints, all the way round junction corners.
+  body(ctx, mask, footpath, '#b7b0a2');
+  body(ctx, mask, footpath - 0.015, '#d8d2c5');
+  onTop(ctx, () => {
+    ctx.fillStyle = 'rgba(90, 80, 60, 0.13)';
+    for (let a = 0.1; a < 1; a += 0.1) {
+      ctx.fillRect(a, 0, 0.008, 1);
+      ctx.fillRect(0, a, 1, 0.008);
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    for (let k = 0; k < 10; k++) ctx.fillRect(((k * 37) % 19) / 19, ((k * 53) % 17) / 17, 0.1, 0.1);
+  });
+  // Kerb stone, gutter, then the carriageway.
+  body(ctx, mask, kerb, '#f0eee8');
+  body(ctx, mask, road + 0.01, '#8a8780');
+  body(ctx, mask, road, '#4b4f57');
   // Subtle asphalt speckle for texture.
   ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-  for (let k = 0; k < 14; k++) ctx.fillRect(0.5 - hw + ((k * 37) % 23) / 40, 0.5 - hw + ((k * 53) % 19) / 33, 0.02, 0.02);
+  for (let k = 0; k < 14; k++) ctx.fillRect(0.5 - road + ((k * 37) % 23) / 44, 0.5 - road + ((k * 53) % 19) / 36, 0.02, 0.02);
 
   if (junction) {
-    // Zebra crossings at each arm entrance.
-    ctx.fillStyle = '#f1f1ec';
     for (const b of arms) {
-      for (let o = -hw + 0.05; o < hw - 0.03; o += 0.1) armQuad(ctx, b, hw + 0.02, hw + 0.12, o, o + 0.05);
+      // Zebra crossing where the footpath line crosses the side road, and a stop line before it.
+      ctx.fillStyle = '#f1f1ec';
+      for (let o = -road + 0.03; o < road - 0.02; o += 0.075) armQuad(ctx, b, zebra[0], zebra[1], o, o + 0.04);
+      const side = incomingSide(b);
+      ctx.fillStyle = '#f1f1ec';
+      armQuad(ctx, b, zebra[1] + 0.02, zebra[1] + 0.045, side > 0 ? 0.01 : -road + 0.02, side > 0 ? road - 0.02 : -0.01);
+      // Short centre line up to the stop line.
+      dashes(ctx, b, zebra[1] + 0.02, 0, 0.012, '#f3d548', [[0, 0.52]]);
     }
   } else {
     // Dashed centre line; on straights and corners it runs through the centre.
-    for (const b of arms) dashes(ctx, b, 0, 0, 0.018, '#f3d548', DASHES);
+    for (const b of arms) dashes(ctx, b, 0, 0, 0.016, '#f3d548', DASHES);
     if (arms.length === 2 && !isStraight(mask)) {
       ctx.fillStyle = '#f3d548';
-      ctx.fillRect(0.482, 0.482, 0.036, 0.036);
+      ctx.fillRect(0.484, 0.484, 0.032, 0.032);
     }
   }
 }
 
+/** Highway cross-section: barriers at the edges, two lanes each way, a jersey barrier in the middle. */
+export const HIGHWAY = {
+  road: 0.46,
+  /** Dashed line between the two lanes of each carriageway. */
+  laneLine: 0.22,
+} as const;
+
 function paintHighway(ctx: CanvasRenderingContext2D, mask: number) {
-  const hw = 0.44;
+  const hw = HIGHWAY.road;
   const arms = bits(mask);
   const junction = arms.length >= 3;
-  body(ctx, mask, hw + 0.05, '#7d838c'); // shoulder / barrier
-  body(ctx, mask, hw + 0.03, '#c3c8ce'); // guard rail
-  body(ctx, mask, hw, '#3d4149'); // asphalt
+  body(ctx, mask, hw + 0.04, '#6c727a'); // barrier face
+  body(ctx, mask, hw + 0.025, '#d4d8dc'); // barrier top
+  body(ctx, mask, hw, '#3b3f47'); // asphalt
   ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
   for (let k = 0; k < 18; k++) ctx.fillRect(0.5 - hw + ((k * 37) % 29) / 33, 0.5 - hw + ((k * 53) % 31) / 35, 0.02, 0.02);
+  // Darker wheel tracks in each lane.
+  for (const b of arms) {
+    for (const o of [-0.34, -0.1, 0.1, 0.34]) dashes(ctx, b, junction ? hw : 0, o, 0.035, 'rgba(0,0,0,0.08)', [[0, 0.52]]);
+  }
 
   const from = junction || !isStraight(mask) ? hw : 0;
   for (const b of arms) {
-    // Solid white edge lines, dashed lane lines, and a concrete median with yellow edges.
+    // Solid edge lines, dashed lane lines, and the median barrier with yellow edge lines.
     dashes(ctx, b, from, -hw + 0.04, 0.012, '#eceff2', [[0, 0.52]]);
     dashes(ctx, b, from, hw - 0.04, 0.012, '#eceff2', [[0, 0.52]]);
-    dashes(ctx, b, from, -0.22, 0.013, '#e4e7ea', DASHES);
-    dashes(ctx, b, from, 0.22, 0.013, '#e4e7ea', DASHES);
+    dashes(ctx, b, from, -HIGHWAY.laneLine, 0.013, '#e4e7ea', DASHES);
+    dashes(ctx, b, from, HIGHWAY.laneLine, 0.013, '#e4e7ea', DASHES);
     if (!junction) {
-      dashes(ctx, b, 0, 0, 0.035, '#f0c93a', [[0, 0.52]]);
-      dashes(ctx, b, 0, 0, 0.018, '#cfd3d8', [[0, 0.52]]);
+      dashes(ctx, b, 0, -0.05, 0.008, '#f0c93a', [[0, 0.52]]);
+      dashes(ctx, b, 0, 0.05, 0.008, '#f0c93a', [[0, 0.52]]);
+      dashes(ctx, b, 0, 0, 0.03, '#8d939a', [[0, 0.52]]);
+      dashes(ctx, b, 0, -0.008, 0.016, '#e2e5e8', [[0, 0.52]]);
     }
+  }
+  if (!junction && arms.length === 2 && !isStraight(mask)) {
+    ctx.fillStyle = '#e2e5e8';
+    ctx.fillRect(0.47, 0.47, 0.06, 0.06);
   }
 }
 
@@ -156,7 +222,7 @@ export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, 
   const mask = bridgeAxisMask(axis);
   const highway = type === RoadType.Highway;
   /** Half-width of the whole deck, out to the parapets. */
-  const edge = highway ? 0.5 : 0.41;
+  const edge = highway ? 0.5 : STREET.footpath + 0.02;
   /** One arm along the span; its lateral +o side is the one facing the viewer. */
   const along = axis === BridgeAxis.X ? 1 : 0;
   const shift = (px: number, paint: () => void) => {

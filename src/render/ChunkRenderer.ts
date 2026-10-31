@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, HALF_H, HALF_W, HEIGHT_STEP, MAX_LEVEL, TILE_H } from '../shared/constants';
 import { BridgeAxis, roadMask, RoadType, type BuildableRoad } from '../sim/roads';
 import { cornerHeight } from '../sim/terrain/elevation';
@@ -16,9 +16,10 @@ import { constructionStage } from '../sim/systems/growth';
 import { isZoned } from '../sim/zones';
 import { siteHeadroom } from './atlas/constructionArt';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
+import { FURNITURE_HEADROOM } from './atlas/streetArt';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/palette';
-import type { TerrainTextures } from './atlas/tiles';
+import { buildingTexture, type TerrainTextures } from './atlas/tiles';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
 import { TREE_VARIANTS } from './atlas/treeArt';
 import { tileToWorld } from './iso';
@@ -277,6 +278,17 @@ export class ChunkRenderer {
       this.buildBuilding(x, y, bid, objects);
       return;
     }
+    if (w.road[i] !== RoadType.None) {
+      const furniture = this.streetFurniture(x, y);
+      if (furniture) {
+        const p = tileToWorld(x, y);
+        const s = new Sprite(furniture);
+        s.x = p.x - HALF_W - GROUND_PAD;
+        s.y = p.y - GROUND_PAD - FURNITURE_HEADROOM - tileLift(w, x, y);
+        objects.addChild(s);
+      }
+      return;
+    }
     // Hash the *world* tile so trees and rocks keep their look when the view rotates.
     const hash = cellHash(w.source[i] + 7919, 104729);
     let texture: Texture | null = null;
@@ -293,6 +305,39 @@ export class ChunkRenderer {
     objects.addChild(s);
   }
 
+  /**
+   * Street furniture for a road tile (docs/specs/city-art.md), or null. Choices hash the *world*
+   * tile, and overbridges and gantries use world coordinates, so they stay put when the view rotates.
+   */
+  private streetFurniture(x: number, y: number): Texture | null {
+    const w = this.world;
+    const i = w.index(x, y);
+    if (w.bridge[i] !== BridgeAxis.None) return null;
+    const f = this.tex.furniture;
+    const mask = roadMask(w, x, y);
+    const straight = mask === 0b0101 || mask === 0b1010;
+    const axis = mask === 0b1010 ? 'u' : 'v';
+    const src = w.source[i];
+    const hash = cellHash(src + 7919, 104729);
+    if (w.road[i] === RoadType.Highway) {
+      if (!straight) return null;
+      const ww = w.view.w;
+      const k = ((src % ww) + Math.floor(src / ww)) % 8;
+      // Overbridges need dry land at both ends.
+      const [sx, sy] = axis === 'u' ? [0, 1] : [1, 0];
+      const dry = (tx: number, ty: number) => w.inBounds(tx, ty) && !isWaterTerrain(w.terrain[w.index(tx, ty)] as TerrainId);
+      if (k === 0 && dry(x - sx, y - sy) && dry(x + sx, y + sy)) return f.overbridge[axis];
+      if (k === 4) return f.gantry[axis];
+      return k % 2 === 1 ? f.highwayLamp[axis] : null;
+    }
+    if (straight) {
+      const style = hash % 5;
+      return style < f.street[axis].length ? f.street[axis][style] : null;
+    }
+    const t = f.lights[mask] !== Texture.EMPTY ? f.lights[mask] : f.cornerLamp[mask];
+    return t === Texture.EMPTY ? null : t;
+  }
+
   /** A building is one sprite, added when we reach its front (south) tile so it sorts with trees. */
   private buildBuilding(x: number, y: number, id: number, objects: Container) {
     const b = this.world.buildings.get(id);
@@ -306,10 +351,10 @@ export class ChunkRenderer {
     const p = tileToWorld(b.x, b.y);
     // Grown footprints are square (1×1 or 2×2), so a site frame fits any rotation.
     const site = b.construction > 0 && (size.w === 1 || size.w === 2) ? size.w : null;
-    const s = new Sprite(site ? this.tex.sites[site][constructionStage(b)] : this.tex.buildings[b.def][b.variant][r]);
+    const s = new Sprite(site ? this.tex.sites[site][constructionStage(b)] : buildingTexture(this.tex, b.def, b.variant, r));
     s.x = p.x - h * HALF_W - GROUND_PAD;
     // Footprints are flat (docs/specs/elevation.md), so the origin tile's level lifts the whole building.
-    s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def)) - tileLift(this.world, b.x, b.y);
+    s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def, b.variant)) - tileLift(this.world, b.x, b.y);
     objects.addChild(s);
   }
 

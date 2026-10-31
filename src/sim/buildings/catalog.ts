@@ -319,7 +319,7 @@ export const BUILDINGS = {
 export type BuildingId = keyof typeof BUILDINGS;
 
 /** Colour variants each building is painted in (render/atlas/buildingArt.ts). */
-export const ART_VARIANTS = 3;
+export const ART_VARIANTS = 6;
 
 export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
 
@@ -351,7 +351,7 @@ export interface BuildingInstance {
   /** Footprint's top (north) tile. */
   x: number;
   y: number;
-  /** Art variant 0–2, fixed when placed. */
+  /** Art variant 0–5, fixed when placed (the renderer wraps it to each building's variant count). */
   variant: number;
   /** Residents (housing) or workers (everything else). Updated by sim/population.ts. */
   occupants: number;

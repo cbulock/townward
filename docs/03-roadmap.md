@@ -167,12 +167,19 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [ ] Highways with barriers, lane markings, foot overbridges and sign gantries
 - [ ] Pedestrians stay on footpaths (mitred route, cross at zebras, never on highways); lane offsets match the new roads
 
+## Phase 8 — Traffic Overhaul ✅  → [specs/traffic.md](specs/traffic.md)
+
+- [x] Commute model: homes' workers to jobs over the road graph (fastest path, congestion-aware, distance decay); volume, congestion and commute time
+- [x] Visible cars drive real commute trips, capped at 0.35 per road tile, spawn only with room, slow down on congested roads
+- [x] Traffic lights replace junction boxes (alternating axes, don't block the junction); drawn as red/green poles
+- [x] Traffic overlay (`T` / top-bar button) with legend; buildings fade in traffic view; commute time in the info panel
+- [x] Gridlock regression test (48% stuck → 0–3% stopped) and commute tests (4 new, 115 total)
+
 ## Later Phases (to be specced when we get there)
 
 | Phase | Theme |
 |---|---|
-| 8 | Traffic overhaul: commuters with real jobs, road capacity and congestion, smarter routing, traffic lights, congestion overlay (next) |
-| 9 | Citizen needs: per-neighbourhood happiness (jobs, shopping, safety, health, school, commute, noise), speech bubbles and a "Citizens say…" feed |
+| 9 | Citizen needs (next): per-neighbourhood happiness (jobs, shopping, safety, health, school, commute, noise), speech bubbles and a "Citizens say…" feed |
 | 10 | Save/Load: Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
 | 11+ | Public transport (buses, trains), libraries and more services, pollution and data overlays |
 | 12 | Performance pass: sim in a Web Worker, 256×256+ maps |

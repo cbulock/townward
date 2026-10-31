@@ -3,6 +3,7 @@ import { mulberry32, subSeed } from '../../shared/rng';
 import type { City } from '../City';
 import { AccessSystem, updateRoadAccess } from '../systems/access';
 import { BudgetSystem } from '../systems/budget';
+import { CommuteSystem } from '../systems/commute';
 import { CoverageSystem, updateCoverage } from '../systems/coverage';
 import { FireSystem } from '../systems/fire';
 import { GrowthSystem } from '../systems/growth';
@@ -17,8 +18,8 @@ const SALT = { growth: 0x6077, fire: 0xf12e } as const;
 
 /**
  * The simulation core (D-058): owns the systems and runs them in a fixed order.
- *   - after an edit:  access → utilities → coverage → traffic
- *   - each day:       growth → fire → (the edit refresh) → population → traffic, plus budget at month end
+ *   - after an edit:  access → utilities → coverage → commute (if roads changed) → traffic
+ *   - each day:       growth → fire → (the edit refresh) → population → commute → traffic, plus budget at month end
  *   - each frame:     the clock and traffic
  * The game layer only calls these entry points and shows the outcome.
  */
@@ -30,6 +31,7 @@ export class Simulation {
   readonly fire: FireSystem;
   readonly population: PopulationSystem;
   readonly budget: BudgetSystem;
+  readonly commute: CommuteSystem;
   readonly traffic: TrafficSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
@@ -43,8 +45,9 @@ export class Simulation {
     this.fire = new FireSystem(world, mulberry32(subSeed(world.seed, SALT.fire)));
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
-    this.traffic = new TrafficSystem(world);
-    this.onChange = [this.access, this.utilities, this.coverage, this.traffic];
+    this.commute = new CommuteSystem(world);
+    this.traffic = new TrafficSystem(world, this.commute);
+    this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.traffic];
   }
 
   get world(): World {
@@ -64,6 +67,7 @@ export class Simulation {
     this.fire.onDay(out);
     this.worldChanged({ roads: false });
     this.population.onDay();
+    this.commute.onDay();
     this.traffic.onDay();
     if (this.city.day % BALANCE.daysPerMonth === 0) this.budget.onMonth(out);
     return out;

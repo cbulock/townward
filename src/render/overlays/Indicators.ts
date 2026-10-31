@@ -51,7 +51,7 @@ export class Indicators {
       s.texture = badge;
       // Above the roof: footprint centre, raised by most of the building's height.
       const c = liftWorld(this.viewRef, b.x + w / 2, b.y + h / 2);
-      const y = c.y - Math.max(18, buildingHeadroom(b.def) - 14);
+      const y = c.y - Math.max(18, buildingHeadroom(b.def, b.variant) - 14);
       s.position.set(c.x, y);
       this.bases.push(y);
       s.visible = true;

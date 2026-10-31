@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
-import { budgetOpenAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { budgetOpenAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -158,6 +158,7 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
   const game = useAtomValue(gameAtom);
   const rotation = useAtomValue(rotationAtom);
   const setBudgetOpen = useSetAtom(budgetOpenAtom);
+  const trafficView = useAtomValue(trafficViewAtom);
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
 
@@ -255,6 +256,23 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
         </button>
       </div>
       <span className="top-divider" />
+      <button
+        type="button"
+        className={`icon-button ${trafficView ? 'is-on' : ''}`}
+        aria-pressed={trafficView}
+        title="Traffic view (T)"
+        aria-label="Traffic view"
+        onClick={() => game?.setTrafficView(!trafficView)}
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <g {...icon}>
+            <path d="M5 16V11l2-5h10l2 5v5" />
+            <path d="M3 16h18v3H3z" />
+            <circle cx="7.5" cy="13.5" r="0.6" />
+            <circle cx="16.5" cy="13.5" r="0.6" />
+          </g>
+        </svg>
+      </button>
       <button
         type="button"
         className="icon-button"

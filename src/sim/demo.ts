@@ -1,5 +1,5 @@
 import { mulberry32, subSeed } from '../shared/rng';
-import { BUILDINGS, startLevel, zonedBuildings, type BuildingDef, type BuildingId } from './buildings/catalog';
+import { ART_VARIANTS, BUILDINGS, startLevel, zonedBuildings, type BuildingDef, type BuildingId } from './buildings/catalog';
 import { BALANCE } from '../shared/balance';
 import { Decor } from './terrain/types';
 import type { City } from './City';
@@ -68,7 +68,7 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
   }
 
   const utilitySlots: UtilitySlot[] = [];
-  const place = (id: BuildingId, x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), Math.floor(rng() * 3)).ok;
+  const place = (id: BuildingId, x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), Math.floor(rng() * ART_VARIANTS)).ok;
   for (let by = 0; by < 2 * BLOCKS; by++) {
     for (let bx = 0; bx < 2 * BLOCKS; bx++) {
       const use = uses[by][bx];
@@ -156,7 +156,7 @@ function fillLots(city: City, rng: () => number) {
         w.decor[i] = Decor.None;
       }
     }
-    w.addBuilding({ def, x, y, variant: Math.floor(rng() * 3), grown: true }, bw, bh);
+    w.addBuilding({ def, x, y, variant: Math.floor(rng() * ART_VARIANTS), grown: true }, bw, bh);
   };
   for (let y = 0; y < w.height; y++) {
     for (let x = 0; x < w.width; x++) {
@@ -212,7 +212,7 @@ function serveIslands(city: City, slots: UtilitySlot[], rng: () => number): bool
       if (entrance === -1 || islands[entrance] !== island) continue;
       const plan = planPlace(w, id, s.x, s.y);
       slots.splice(k, 1);
-      if (plan.ok && applyPlace(city, plan, Math.floor(rng() * 3)).ok) return;
+      if (plan.ok && applyPlace(city, plan, Math.floor(rng() * ART_VARIANTS)).ok) return;
       k--;
     }
     placeOnIsland(city, id, island, islands, rng);
@@ -234,7 +234,7 @@ function placeOnIsland(city: City, id: BuildingId, island: number, islands: Int3
       const entrance = findEntrance(w, x, y, bw, bh, 1);
       if (entrance === -1 || islands[entrance] !== island) continue;
       const plan = planPlace(w, id, x, y);
-      if (plan.ok && applyPlace(city, plan, Math.floor(rng() * 3)).ok) return;
+      if (plan.ok && applyPlace(city, plan, Math.floor(rng() * ART_VARIANTS)).ok) return;
     }
   }
 }

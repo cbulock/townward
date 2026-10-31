@@ -16,6 +16,7 @@ import {
   clockAtom,
   dayNightAtom,
   budgetAtom,
+  trafficViewAtom,
   worldVersionAtom,
   toolPreviewAtom,
 } from './atoms';
@@ -49,6 +50,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('clock', (h) => store.set(clockAtom, h)),
     game.events.on('dayNight', (m) => store.set(dayNightAtom, m)),
     game.events.on('budget', (b) => store.set(budgetAtom, b)),
+    game.events.on('trafficView', (on) => store.set(trafficViewAtom, on)),
     game.events.on('worldChanged', (v) => store.set(worldVersionAtom, v)),
     game.events.on('city', (c) => store.set(cityAtom, c)),
     game.events.on('inspect', (i) => store.set(inspectAtom, i)),

@@ -1,5 +1,6 @@
 import { turn, type Rotation } from '../render/view/ViewTransform';
 import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildingArt';
+import { buildingTexture } from '../render/atlas/tiles';
 import { BRIDGE_ANCHOR_Y, GROUND_PAD } from '../render/atlas/geometry';
 import { Renderer } from '../render/Renderer';
 import { BALANCE } from '../shared/balance';
@@ -71,6 +72,8 @@ const TOOL_LABEL = {
   'zone-ch': 'Offices',
   'zone-i': 'Industry',
 } as const;
+/** Toast ids, unique across game instances (dev mode mounts a game twice, sharing one HUD store). */
+let noticeSeq = 0;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
@@ -93,8 +96,9 @@ export class Game {
   private inspected: number | null = null;
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
-  private noticeId = 0;
   private dayNightMode = readDayNight();
+  /** Traffic overlay on (roads tinted by congestion). */
+  private trafficViewOn = false;
   /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
   private worldVersion = 0;
   /** Utility hints already shown this game. */
@@ -119,6 +123,7 @@ export class Game {
     renderer.setAgentSource(
       () => this.traffic.agents,
       () => this.traffic.stops,
+      () => this.traffic.lights(),
     );
     this.loop = new GameLoop(
       SIM_TICK_HZ,
@@ -294,6 +299,7 @@ export class Game {
   /** The systems are up to date: refresh the minimap, badges, hints and panels. */
   private afterSimChange() {
     this.bumpWorld();
+    if (this.trafficViewOn) this.renderer.setTrafficOverlay(this.sim.commute.congestion);
     this.renderer.indicators.sync(this.world);
     this.hintUtilities();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
@@ -327,6 +333,8 @@ export class Game {
   private newDay() {
     const out = this.sim.day();
     this.showDay(out);
+    // Congestion changes every day, even when no buildings did.
+    if (this.trafficViewOn && out.changed.length === 0) this.renderer.setTrafficOverlay(this.sim.commute.congestion);
     const r = out.budget;
     if (r) {
       this.events.emit('funds', this.city.funds);
@@ -375,15 +383,15 @@ export class Game {
   /** The "pop" a building makes when it appears. */
   private popBuilding(b: BuildingInstance, delay: number) {
     const { w, h } = BUILDINGS[b.def].size;
-    const frame = buildingFrameSize(b.def);
+    const frame = buildingFrameSize(b.def, b.variant);
     this.renderer.effects.pop(
       [
         {
           // Fractional tile coords put the pop at the footprint's centre.
           x: b.x + (w - 1) / 2,
           y: b.y + (h - 1) / 2,
-          texture: this.renderer.textures.buildings[b.def][b.variant][this.renderer.rotation],
-          anchorY: (buildingHeadroom(b.def) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
+          texture: buildingTexture(this.renderer.textures, b.def, b.variant, this.renderer.rotation),
+          anchorY: (buildingHeadroom(b.def, b.variant) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
         },
       ],
       delay,
@@ -410,6 +418,18 @@ export class Game {
   /** Glide the camera to a view-tile point (minimap click). */
   lookAt(p: Point) {
     this.renderer.panToViewTile(p);
+  }
+
+  get trafficView(): boolean {
+    return this.trafficViewOn;
+  }
+
+  /** Show or hide the traffic overlay (roads coloured by congestion). */
+  setTrafficView(on: boolean) {
+    this.trafficViewOn = on;
+    this.renderer.setTrafficOverlay(on ? this.sim.commute.congestion : null);
+    this.sound.play('tool');
+    this.events.emit('trafficView', on);
   }
 
   get dayNight(): DayNightMode {
@@ -479,6 +499,7 @@ export class Game {
     this.events.emit('city', {
       ...s,
       demand: this.sim.growth.demand(),
+      traffic: this.sim.commute.report,
       power: this.sim.utilities.report.power,
       water: this.sim.utilities.report.water,
       date: this.city.date,
@@ -531,6 +552,7 @@ export class Game {
       services: d.category === 'civic' ? [] : SERVICE_KINDS.filter((k) => b.services & serviceBit(k)),
       provides: d.service ? { kind: 'service', service: d.service, radius: d.radius ?? 0 } : d.supplies ? { kind: 'utility', ...d.supplies } : null,
       upkeep: d.upkeep ?? 0,
+      commuteMinutes: d.category === 'residential' ? (this.sim.commute.commuteMinutes.get(b.id) ?? null) : null,
     };
     this.events.emit('inspect', info);
   }
@@ -682,7 +704,7 @@ export class Game {
   }
 
   private notify(kind: 'error' | 'info', message: string) {
-    this.events.emit('notice', { id: ++this.noticeId, kind, message });
+    this.events.emit('notice', { id: ++noticeSeq, kind, message });
   }
 
   // ---------------------------------------------------------------- loop
@@ -769,6 +791,7 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
+    else if (code === 'KeyT') this.setTrafficView(!this.trafficViewOn);
     else if (code === 'KeyL') this.setDayNight(DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length]);
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);

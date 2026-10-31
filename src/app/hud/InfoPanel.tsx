@@ -73,6 +73,12 @@ export function InfoPanel() {
           </strong>
         </div>
       )}
+      {info.commuteMinutes !== null && (
+        <div className="info-row">
+          <span>Commute</span>
+          <strong>{Math.round(info.commuteMinutes)} min</strong>
+        </div>
+      )}
       {info.needsUtilities && info.constructionDays === 0 && (
         <div className="info-utilities">
           <span className={`info-pill ${info.powered ? 'ok' : 'warn'}`}>{info.powered ? '⚡ Power' : '⚡ No power'}</span>

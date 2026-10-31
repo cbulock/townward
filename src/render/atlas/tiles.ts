@@ -7,7 +7,7 @@ import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
-import { BUILDING_ROTATIONS, BUILDING_VARIANTS, buildingFrameSize, paintBuilding } from './buildingArt';
+import { BUILDING_ROTATIONS, buildingFrameSize, buildingVariantCount, paintBuilding } from './buildingArt';
 import {
   paintPerson,
   paintVehicle,
@@ -33,6 +33,15 @@ import {
 } from './transitionArt';
 import { paintTreeCluster, TREE_VARIANTS } from './treeArt';
 import { paintBusStop, STOP_FRAME_H, STOP_FRAME_W } from './stopArt';
+import {
+  FURNITURE_FRAME_H,
+  FURNITURE_FRAME_W,
+  paintFurniture,
+  ROAD_AXES,
+  STREET_STYLES,
+  type FurniturePiece,
+  type RoadAxis,
+} from './streetArt';
 import { paintSite, SITE_SIZES, SITE_STAGES, siteFrameSize, type SiteSize } from './constructionArt';
 
 const ALL_TERRAINS: readonly TerrainId[] = [
@@ -63,13 +72,18 @@ export interface TerrainTextures {
   roads: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Bridge spans (taller frames: see BRIDGE_HEADROOM), indexed by road type then BridgeAxis (0 is Texture.EMPTY). */
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
+  /** Street furniture (streetArt.ts). Mask-indexed arrays hold Texture.EMPTY where a mask has none. */
+  furniture: StreetFurniture;
   /** Plain white diamond for tool previews (tinted at runtime). */
   selection: Texture;
   /** Zoned-lot diamond with an outline (tinted by zone at runtime). */
   zoneLot: Texture;
   /** Construction sites, indexed by footprint size then stage (0 foundation, 1 scaffold). */
   sites: Readonly<Record<SiteSize, readonly Texture[]>>;
-  /** Buildings, indexed by id, variant, then view rotation. Frames vary in size: see buildingFrameSize(). */
+  /**
+   * Buildings, indexed by id, variant, then view rotation. Each building has buildingVariantCount(id)
+   * variants (look them up with buildingTexture); frames vary in size: see buildingFrameSize().
+   */
   buildings: Readonly<Record<BuildingId, Texture[][]>>;
   fx: FxTextures;
   /** Vehicles, indexed by kind, then variant, then direction (0 NE, 1 SE, 2 SW, 3 NW). */
@@ -82,10 +96,49 @@ export interface TerrainTextures {
   warnRoad: Texture;
   warnPower: Texture;
   warnWater: Texture;
+  /** Traffic-light pole (lamp tinted red/green). */
+  lamp: Texture;
   hover: Texture;
   gridLine: Texture;
   /** The atlas pages (so their mesh shaders can be released). */
   sources: readonly TextureSource[];
+}
+
+/** A building instance's frame: its variant wraps round the building's variant count. */
+export function buildingTexture(tex: TerrainTextures, id: BuildingId, variant: number, rotation: number): Texture {
+  const set = tex.buildings[id];
+  return set[variant % set.length][rotation];
+}
+
+export interface StreetFurniture {
+  /** Straight streets, indexed by axis then style. */
+  street: Readonly<Record<RoadAxis, readonly Texture[]>>;
+  /** Traffic lights for junctions (3–4 arms), indexed by mask. */
+  lights: readonly Texture[];
+  /** A lamp on the outside of a bend, indexed by mask. */
+  cornerLamp: readonly Texture[];
+  highwayLamp: Readonly<Record<RoadAxis, Texture>>;
+  gantry: Readonly<Record<RoadAxis, Texture>>;
+  overbridge: Readonly<Record<RoadAxis, Texture>>;
+}
+
+const armCount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
+const isBend = (m: number) => armCount(m) === 2 && m !== 0b0101 && m !== 0b1010;
+
+/** Every furniture frame, by atlas name. */
+function furniturePieces(): [string, FurniturePiece][] {
+  const out: [string, FurniturePiece][] = [];
+  for (const axis of ROAD_AXES) {
+    for (let style = 0; style < STREET_STYLES; style++) out.push([`furn_street_${axis}_${style}`, { kind: 'street', axis, style }]);
+    out.push([`furn_hwlamp_${axis}`, { kind: 'highwayLamp', axis }]);
+    out.push([`furn_gantry_${axis}`, { kind: 'gantry', axis }]);
+    out.push([`furn_overbridge_${axis}`, { kind: 'overbridge', axis }]);
+  }
+  for (let m = 0; m < 16; m++) {
+    if (armCount(m) >= 3) out.push([`furn_lights_${m}`, { kind: 'lights', mask: m }]);
+    if (isBend(m)) out.push([`furn_corner_${m}`, { kind: 'cornerLamp', mask: m }]);
+  }
+  return out;
 }
 
 const ROAD_TYPES: readonly BuildableRoad[] = [RoadType.Road, RoadType.Highway];
@@ -151,6 +204,21 @@ function paintPin(ctx: CanvasRenderingContext2D, rim: string, fill: string) {
   ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.arc(9, 8, 6.8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Traffic light: a dark pole and head with a white lamp (tinted red or green at runtime). */
+function paintLamp(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(3.5, 15, 2.2, 0.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#3a3d44';
+  ctx.fillRect(3, 5, 1, 10);
+  ctx.fillRect(1.5, 0.5, 4, 5.5);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(3.5, 3.2, 1.5, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -270,6 +338,7 @@ export function buildTerrainTextures(): TerrainTextures {
     for (let m = 0; m < 16; m++) b.add(`road_${t}_${m}`, W, H, (ctx) => paintRoad(ctx, t, m));
     for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis));
   }
+  for (const [name, piece] of furniturePieces()) b.add(name, FURNITURE_FRAME_W, FURNITURE_FRAME_H, (ctx) => paintFurniture(ctx, piece));
   b.add('selection', W, H, paintSelection);
   b.add('zone_lot', W, H, paintZoneLot);
   for (const size of SITE_SIZES) {
@@ -277,8 +346,8 @@ export function buildTerrainTextures(): TerrainTextures {
     for (const stage of SITE_STAGES) b.add(`site_${size}_${stage}`, f.w, f.h, (ctx) => paintSite(ctx, size, stage));
   }
   for (const id of BUILDING_IDS) {
-    const f = buildingFrameSize(id);
-    for (let v = 0; v < BUILDING_VARIANTS; v++) {
+    for (let v = 0; v < buildingVariantCount(id); v++) {
+      const f = buildingFrameSize(id, v);
       for (const r of BUILDING_ROTATIONS) b.add(`bld_${id}_${v}_${r}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v, r));
     }
   }
@@ -294,6 +363,7 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('warn_road', 18, 20, paintWarnRoad);
   b.add('warn_power', 18, 20, paintWarnPower);
   b.add('warn_water', 18, 20, paintWarnWater);
+  b.add('lamp', 7, 16, paintLamp);
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
   b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
@@ -301,7 +371,6 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('grid', W, H, paintGridLine);
 
   const tex = b.build();
-  console.warn('ATLAS_PROBE', b.pageCount, b.sources.map((s) => s.width + 'x' + s.height).join(','));
   const get = (name: string): Texture => {
     const t = tex.get(name);
     if (!t) throw new Error(`atlas frame missing: ${name}`);
@@ -329,13 +398,21 @@ export function buildTerrainTextures(): TerrainTextures {
     bridges: Object.fromEntries(
       ROAD_TYPES.map((t) => [t, [Texture.EMPTY, get(`bridge_${t}_${BridgeAxis.X}`), get(`bridge_${t}_${BridgeAxis.Y}`)]]),
     ) as Record<BuildableRoad, Texture[]>,
+    furniture: {
+      street: { u: range(STREET_STYLES, (k) => get(`furn_street_u_${k}`)), v: range(STREET_STYLES, (k) => get(`furn_street_v_${k}`)) },
+      lights: range(16, (m) => (armCount(m) >= 3 ? get(`furn_lights_${m}`) : Texture.EMPTY)),
+      cornerLamp: range(16, (m) => (isBend(m) ? get(`furn_corner_${m}`) : Texture.EMPTY)),
+      highwayLamp: { u: get('furn_hwlamp_u'), v: get('furn_hwlamp_v') },
+      gantry: { u: get('furn_gantry_u'), v: get('furn_gantry_v') },
+      overbridge: { u: get('furn_overbridge_u'), v: get('furn_overbridge_v') },
+    },
     selection: get('selection'),
     zoneLot: get('zone_lot'),
     sites: { 1: SITE_STAGES.map((st) => get(`site_1_${st}`)), 2: SITE_STAGES.map((st) => get(`site_2_${st}`)) },
     buildings: Object.fromEntries(
       BUILDING_IDS.map((id) => [
         id,
-        range(BUILDING_VARIANTS, (v) => BUILDING_ROTATIONS.map((r) => get(`bld_${id}_${v}_${r}`))),
+        range(buildingVariantCount(id), (v) => BUILDING_ROTATIONS.map((r) => get(`bld_${id}_${v}_${r}`))),
       ]),
     ) as Record<BuildingId, Texture[][]>,
     vehicles: Object.fromEntries(
@@ -346,6 +423,7 @@ export function buildTerrainTextures(): TerrainTextures {
     warnRoad: get('warn_road'),
     warnPower: get('warn_power'),
     warnWater: get('warn_water'),
+    lamp: get('lamp'),
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),

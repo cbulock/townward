@@ -2,6 +2,25 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Phase 8 — Traffic overhaul (step 2 of the plan)
+- Reproduced the user's gridlock headlessly (`tests/support/jamTown.ts`): 318 cars, 48% stuck.
+- **New `systems/commute.ts`:**
+  - Dijkstra from each group of homes, with congestion-aware tile times and distance-decayed job attraction.
+  - Flow is pushed down the shortest-path tree, then smoothed.
+  - Outputs volume and congestion per road tile, commute minutes per home, and weighted trips.
+- **Traffic:**
+  - Cars drive commute trips.
+  - Capped at 0.35 per road tile, spawning only with room.
+  - The congestion speed factor slows cars down.
+  - Traffic lights (5 s phases, offset per junction, don't-block-the-junction) replace the junction boxes.
+- **Visuals:**
+  - Traffic-light poles (red/green).
+  - `T` overlay of roads coloured by congestion, with buildings faded, plus a legend (commuters, average commute, jammed tiles).
+  - Commute time in the info panel.
+- Fixed: duplicate toast ids when dev mode mounts the game twice.
+- Result: 0–3% stopped and 37 cars on the same town; the connector shows as congested and a highway relieves it. Tests: 115.
+- Shared the working tree with the city-art session (simcity-web-5e). Their lane offsets and pedestrian paths in `traffic.ts` were kept alongside this work.
+
 ## 2026-11-01: Systems foundation (step 1 of the plan, D-057)
 - Decisions: order is foundation → traffic → needs → backend (D-057); no free starter utilities (D-056); "systems as services" means in-game modules (D-058); the product name is still open (D-001).
 - Split `population.ts` and `services.ts` into `systems/` modules (access, utilities, coverage, fire, population, budget); moved growth and traffic there.

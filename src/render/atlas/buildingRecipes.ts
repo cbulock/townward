@@ -341,7 +341,7 @@ export const ART: Readonly<Record<RecipeId, readonly BuildingArt[]>> = {
     {},
     { wall: '#d7d2e3', sign: 'INN', signColor: '#2d63c8', masses: [one(2, 0.14, 'lobby', '#5a5f6a'), one(10, 0.24)], extras: ['acunits'] },
     { wall: '#e6d0c0', trim: '#c9a447', sign: 'GRAND', signColor: '#c8902d', masses: [one(9, 0.2), one(4, 0.3)], extras: ['canopy'] },
-    { wall: '#7fa3b8', facade: 'curtain', sign: 'SUITES', signColor: '#1f3f6a', masses: [one(14, 0.26)], extras: ['canopy', 'helipad'] },
+    { wall: '#7fa3b8', facade: 'curtain', sign: 'SUITES', signColor: '#1f3f6a', masses: [one(14, 0.26)], extras: ['canopy', 'antenna'] },
     { wall: '#f0e6d6', facade: 'grid', sign: 'PLAZA', signColor: '#2f7d4a', masses: [one(12, 0.22)], extras: ['canopy', 'pool'] },
     { wall: '#f3efe6', sign: 'RESORT', signColor: '#1f8aa0', masses: [one(2, 0.14, 'lobby'), one(8, 0.22)], extras: ['balconies', 'pool'] },
   ),
@@ -427,7 +427,8 @@ export const ART: Readonly<Record<RecipeId, readonly BuildingArt[]>> = {
   police_station: variants(
     {
       floorH: 10,
-      masses: [one(2, 0.13)],
+      // Pulled back from the street so the patrol cars have a forecourt.
+      masses: [{ floors: 2, box: { u0: 0.12, u1: 0.88, v0: 0.12, v1: 0.6 } }],
       wall: '#dfe6ef',
       roof: 'flat',
       roofColor: '#3c5a8c',
@@ -438,7 +439,7 @@ export const ART: Readonly<Record<RecipeId, readonly BuildingArt[]>> = {
       signColor: '#1f4fa8',
     },
     {},
-    { wall: '#c4ccd6', facade: 'grid', masses: [one(3, 0.15)], extras: ['antenna', 'patrolcars'] },
+    { wall: '#c4ccd6', facade: 'grid', masses: [{ floors: 3, box: { u0: 0.14, u1: 0.86, v0: 0.12, v1: 0.6 } }], extras: ['antenna', 'patrolcars'] },
     { wall: '#b8664d', facade: 'brick', trim: '#e8dcc8', extras: ['canopy', 'patrolcars'] },
   ),
   fire_station: variants(

@@ -141,9 +141,16 @@ export class IsoFrame {
   }
 }
 
-/** Lighten (f > 0) or darken (f < 0) a hex colour. */
-export function shade(hex: string, f: number): string {
-  const [r, g, b] = hexToRgb(hex);
+/** Parse '#rrggbb' or 'rgb(r, g, b)' (shade's own output, so shades can be chained). */
+function parseColor(color: string): [number, number, number] {
+  if (color.startsWith('#')) return hexToRgb(color);
+  const m = color.match(/\d+(\.\d+)?/g);
+  return m && m.length >= 3 ? [Number(m[0]), Number(m[1]), Number(m[2])] : [128, 128, 128];
+}
+
+/** Lighten (f > 0) or darken (f < 0) a colour. */
+export function shade(color: string, f: number): string {
+  const [r, g, b] = parseColor(color);
   const k = (c: number) => Math.round(Math.max(0, Math.min(255, f >= 0 ? c + (255 - c) * f : c * (1 + f))));
   return `rgb(${k(r)}, ${k(g)}, ${k(b)})`;
 }

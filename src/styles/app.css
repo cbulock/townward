@@ -1200,3 +1200,48 @@ button.funds:hover {
 .top-bar {
   z-index: 6;
 }
+
+/* ---------- Traffic overlay legend ---------- */
+.icon-button.is-on {
+  background: rgba(79, 209, 197, 0.16);
+  color: var(--accent);
+}
+.traffic-legend {
+  right: 16px;
+  bottom: 152px;
+  width: 232px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation-name: hint-in;
+}
+.traffic-title {
+  font-size: 12px;
+}
+.traffic-steps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.traffic-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.traffic-step i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.traffic-summary,
+.traffic-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.traffic-summary {
+  color: var(--text);
+}
