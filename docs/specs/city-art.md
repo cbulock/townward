@@ -28,11 +28,22 @@ All art stays procedural (D-011) and original. Nothing here changes the simulati
 - Junctions: zebra crossings sit **on the footpath line** (where pedestrians cross), with stop lines before them on the incoming lane.
 - **Street furniture** is drawn as one sprite per road tile in the objects layer, so it sorts with buildings:
   - straight streets: street trees on the near footpath and lamp posts, chosen per tile with a stable hash;
-  - junctions: traffic lights on the corners (not the far corner, which agents would wrongly pass in front of);
+  - junctions: no furniture. The traffic lights are the live ones the traffic sim drives (Phase 8, drawn by AgentRenderer); static poles would show the wrong colours;
   - corners: a lamp on the outer corner.
 - Highways have concrete barriers on both edges and a central jersey barrier, two lanes each way, and lamps on the near shoulder. They have **no footpath**.
   - **Foot overbridges** cross straight highway tiles every 8 tiles (on a stable world-coordinate rule): a deck with railings and a stair tower at each end. Cars pass underneath.
   - **Sign gantries** carry green direction boards over the highway, offset 4 tiles from the overbridges.
+
+## Smoke and steam
+
+- `render/fx/Smoke.ts`: pooled puffs (cap 900) using the shared puff texture, in a layer above the objects.
+- Sources come from the art itself (`smokeSources(id, variant, rotation)` in `buildingArt.ts`), so plumes leave the painted stack tops in every rotation:
+  - factory smokestacks: grey smoke;
+  - power-plant chimneys and gas-plant exhaust stacks: grey smoke;
+  - cooling towers: white steam (bigger and softer).
+- Only finished buildings emit; zoned industry also needs someone at work. Only stacks on screen emit, and nothing below zoom 0.3. The list of stacks is rebuilt every second and right after a rotation.
+- Puffs rise, slow, spread and drift with a light wind, then fade out. They are tinted by day/night like everything else.
+- The painted plumes on the power plants were removed so the smoke isn't doubled.
 
 ## People and cars
 

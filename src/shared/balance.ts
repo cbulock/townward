@@ -45,9 +45,6 @@ export const BALANCE = {
 
   // --- Zoning & growth (sim/growth.ts, docs/specs/buildings.md) ---
   // --- Services & utilities (sim/services.ts, docs/specs/core.md) ---
-  /** Occupancy with no services; each covering service adds serviceStep (4 services = 100%). */
-  serviceBase: 0.7,
-  serviceStep: 0.075,
   /** Daily chance that a finished building outside fire coverage burns down (once the city is this big). */
   fireChance: 0.0003,
   firePopulation: 200,

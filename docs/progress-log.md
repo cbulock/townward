@@ -2,6 +2,24 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: City art pass (buildings, streets, people, smoke)
+- User request: make buildings, parks, utilities, roads and highways look far better, with real variety, footpaths and overhead bridges. Later: animated smoke from factories and power plants. Spec: `docs/specs/city-art.md`, decision D-060.
+- **Buildings (`buildingRecipes.ts` + `buildingArt.ts`):**
+  - 6 variants per zoned building that change form: podiums, setbacks, pyramid tops, heights; brick, siding, ribbon, grid and finned glass facades; helipads, spires, antennas, roof gardens, pools and solar panels; garages, trees and planters.
+  - Named shops (Bakery, Books, Deli, Florist, Pharmacy), cafés (Diner, Pizza, Noodles, Bar, Gelato), hotels (Inn, Grand, Suites, Plaza, Resort) and markets.
+  - Industry gets silos, tanks and twin stacks.
+  - Shared iso helpers moved to `isoPaint.ts`.
+- **Civic (`civicArt.ts`):**
+  - cooling-tower, gas and twin-tower power plants; globe, classic and reservoir water towers;
+  - 6 parks (fountain, playground, pond, court, gazebo garden, picnic grove);
+  - patrol cars, fire doors and a hose tower, red crosses, a school playing field;
+  - a domed town hall.
+- **Streets (`roadArt.ts`, new `streetArt.ts`):** paved footpaths with kerbs, zebra crossings on the footpath line, and stop lines. Street trees and lamps go in the objects layer. Highways get barriers, two lanes each way, lamps, sign gantries, and foot overbridges every 8 tiles.
+- **Agents:** pedestrians follow a mitred footpath route (they cross at zebras) and never walk on highways. Cars use lane 0.13, and highways have inner and outer lanes.
+- **Smoke (`render/fx/Smoke.ts`):** pooled plumes from stack tops taken from the art; steam from cooling towers.
+- Worked alongside the Phase 8 traffic session in the same tree: kept its live traffic lights and dropped my static ones.
+- Checked in headless Chrome: the demo at several zooms and after rotation, plus variant sheets. Typecheck and lint clean, 118 tests.
+
 ## 2026-11-01: Phase 8 — Traffic overhaul (step 2 of the plan)
 - Reproduced the user's gridlock headlessly (`tests/support/jamTown.ts`): 318 cars, 48% stuck.
 - **New `systems/commute.ts`:**

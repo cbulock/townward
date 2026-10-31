@@ -69,10 +69,8 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
 
 - A building is **one sprite**, in a frame tall enough for its floors and roof.
 - It's drawn in the chunk that owns its **front tile** `(x + w − 1, y + h − 1)` and sorted with trees by that tile's diagonal, so buildings and trees overlap correctly.
-- Painter (`buildingArt.ts`): an iso box with a lit south-west face and a shaded south-east face, then:
-  - roof: gable, hip, flat with parapet, sawtooth, or glass;
-  - facade: punched windows, window bands or a curtain wall, with a few lit windows;
-  - extras: chimney, awning, sign, balconies, water tank, AC units, loading dock, smokestack, canopy, crown, parking, garden.
+- Painter (`buildingArt.ts`) reads recipes from `buildingRecipes.ts`. Each building is a stack of iso boxes, with a lit south-west face and a shaded south-east face. Parks, the town hall and utilities have their own painters (`civicArt.ts`).
+- Each zoned building has 6 variants that change form, not only colour. See [city-art.md](city-art.md) for massing, facades, roofs, rooftop and lot details.
 
 ## Zoning (Phase 4b)
 

@@ -158,14 +158,15 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] `Game` drives the `Simulation` and only shows its outcome; no behaviour change (/demo is identical, all tests pass)
 - [x] Core tests (3 new, 111 total)
 
-## City Art Pass 🚧  → [specs/city-art.md](specs/city-art.md)
+## City Art Pass ✅  → [specs/city-art.md](specs/city-art.md)
 
-- [ ] Building variants that change form (massing, height, roof, facade, rooftop, lot); 6 per zoned building
-- [ ] Shop, café, hotel and market names per variant; industrial equipment
-- [ ] Civic art: power plants, water towers, 6 parks, police/fire/clinic/school details
-- [ ] Streets with real footpaths, kerbs, crossings and stop lines; street trees, lamps and traffic lights
-- [ ] Highways with barriers, lane markings, foot overbridges and sign gantries
-- [ ] Pedestrians stay on footpaths (mitred route, cross at zebras, never on highways); lane offsets match the new roads
+- [x] Building variants that change form (massing, height, roof, facade, rooftop, lot); 6 per zoned building
+- [x] Shop, café, hotel and market names per variant; industrial equipment
+- [x] Civic art: power plants, water towers, 6 parks, police/fire/clinic/school details
+- [x] Streets with real footpaths, kerbs, crossings and stop lines; street trees and lamps (traffic lights are the live ones from Phase 8)
+- [x] Highways with barriers, lane markings, foot overbridges and sign gantries
+- [x] Animated smoke from factory and power-plant stacks, steam from cooling towers
+- [x] Pedestrians stay on footpaths (mitred route, cross at zebras, never on highways); lane offsets match the new roads (3 tests, 118 total)
 
 ## Phase 8 — Traffic Overhaul ✅  → [specs/traffic.md](specs/traffic.md)
 

@@ -72,9 +72,12 @@ Roads and highways connect to each other. All 16 masks per type are painted proc
 
 | Piece | Street | Highway |
 |---|---|---|
-| Body | asphalt, sidewalks, kerb shadow | wider asphalt, guard rails |
-| Markings | dashed yellow centre line | white edge lines, dashed lanes, yellow-edged concrete median |
-| Junctions (3–4 arms) | zebra crossings | markings stop at the junction box |
+| Body | carriageway (half-width 0.26), kerb, paved footpath out to the tile edge | barriers, two lanes each way, jersey median |
+| Markings | dashed yellow centre line | white edge lines, dashed lanes, yellow lines either side of the median |
+| Junctions (3–4 arms) | zebra crossings on the footpath line, stop lines | markings stop at the junction box |
+| Furniture (objects layer) | street trees, lamps, corner lamps | lamps, sign gantries, foot overbridges every 8 tiles |
+
+See [city-art.md](city-art.md) for the cross-sections and furniture rules.
 
 Dash positions line up across tile edges. The ghost preview auto-tiles as if the plan were already built.
 

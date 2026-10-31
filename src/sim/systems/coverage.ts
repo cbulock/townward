@@ -1,4 +1,3 @@
-import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, SERVICE_KINDS, type BuildingDef, type BuildingInstance, type ServiceKind } from '../buildings/catalog';
 import type { World } from '../World';
 import { isWorking } from './utilities';
@@ -21,10 +20,6 @@ export function serviceScore(b: BuildingInstance): number {
   return n;
 }
 
-/** Occupancy multiplier from services: 70% with none, 100% with all four. */
-export function serviceFactor(b: BuildingInstance): number {
-  return BALANCE.serviceBase + BALANCE.serviceStep * serviceScore(b);
-}
 
 /** Recompute which services cover each building. Call after building or road changes. */
 export function updateCoverage(world: World) {

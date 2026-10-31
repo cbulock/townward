@@ -1,8 +1,7 @@
 import { BALANCE } from '../../shared/balance';
-import { BUILDINGS } from '../buildings/catalog';
+import { BUILDINGS, type BuildingInstance } from '../buildings/catalog';
 import type { World } from '../World';
 import { isActive } from './access';
-import { serviceFactor } from './coverage';
 import { hasUtilities } from './utilities';
 import type { SimSystem } from '../core/System';
 
@@ -21,14 +20,19 @@ export interface CityStats {
   unemployed: number;
 }
 
+/** How full a building gets from its happiness: 55% when miserable, 100% when fully happy. */
+export function happinessFactor(b: BuildingInstance): number {
+  return BALANCE.happinessBase + BALANCE.happinessRange * b.happiness;
+}
+
 export function cityStats(world: World): CityStats {
   let population = 0;
   let housing = 0;
   let jobs = 0;
   let workers = 0;
   for (const b of world.buildings.values()) {
-    // Construction sites keep carried-over occupants for later but don't count yet.
-    if (b.construction > 0) continue;
+    // Construction sites keep carried-over occupants for later but don't count yet; abandoned buildings are empty.
+    if (b.construction > 0 || b.abandoned) continue;
     const d = BUILDINGS[b.def];
     if (d.category === 'residential') {
       population += b.occupants;
@@ -57,7 +61,7 @@ export function simulateDay(world: World) {
     const d = BUILDINGS[b.def];
     if (d.category !== 'residential' || !isActive(b)) continue;
     // No power or water: people leave. Otherwise services set how full a home gets (docs/specs/core.md).
-    const target = hasUtilities(b) ? Math.round(d.capacity * fill * serviceFactor(b)) : 0;
+    const target = hasUtilities(b) && !b.abandoned ? Math.round(d.capacity * fill * happinessFactor(b)) : 0;
     if (b.occupants < target) b.occupants += Math.max(1, Math.round((target - b.occupants) * BALANCE.moveInRate));
     else if (b.occupants > target) b.occupants -= Math.max(1, Math.round((b.occupants - target) * BALANCE.moveInRate));
     b.occupants = Math.min(d.capacity, Math.max(0, b.occupants));
@@ -70,8 +74,8 @@ export function simulateDay(world: World) {
   for (const b of world.buildings.values()) {
     const d = BUILDINGS[b.def];
     if (d.category === 'residential' || b.construction > 0) continue;
-    const factor = d.category === 'civic' ? 1 : serviceFactor(b);
-    b.occupants = b.entrance === -1 || !hasUtilities(b) ? 0 : Math.floor(d.capacity * share * factor);
+    const factor = d.category === 'civic' ? 1 : happinessFactor(b);
+    b.occupants = b.entrance === -1 || !hasUtilities(b) || b.abandoned ? 0 : Math.floor(d.capacity * share * factor);
   }
 }
 

@@ -187,10 +187,13 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
   const candidates = new Map<ZonedType, BuildingInstance[]>(ZONED_TYPES.map((z) => [z, []]));
   for (const b of world.buildings.values()) {
     const def: BuildingDef = BUILDINGS[b.def];
-    if (!b.grown || b.construction > 0 || b.entrance === -1 || def.zone === null || def.density === null || def.level >= 3) continue;
+    if (!b.grown || b.abandoned || b.construction > 0 || b.entrance === -1 || def.zone === null || def.density === null || def.level >= 3) continue;
     if (b.fullDays < BALANCE.upgradeAfterDays || population < BALANCE.levelPopulation[def.level + 1]) continue;
-    // Level 2 needs at least one service nearby, level 3 needs all four (and power and water).
-    if (!hasUtilities(b) || serviceScore(b) < (def.level + 1 >= 3 ? SERVICE_KINDS.length : 1)) continue;
+    // Level 2 needs at least one service nearby and some happiness; level 3 needs all four
+    // services and happy residents (and power and water).
+    const toLevel3 = def.level + 1 >= 3;
+    if (!hasUtilities(b) || serviceScore(b) < (toLevel3 ? SERVICE_KINDS.length : 1)) continue;
+    if (b.happiness < (toLevel3 ? BALANCE.happyLevel3 : BALANCE.happyLevel2)) continue;
     candidates.get(zoneOf(def.zone, def.density))?.push(b);
   }
   for (const z of ZONED_TYPES) {
