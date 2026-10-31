@@ -38,7 +38,7 @@
 
 - **Info panel** slides in from the right when you inspect a tile or building.
 - **Minimap** sits bottom-right (see below). The controls hint is bottom-left and the toolbar bottom-centre.
-- **Toolbar groups**, separated by thin dividers: *Select · Clear · Build* | *Homes · Shops · Industry · Dezone* | *Road · Highway*.
+- **Toolbar groups**, separated by thin dividers: *Select · Clear · Build* | *Homes · Shops · Industry · Dezone* | *Raise · Lower · Level* | *Road · Highway*. Build offers civic buildings only (D-042).
 - **Tool options** (e.g. zone density, road type) pop up above the active toolbar button.
 
 ## Minimap (Phase 5)
@@ -75,7 +75,7 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 2. Terrain preset cards (thumbnail plus name)
 3. Map size: Small 64 / Medium 128 / Large 256
 4. Seed input with a 🎲 randomize button
-5. "Advanced" sliders: Water level, Tree density, River count, Coast sides
+5. "Advanced" sliders: Water level, Hills, Tree density, River count, Coast sides
 6. Live minimap preview (updates as you change settings, debounced)
 7. **Start Building** button
 
@@ -88,6 +88,7 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 | Use tool | Left click / drag | — |
 | Cancel tool / drag | Right click | `Esc` |
 | Road / Zone R/C/I / Dezone / Bulldoze | — | `R` / `1` `2` `3` / `4` / `B` |
+| Raise / Lower / Level land | Drag | `5` / `6` / `7` |
 | Inspect | — | `Q` |
 | Pause / speed | Top-bar buttons | `Space` / `[` `]` |
 | Inspect building | Click (Select tool) | `Esc` closes |

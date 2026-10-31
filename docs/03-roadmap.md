@@ -136,17 +136,17 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 ---
 
-## Phase 6 — Elevation, Terraforming & Borderlands 🚧  → [specs/elevation.md](specs/elevation.md)
+## Phase 6 — Elevation, Terraforming & Borderlands ✅  → [specs/elevation.md](specs/elevation.md)
 
-- [ ] Height layer with the smoothness rule; `surfaceHeight`, flat-footprint checks
-- [ ] Generator: Hills slider and per-preset hills (River Valley terrain stays byte-identical)
-- [ ] Ground as sloped meshes with hill lighting (custom shader), animated water kept
-- [ ] Roads, zone lots, grid, previews, hover on slopes; objects, agents, badges and effects lifted
-- [ ] Height-aware picking
-- [ ] Raise / Lower / Level tools with the ripple to neighbours, previews and costs
-- [ ] Buildings and growth need flat footprints
-- [ ] Borderlands: decorative hills and mountains round the map, with fog and a border line
-- [ ] Minimap hill shading; tests; 60 FPS kept
+- [x] Height layer with the smoothness rule; `surfaceHeight`, flat-footprint checks
+- [x] Generator: Hills slider and per-preset hills (River Valley terrain stays byte-identical)
+- [x] Ground as sloped meshes with hill lighting (custom shader), animated water kept
+- [x] Roads, zone lots, grid, previews, hover on slopes; objects, agents, badges and effects lifted
+- [x] Height-aware picking
+- [x] Raise / Lower / Level tools (`5` `6` `7`) with the ripple to neighbours, previews and costs
+- [x] Buildings and 2×2 merges need flat footprints
+- [x] Borderlands: decorative hills and mountains round the map, with fog and a dashed border line (replaces the soil slab)
+- [x] Minimap hill shading; tests (7 new, 109 total). Headless: 60 FPS, 119 draw calls at 1×, 579 fully zoomed out; map + ring boot in 57 ms. Real-hardware FPS check still open.
 
 ## Later Phases (to be specced when we get there)
 

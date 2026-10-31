@@ -2,6 +2,21 @@
 
 Newest first. One entry per work session.
 
+## 2026-10-31: Phase 6 — Elevation, terraforming & borderlands
+- **Decisions this session:** borderlands with hills for the map edge; Phase 6 next; the Build tool now places civic buildings only (D-042); nothing committed yet.
+- **Heights** (D-043): `World.elevation` with the one-level-per-tile rule, plus `surfaceHeight`, `cornerHeight`, `isFlat` and `smoothElevation` (`sim/terrain/elevation.ts`). The generator has a Hills slider and per-preset hills; River Valley's terrain stays byte-identical.
+- **Rendering** (D-044):
+  - Ground, roads, zone lots, the grid, hover and previews are sloped meshes from `render/ground/TileMesh.ts`, with a custom shader for hill light and fog. Water still animates.
+  - Objects, agents, badges and effects are lifted onto the terrain (`render/view/lift.ts`).
+  - Picking uses fixed-point iteration.
+  - The minimap is hill-shaded.
+- **Terraforming:** Raise, Lower and Level (`5`/`6`/`7`) at $15 per tile-level. Neighbours ripple to keep the rule, and water, roads and buildings are locked. Ripple tiles show fainter in the preview.
+- **Building rules:** buildings and 2×2 merges need flat footprints.
+- **Borderlands** (D-045): an extended render-only world with rivers and sea carried on, hills rising to rocky mountains, fog, a fogged underlay (no lattice when zoomed out) and a dashed border line. The soil slab is gone.
+- Tests: 109 total (7 new: elevation, terraform, borderlands).
+- Verified in headless Chromium: hills on every preset; terraform preview cost, a road over a raised hill, a lowered dip; borderlands on Forested and Coastal; a town growing on hills; rotation. No console errors.
+- Gotcha: the module-level shader cache must be released per atlas, not globally. React's dev double-mount destroys the first game while the second is already running, and a global release broke the second game's meshes ("Mesh shader has no glProgram").
+
 ## 2026-10-31: Finishing the open items (Phases 5, 4c extras, 2b)
 - **Phase 5:**
   - The toolbar is grouped.

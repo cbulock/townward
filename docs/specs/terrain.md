@@ -32,7 +32,7 @@ We render it in our isometric view (D-002). **Reference map: `?seed=42`** (appro
 | Flowers (white / yellow) | grouped patches in open grass |
 | Tall grass | scattered |
 
-Elevation is not part of Phase 2. Hills and slopes come in Phase 6.
+Elevation arrived in Phase 6: see [elevation.md](elevation.md). Every preset has a **Hills** slider.
 
 ## River Valley Generator (`src/sim/terrain/riverValley.ts`)
 
@@ -56,7 +56,7 @@ All tuning knobs are constants at the top of the file (`RIVER`, `LAKES`). Each f
 - **Shores.** A solid light-cyan surf band hugs the land contour (same wobble as the land mask). Grass edges get a darker green rim.
 - **Water animation.** 8 shimmer frames are swapped every 0.16 s, only in visible chunks.
 - **Objects.** Trees (one cluster sprite per tile, 6 variants × 3 densities) and decorations are depth-sorted per chunk.
-- **Map edge.** A soil slab sits under the front edges, with blue where water meets the edge. The ground is masked to the map diamond.
+- **Map edge.** Since Phase 6 the borderlands surround the map: decorative hills, mountains, and rivers and sea carried on past the edge, fading into fog. A faint dashed line marks the border. This replaced the soil slab.
 - All art is painted in code at boot into one atlas texture (`src/render/atlas/`).
 
 ## Tests
@@ -81,6 +81,7 @@ All tuning knobs are constants at the top of the file (`RIVER`, `LAKES`). Each f
 - **Trees:** shifts the forest threshold and the number of lone trees.
 - **Rivers:** 0 none; 1 main river (60% chance of a tributary); 2 main + tributary; 3 adds a second river parallel to the main one.
 - **Coast:** sea along 1–3 randomly chosen edges, with a noisy coastline. 4 makes an island.
+- **Hills** (Phase 6): rolling hills. The defaults are River Valley 0.35, Plains 0.15, Coastal 0.3, Island 0.45, Lakes 0.3 and Forested 0.6. Heights only add the elevation layer, so River Valley's terrain, trees and decorations stay byte-identical.
 - Every preset generates 128×128 in under 10 ms (256×256 in about 30 ms) and always leaves more than 35% buildable land.
 
 ## New Game Screen (Phase 2b)

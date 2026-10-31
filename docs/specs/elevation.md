@@ -1,6 +1,6 @@
 # Spec: Elevation, Terraforming & Borderlands (Phase 6)
 
-Status: **In progress.**
+Status: **Implemented** (Phase 6).
 
 ## Height Model
 

@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phases 0–5 built ✅ (2b presets & New Game, 4c traffic extras, 5 HUD & polish). Open: the 60 FPS check on real hardware (Phases 1, 2a, 3) |
-| **Next phase** | Phase 6 — Elevation & terraforming, or Phase 10 save/load (agreed design: D-034) |
+| **Current phase** | Phases 0–6 built ✅ (latest: 6 elevation, terraforming & borderlands). Open: the 60 FPS check on real hardware |
+| **Next phase** | Phase 7 — core simulation (power, water, budget & taxes), or Phase 10 save/load (agreed design: D-034) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It
@@ -33,6 +33,7 @@ pnpm typecheck && pnpm lint
 | [specs/roads.md](specs/roads.md) | Road tool, auto-tiling, bulldozing, costs |
 | [specs/buildings.md](specs/buildings.md) | Building catalog, footprints, placement; zoning and growth (planned) |
 | [specs/simulation.md](specs/simulation.md) | Time, population, jobs, budget, traffic and pedestrians |
+| [specs/elevation.md](specs/elevation.md) | Heights, sloped rendering, terraforming, borderlands |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

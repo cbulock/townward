@@ -57,3 +57,13 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 - **D-040 — Queuing by lane gaps and junction boxes, with patience.** 2026-10-31. Cars keep a gap within their lane (one direction of one segment) and to the tail of the next lane. A junction box is used by one movement at a time, except straight traffic on the same axis. Waiting 4 s overrides the box and waiting 25 s despawns, so the network can never deadlock. Traffic lights can come later on top of the boxes.
 - **D-041 — Bus stops are automatic.** 2026-10-31. There's no stop tool yet. Stops go outside the busiest buildings on straight road, spaced 6 tiles apart. Buses run stop to stop and dwell 2 s. Shelters are drawn in the agent layer, so they depth-sort with the cars.
 - **D-042 — The Build tool places civic buildings only.** 2026-10-31. User decision. Homes, shops and industry only appear through zoning, which keeps the growth rules meaningful. `PLACEABLE_IDS` in the catalog drives the picker and `Game.setBuilding`. Sim-level `planPlace` still accepts any building, since tests and future scenarios use it.
+- **D-043 — Heights live on tile centres, slopes are capped at one level per tile, and a level is 8 px.** 2026-10-31.
+  - Tile-centre heights fit the dual grid (D-019): each ground cell's corners are tile centres, so cells become sloped quads with no new data.
+  - With an 8 px step, under `HALF_H`, the terrain can never hide anything behind it, so the layered drawing order (ground → roads → agents → objects) still holds with no depth buffer.
+  - Water is pinned to level 0, which keeps shores and bridges gentle.
+- **D-044 — Ground drawn as merged meshes with a small custom shader.** 2026-10-31.
+  - Sprites can't bend to slopes. Each chunk now has one mesh per atlas page, built from the same atlas frames, with per-vertex colour (hill light, zone tint) and fog.
+  - Water animates by rewriting its UVs in visible chunks.
+  - Roads, zone lots, the grid, hover and previews use the same bent tile quads. Taller things (trees, buildings, bridges, agents) stay sprites, lifted by height.
+  - Shaders are cached per atlas page and released before the pages are destroyed.
+- **D-045 — Borderlands are render-only and replace the soil slab.** 2026-10-31. User choice. An extended world (map + ring, `sim/terrain/borderlands.ts`) copies the map into its middle, so the seam matches. It continues edge water outward and rises into hills and mountains with fog. Nothing in the sim reads it. Tree sprites only within 10 tiles; further out, forest is tinted ground, which keeps the sprite count low. It's rebuilt when the map edge is terraformed. The camera may pan a quarter of the ring past the edge.
