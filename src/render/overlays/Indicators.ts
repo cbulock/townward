@@ -1,6 +1,6 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
 import { BUILDINGS, type BuildingInstance } from '../../sim/buildings/catalog';
-import { needsUtilities } from '../../sim/services';
+import { needsUtilities } from '../../sim/systems/utilities';
 import type { World } from '../../sim/World';
 import { buildingHeadroom } from '../atlas/buildingArt';
 import { liftWorld } from '../view/lift';

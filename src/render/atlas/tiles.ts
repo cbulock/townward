@@ -18,7 +18,7 @@ import {
   VEHICLE_KINDS,
   VEHICLE_VARIANTS,
 } from './agentArt';
-import type { AgentKind } from '../../sim/traffic';
+import type { AgentKind } from '../../sim/systems/traffic';
 import { BUILDING_IDS, type BuildingId } from '../../sim/buildings/catalog';
 import { CHIP_SIZE, LEAF_SIZE, paintChip, paintLeaf, paintPuff, PUFF_SIZE } from './fxArt';
 import type { FxTextures } from '../fx/Effects';

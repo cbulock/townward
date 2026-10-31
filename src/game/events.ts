@@ -1,7 +1,7 @@
 import type { BuildingId } from '../sim/buildings/catalog';
-import type { ZoneDemand } from '../sim/growth';
-import type { BudgetReport } from '../sim/population';
-import type { UtilityTotals } from '../sim/services';
+import type { ZoneDemand } from '../sim/systems/growth';
+import type { BudgetReport } from '../sim/systems/budget';
+import type { UtilityTotals } from '../sim/systems/utilities';
 import type { ServiceKind } from '../sim/buildings/catalog';
 import type { ToolId } from './tools';
 

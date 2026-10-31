@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BUILDINGS } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { buildDemoCity } from '../src/sim/demo';
-import { cityStats } from '../src/sim/population';
+import { cityStats } from '../src/sim/systems/population';
 import { generateTerrain } from '../src/sim/terrain/generate';
 import { presetSettings } from '../src/sim/terrain/presets';
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { City } from '../src/sim/City';
 import { applyPlace, applyRoad, planPlace, planRoad } from '../src/sim/commands';
-import { updateRoadAccess } from '../src/sim/population';
+import { updateRoadAccess } from '../src/sim/systems/access';
 import { roadPath, RoadType } from '../src/sim/roads';
 import { Terrain } from '../src/sim/terrain/types';
-import { computeBusStops, findRoute, outboundShare, Traffic, TRAFFIC, tripRate, type Agent } from '../src/sim/traffic';
+import { computeBusStops, findRoute, outboundShare, Traffic, TRAFFIC, tripRate, type Agent } from '../src/sim/systems/traffic';
 import { World } from '../src/sim/World';
 
 function grid() {

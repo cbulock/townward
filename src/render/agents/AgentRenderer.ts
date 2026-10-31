@@ -1,5 +1,5 @@
 import { Container, Sprite } from 'pixi.js';
-import { agentPose, type Agent, type BusStop } from '../../sim/traffic';
+import { agentPose, type Agent, type BusStop } from '../../sim/systems/traffic';
 import type { World } from '../../sim/World';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';

@@ -1,4 +1,4 @@
-import { BALANCE } from '../shared/balance';
+import { BALANCE } from '../../shared/balance';
 import {
   ART_VARIANTS,
   BUILDINGS,
@@ -8,13 +8,17 @@ import {
   type BuildingDef,
   type BuildingId,
   type BuildingInstance,
-} from './buildings/catalog';
-import { cityStats, findEntrance, hasUtilities } from './population';
-import { serviceScore } from './services';
-import { Decor } from './terrain/types';
-import { isFlat } from './terrain/elevation';
-import type { World } from './World';
-import { isZoned, ZONE_DENSITY, ZONE_LETTER, ZONED_TYPES, zoneOf, type ZonedType } from './zones';
+} from '../buildings/catalog';
+import { findEntrance } from './access';
+import { cityStats } from './population';
+import { hasUtilities } from './utilities';
+import { serviceScore } from './coverage';
+import { Decor } from '../terrain/types';
+import { isFlat } from '../terrain/elevation';
+import type { World } from '../World';
+import { isZoned, ZONE_DENSITY, ZONE_LETTER, ZONED_TYPES, zoneOf, type ZonedType } from '../zones';
+import type { City } from '../City';
+import type { DayOutcome, SimSystem } from '../core/System';
 
 /**
  * Zoned growth: demand, new lots, construction and levelling up. Runs once per in-game day.
@@ -288,4 +292,22 @@ function findMergeSquare(
     }
   }
   return null;
+}
+
+/** Zoned growth once a day; new and finished sites go into the day's outcome. */
+export class GrowthSystem implements SimSystem {
+  readonly name = 'growth';
+  constructor(
+    private readonly city: City,
+    private readonly rng: Rng,
+  ) {}
+  onDay(out: DayOutcome) {
+    const g = growDay(this.city.world, this.rng, this.city.taxRate);
+    out.changed.push(...g.changed);
+    out.started.push(...g.started);
+    out.completed.push(...g.completed);
+  }
+  demand(): ZoneDemand {
+    return zoneDemand(this.city.world, this.city.taxRate);
+  }
 }

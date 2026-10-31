@@ -1,4 +1,4 @@
-import type { AgentKind } from '../../sim/traffic';
+import type { AgentKind } from '../../sim/systems/traffic';
 import { IsoFrame, shade } from './buildingArt';
 import { GROUND_PAD, GROUND_FRAME_H } from './geometry';
 import { HALF_H, HALF_W } from '../../shared/constants';

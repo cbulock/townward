@@ -4,10 +4,12 @@ import { BALANCE } from '../shared/balance';
 import { Decor } from './terrain/types';
 import type { City } from './City';
 import { applyPlace, applyRoad, applyZone, planPlace, planRoad, planZone } from './commands';
-import { growDay } from './growth';
-import { findEntrance, simulateDay, updateRoadAccess } from './population';
+import { growDay } from './systems/growth';
+import { refreshCity } from './core/Simulation';
+import { findEntrance } from './systems/access';
+import { simulateDay } from './systems/population';
 import { rectTiles, roadPath, RoadType, type BuildableRoad } from './roads';
-import { needsUtilities, roadIslands, updateServices } from './services';
+import { needsUtilities, roadIslands } from './systems/utilities';
 import { isZoned, ZONE_DENSITY, ZONE_LETTER, ZoneType, type ZonedType } from './zones';
 
 /**
@@ -110,12 +112,10 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
   }
 
   const grow = mulberry32(subSeed(seed, 0x6077));
-  updateRoadAccess(w);
-  updateServices(w);
+  refreshCity(w);
   for (let day = 0; day < DAYS; day++) {
     for (let k = 0; k < GROWTH_STEPS; k++) growDay(w, grow, city.taxRate);
-    updateRoadAccess(w);
-    updateServices(w);
+    refreshCity(w);
     if (day % 5 === 0) serveIslands(city, utilitySlots, rng);
     simulateDay(w);
   }
@@ -124,19 +124,16 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
   // A showcase shouldn't have empty blocks: build out every lot growth hasn't reached yet,
   // then simulate a month so people move in and utilities catch up.
   fillLots(city, rng);
-  updateRoadAccess(w);
-  updateServices(w);
+  refreshCity(w);
   // The build-out jumps demand: add plants and towers until everyone is supplied.
   for (let k = 0; k < 60 && serveIslands(city, utilitySlots, rng); k++);
   for (let day = 0; day < SETTLE_DAYS; day++) {
-    updateRoadAccess(w);
-    updateServices(w);
+    refreshCity(w);
     if (day % 5 === 0) serveIslands(city, utilitySlots, rng);
     simulateDay(w);
   }
   for (let k = 0; k < 60 && serveIslands(city, utilitySlots, rng); k++);
-  updateRoadAccess(w);
-  updateServices(w);
+  refreshCity(w);
   city.day = DAYS + SETTLE_DAYS;
   return { centre: { x: x0 + span / 2, y: y0 + span / 2 } };
 }
@@ -224,8 +221,7 @@ function serveIslands(city: City, slots: UtilitySlot[], rng: () => number): bool
     if (need.power) supply('power_plant', island);
     if (need.water) supply('water_tower', island);
   }
-  updateRoadAccess(w);
-  updateServices(w);
+  refreshCity(w);
   return true;
 }
 

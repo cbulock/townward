@@ -4,13 +4,14 @@ import { mulberry32 } from '../src/shared/rng';
 import { BUILDINGS, chooseBuilding, type BuildingDef } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, planPlace, planRoad, planZone } from '../src/sim/commands';
-import { growDay, zoneDemand } from '../src/sim/growth';
-import { cityStats, findEntrance, simulateDay, updateRoadAccess } from '../src/sim/population';
+import { growDay, zoneDemand } from '../src/sim/systems/growth';
+import { findEntrance } from '../src/sim/systems/access';
+import { cityStats, simulateDay } from '../src/sim/systems/population';
 import { rectTiles, roadPath, RoadType } from '../src/sim/roads';
 import { Terrain } from '../src/sim/terrain/types';
 import { World } from '../src/sim/World';
 import { zoneOf, ZoneType, type ZoneTypeId } from '../src/sim/zones';
-import { updateServices } from '../src/sim/services';
+import { refreshCity } from '../src/sim/core/Simulation';
 
 function town(size = 24) {
   const w = new World(size, size, 0);
@@ -29,8 +30,7 @@ function runDays(w: World, days: number, seed = 1) {
   const rng = mulberry32(seed);
   for (let d = 0; d < days; d++) {
     growDay(w, rng);
-    updateRoadAccess(w);
-    updateServices(w);
+    refreshCity(w);
     simulateDay(w);
   }
 }
@@ -119,7 +119,7 @@ describe('growth', () => {
       expect(BUILDINGS[b.def].level).toBe(1);
     }
     // Sites don't count as population until they finish.
-    updateRoadAccess(w);
+    refreshCity(w);
     simulateDay(w);
     expect(cityStats(w).housing).toBe(0);
 

@@ -8,15 +8,17 @@ import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
-import { growDay, zoneDemand } from '../sim/growth';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
-import { mulberry32, subSeed } from '../shared/rng';
 import { isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
-import { cityStats, collectBudget, findEntrance, monthlyBudget, simulateDay, updateRoadAccess, type BudgetReport } from '../sim/population';
-import { needsUtilities, rollFires, serviceBit, updateServices, type ServiceReport } from '../sim/services';
+import { Simulation } from '../sim/core/Simulation';
+import type { DayOutcome } from '../sim/core/System';
+import { findEntrance } from '../sim/systems/access';
+import { serviceBit } from '../sim/systems/coverage';
+import { cityStats } from '../sim/systems/population';
+import type { Traffic } from '../sim/systems/traffic';
+import { needsUtilities } from '../sim/systems/utilities';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
-import { Traffic } from '../sim/traffic';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
 import type { TerrainSettings } from '../sim/terrain/presets';
@@ -76,12 +78,11 @@ export class Game {
   readonly events = new EventBus<GameEventMap>();
   readonly city: City;
   readonly sound = new SoundBoard();
-  readonly traffic: Traffic;
+  /** The simulation core: every system (access, utilities, growth, traffic …) lives here. */
+  readonly sim: Simulation;
   private readonly renderer: Renderer;
   private readonly input: InputController;
   private readonly loop: GameLoop;
-  /** Seeded so the same actions on the same map grow the same town. */
-  private readonly growthRng: () => number;
 
   private simTick = 0;
   private hovered: TilePos | null = null;
@@ -96,8 +97,6 @@ export class Game {
   private dayNightMode = readDayNight();
   /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
   private worldVersion = 0;
-  private serviceReport: ServiceReport = { power: { supply: 0, demand: 0, short: 0 }, water: { supply: 0, demand: 0, short: 0 } };
-  private lastBudget: BudgetReport | null = null;
   /** Utility hints already shown this game. */
   private readonly hinted = new Set<'power' | 'water'>();
   private statsTimer = 0;
@@ -116,8 +115,7 @@ export class Game {
       onCancel: () => this.cancel(),
       onClick: (p) => this.onClick(p),
     });
-    this.traffic = new Traffic(city.world, city.world.seed);
-    this.growthRng = mulberry32(subSeed(city.world.seed, 0x6077));
+    this.sim = new Simulation(city);
     renderer.setAgentSource(
       () => this.traffic.agents,
       () => this.traffic.stops,
@@ -137,7 +135,6 @@ export class Game {
     const game = new Game(city, renderer);
     if (demo) {
       game.afterWorldChange(true);
-      game.lastBudget = monthlyBudget(world, city.taxRate);
       // Start over downtown, a little zoomed out.
       const p = tileToWorld(demo.centre.x, demo.centre.y);
       renderer.camera.jumpTo(p.x, p.y, 0.8);
@@ -149,6 +146,10 @@ export class Game {
 
   get world(): World {
     return this.city.world;
+  }
+
+  get traffic(): Traffic {
+    return this.sim.traffic.traffic;
   }
 
   get tool(): ToolId {
@@ -284,15 +285,17 @@ export class Game {
     );
   }
 
-  /** Roads or buildings changed: recheck road access, warning badges, routes and the info panel. */
+  /** Roads or buildings changed by the player: update the systems, then everything on screen. */
   private afterWorldChange(roadsChanged: boolean) {
+    this.sim.worldChanged({ roads: roadsChanged });
+    this.afterSimChange();
+  }
+
+  /** The systems are up to date: refresh the minimap, badges, hints and panels. */
+  private afterSimChange() {
     this.bumpWorld();
-    updateRoadAccess(this.world);
-    this.serviceReport = updateServices(this.world);
     this.renderer.indicators.sync(this.world);
     this.hintUtilities();
-    this.traffic.refreshDemand();
-    if (roadsChanged) this.traffic.invalidateRoutes();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
     this.emitInspect();
     this.emitCity();
@@ -322,19 +325,12 @@ export class Game {
   }
 
   private newDay() {
-    const city = this.city;
-    city.day++;
-    this.grow();
-    this.fires();
-    this.serviceReport = updateServices(this.world);
-    simulateDay(this.world);
-    this.traffic.refreshDemand();
-    if (city.day % BALANCE.daysPerMonth === 0) {
-      const r = collectBudget(city);
-      this.lastBudget = r;
-      this.emitBudget();
-      this.events.emit('funds', city.funds);
-      const month = MONTH_NAMES[(city.date.month + 11) % 12];
+    const out = this.sim.day();
+    this.showDay(out);
+    const r = out.budget;
+    if (r) {
+      this.events.emit('funds', this.city.funds);
+      const month = MONTH_NAMES[(this.city.date.month + 11) % 12];
       const sign = r.net >= 0 ? '+' : '−';
       this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
     }
@@ -343,23 +339,37 @@ export class Game {
     this.emitInspect();
   }
 
-  /** A day of zoned growth: refresh what changed, with dust for new sites and a pop for finished ones. */
-  private grow() {
-    const g = growDay(this.world, this.growthRng, this.city.taxRate);
-    if (g.changed.length === 0) return;
-    this.renderer.refreshWorld(...g.changed);
+  /**
+   * Show a day's outcome: dust for new construction sites, a pop for finished buildings,
+   * smoke and a toast for fires. Then refresh what's on screen if anything changed.
+   */
+  private showDay(out: DayOutcome) {
+    if (out.changed.length === 0) return;
+    this.renderer.refreshWorld(...out.changed);
     const fx = this.renderer.effects;
-    for (const id of g.started) {
+    for (const id of out.started) {
       const b = this.world.buildings.get(id);
       if (!b) continue;
       const { w, h } = BUILDINGS[b.def].size;
       for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 3, Math.random() * 0.3);
     }
-    for (const id of g.completed) {
+    for (const id of out.completed) {
       const b = this.world.buildings.get(id);
       if (b) this.popBuilding(b, 0);
     }
-    this.afterWorldChange(false);
+    if (out.burned.length > 0) {
+      for (const b of out.burned) {
+        const { w, h } = BUILDINGS[b.def].size;
+        for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 10, Math.random() * 0.4);
+      }
+      this.sound.play('clear');
+      const name = BUILDINGS[out.burned[0].def].name;
+      this.notify(
+        'error',
+        out.burned.length === 1 ? `A fire destroyed a ${name}. Build a Fire Station nearby.` : `${out.burned.length} buildings burned down. Build Fire Stations to cover the city.`,
+      );
+    }
+    this.afterSimChange();
   }
 
   /** The "pop" a building makes when it appears. */
@@ -422,24 +432,9 @@ export class Game {
     return this.dayNightMode === 'night' ? NIGHT_HOUR : this.city.hour;
   }
 
-  /** Fires in buildings no fire station covers: clear the lot, smoke and a toast. */
-  private fires() {
-    const burned = rollFires(this.world, cityStats(this.world).population, this.growthRng);
-    if (burned.length === 0) return;
-    for (const b of burned) {
-      const { w, h } = BUILDINGS[b.def].size;
-      this.renderer.refreshWorld({ x: b.x, y: b.y, w, h });
-      for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) this.renderer.effects.burst(x, y, 'dust', 10, Math.random() * 0.4);
-    }
-    this.sound.play('clear');
-    const name = BUILDINGS[burned[0].def].name;
-    this.notify('error', burned.length === 1 ? `A fire destroyed a ${name}. Build a Fire Station nearby.` : `${burned.length} buildings burned down. Build Fire Stations to cover the city.`);
-    this.afterWorldChange(false);
-  }
-
   /** Once per game: explain missing power or water the first time homes go without. */
   private hintUtilities() {
-    const r = this.serviceReport;
+    const r = this.sim.utilities.report;
     for (const kind of ['power', 'water'] as const) {
       if (this.hinted.has(kind) || r[kind].short === 0) continue;
       this.hinted.add(kind);
@@ -466,12 +461,13 @@ export class Game {
 
   /** Budget panel data: the tax rate, last month's report and what next month looks like now. */
   emitBudget() {
+    const u = this.sim.utilities.report;
     this.events.emit('budget', {
       taxRate: this.city.taxRate,
-      last: this.lastBudget,
-      forecast: monthlyBudget(this.world, this.city.taxRate),
-      power: this.serviceReport.power,
-      water: this.serviceReport.water,
+      last: this.sim.budget.last,
+      forecast: this.sim.budget.forecast(),
+      power: u.power,
+      water: u.water,
     });
   }
 
@@ -482,9 +478,9 @@ export class Game {
     for (const a of this.traffic.agents) if (a.kind !== 'person') cars++;
     this.events.emit('city', {
       ...s,
-      demand: zoneDemand(this.world, this.city.taxRate),
-      power: this.serviceReport.power,
-      water: this.serviceReport.water,
+      demand: this.sim.growth.demand(),
+      power: this.sim.utilities.report.power,
+      water: this.sim.utilities.report.water,
       date: this.city.date,
       speed: this.speedIndex,
       cars,
@@ -703,11 +699,11 @@ export class Game {
 
   private frame(dt: number) {
     this.input.update(dt);
-    this.city.clock += dt * GAME_SPEEDS[this.speedIndex];
+    // The clock and traffic advance every frame, scaled by game speed.
+    this.sim.frame(dt * GAME_SPEEDS[this.speedIndex]);
     const hour = this.visibleHour();
     this.renderer.setDaylight(hour === null ? 0xffffff : daylightTint(hour));
     // Agents move every frame (smooth), scaled by game speed.
-    this.traffic.update(dt * GAME_SPEEDS[this.speedIndex], this.city.hour);
     this.renderer.render(dt);
 
     this.statsFrames++;

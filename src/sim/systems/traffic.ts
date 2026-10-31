@@ -1,8 +1,9 @@
-import { mulberry32 } from '../shared/rng';
-import { BUILDINGS } from './buildings/catalog';
-import { isActive } from './population';
-import { roadMask, RoadType } from './roads';
-import type { World } from './World';
+import { mulberry32 } from '../../shared/rng';
+import { BUILDINGS } from '../buildings/catalog';
+import { isActive } from './access';
+import { roadMask, RoadType } from '../roads';
+import type { World } from '../World';
+import type { SimSystem, WorldChange } from '../core/System';
 
 /**
  * Cars and pedestrians moving over the road network. Pure data and logic;
@@ -542,5 +543,24 @@ export class Traffic {
 
   clear() {
     this.agents.length = 0;
+  }
+}
+
+/** Cars, people and buses: demand follows the city, routes are rebuilt when roads change. */
+export class TrafficSystem implements SimSystem {
+  readonly name = 'traffic';
+  readonly traffic: Traffic;
+  constructor(world: World) {
+    this.traffic = new Traffic(world, world.seed);
+  }
+  onWorldChanged(change: WorldChange) {
+    this.traffic.refreshDemand();
+    if (change.roads) this.traffic.invalidateRoutes();
+  }
+  onDay() {
+    this.traffic.refreshDemand();
+  }
+  onFrame(dt: number, hour: number) {
+    this.traffic.update(dt, hour);
   }
 }

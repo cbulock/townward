@@ -4,7 +4,7 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 
 ## Open (need your call)
 
-- **D-001 — Product name.** Status: *Open.* We need an original name; the repo folder can stay `simcity-web`.
+- **D-001 — Product name.** Status: *Open; user chose to decide later (2026-11-01).* We need an original name; the repo folder can stay `simcity-web`.
 
 ## Accepted
 
@@ -82,3 +82,9 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 - **D-053 — Services are coverage circles that shape occupancy and growth.** 2026-11-01. Police, fire, clinic and school cover a radius. Each one covering a building adds 7.5% to its occupancy (70% with none). Level 2 needs at least one service, level 3 needs all four. Fire stations also prevent random fires, which only start once the city has 200 residents.
 - **D-054 — Density as separate zone tools (Homes, Apartments, Shops, Offices, Industry).** 2026-11-01. User request: a clear way to get apartments and offices. Each zoned building has a density. High-density zones start at walk-ups and small offices and grow into towers. Low-density zones top out at level 2.
 - **D-055 — /demo is a planned city grown by the real sim, then built out.** 2026-11-01. User request: a seeded, beautiful city to show off. The layout is planned (grid, rings, service blocks), growth runs with the normal rules, and empty lots are filled at the end. Two years of growth alone leaves many blocks empty, because growth follows demand. Utilities are added per road island so islands cut off by the river aren't left dark.
+- **D-056 — No free starter utilities.** 2026-11-01. User decision. Building the first power plant and water tower is the player's first goal; the one-time hints explain it.
+- **D-057 — Next steps: systems foundation → traffic overhaul → citizen needs → backend saving.** 2026-11-01. User decision. Saving comes last because the save format (D-034) stores only the seed, layers and buildings. Traffic and needs are recomputed from those, so reworking them doesn't change the format.
+- **D-058 — "Systems as services" means separate in-game modules, not network services.** 2026-11-01.
+  - The sim runs 10 ticks a second, far too often to send over a network.
+  - Each system (access, utilities, coverage, fire, growth, population, budget, traffic, later needs and transit) is its own module behind one `SimSystem` interface. A `Simulation` core runs them in a fixed order.
+  - This keeps each system testable and replaceable, and ready to move into a Web Worker (Phase 12). The backend stays a separate small server for accounts and saves only.

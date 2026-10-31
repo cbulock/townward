@@ -3,11 +3,12 @@ import { BALANCE } from '../src/shared/balance';
 import { BUILDINGS } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { applyPlace, applyRoad, planPlace, planRoad } from '../src/sim/commands';
-import { cityStats, collectBudget, monthlyBudget, simulateDay, updateRoadAccess } from '../src/sim/population';
+import { cityStats, simulateDay } from '../src/sim/systems/population';
+import { collectBudget, monthlyBudget } from '../src/sim/systems/budget';
 import { roadPath, RoadType } from '../src/sim/roads';
-import { updateServices } from '../src/sim/services';
+import { refreshCity } from '../src/sim/core/Simulation';
 import { Terrain } from '../src/sim/terrain/types';
-import { agentPose, findRoute, Traffic } from '../src/sim/traffic';
+import { agentPose, findRoute, Traffic } from '../src/sim/systems/traffic';
 import { World } from '../src/sim/World';
 
 function town() {
@@ -29,8 +30,7 @@ const zoned = (w: World) => [...w.buildings.values()].filter((b) => BUILDINGS[b.
 
 /** Road access, then utilities and services (what Game does after every change). */
 function refresh(w: World) {
-  updateRoadAccess(w);
-  updateServices(w);
+  refreshCity(w);
 }
 
 describe('road access', () => {

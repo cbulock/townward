@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue } from 'jotai';
-import type { UtilityTotals } from '../../sim/services';
+import type { UtilityTotals } from '../../sim/systems/utilities';
 import { BALANCE } from '../../shared/balance';
-import type { BudgetReport } from '../../sim/population';
+import type { BudgetReport } from '../../sim/systems/budget';
 import { budgetAtom, budgetOpenAtom, gameAtom } from '../atoms';
 
 const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString()}`;

@@ -1,5 +1,5 @@
 import { Application, Container, Sprite, Texture } from 'pixi.js';
-import type { Agent, BusStop } from '../sim/traffic';
+import type { Agent, BusStop } from '../sim/systems/traffic';
 import type { World } from '../sim/World';
 import type { TileRect } from './view/ViewTransform';
 import { ViewTransform, type Point, type Rotation } from './view/ViewTransform';

@@ -6,7 +6,7 @@ import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
 import { ZoneType, type ZonedType } from '../sim/zones';
-import { findEntrance } from '../sim/population';
+import { findEntrance } from '../sim/systems/access';
 import { BALANCE } from '../shared/balance';
 import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
