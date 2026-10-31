@@ -2,7 +2,7 @@ import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { CHUNK_SIZE, HALF_H, HALF_W, TILE_H } from '../shared/constants';
 import { roadMask, RoadType, type BuildableRoad } from '../sim/roads';
 import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
-import type { World } from '../sim/World';
+import type { ViewWorld } from './view/ViewWorld';
 import type { Rect } from './Camera';
 import { DECOR_VARIANTS } from './atlas/decorArt';
 import { buildingHeadroom } from './atlas/buildingArt';
@@ -77,7 +77,8 @@ export class ChunkRenderer {
   visibleSprites = 0;
 
   constructor(
-    private readonly world: World,
+    /** The world as seen from the current rotation; everything here is in view space. */
+    private readonly world: ViewWorld,
     private readonly tex: TerrainTextures,
   ) {
     const cw = Math.ceil(world.width / CHUNK_SIZE);
@@ -220,7 +221,8 @@ export class ChunkRenderer {
       this.buildBuilding(x, y, bid, objects);
       return;
     }
-    const hash = cellHash(x + 7919, y + 104729);
+    // Hash the *world* tile so trees and rocks keep their look when the view rotates.
+    const hash = cellHash(w.source[i] + 7919, 104729);
     let texture: Texture | null = null;
     const density = w.tree[i];
     const decor = w.decor[i];
@@ -239,10 +241,14 @@ export class ChunkRenderer {
   private buildBuilding(x: number, y: number, id: number, objects: Container) {
     const b = this.world.buildings.get(id);
     if (!b) return;
-    const { w, h } = BUILDINGS[b.def].size;
+    const r = this.world.view.r;
+    const size = BUILDINGS[b.def].size;
+    // Footprint in view space (quarter turns swap width and height).
+    const w = r % 2 === 0 ? size.w : size.h;
+    const h = r % 2 === 0 ? size.h : size.w;
     if (x !== b.x + w - 1 || y !== b.y + h - 1) return;
     const p = tileToWorld(b.x, b.y);
-    const s = new Sprite(this.tex.buildings[b.def][b.variant]);
+    const s = new Sprite(this.tex.buildings[b.def][b.variant][r]);
     s.x = p.x - h * HALF_W - GROUND_PAD;
     s.y = p.y - GROUND_PAD - buildingHeadroom(b.def);
     objects.addChild(s);
@@ -383,6 +389,13 @@ export class ChunkRenderer {
     }
     this.visibleChunks = chunks;
     this.visibleSprites = sprites;
+  }
+
+  /** Free every display object (used when the view rotates and the terrain is rebuilt). */
+  destroy() {
+    for (const c of [this.groundRoot, this.roadsRoot, this.gridRoot, this.objectsRoot, this.slab, this.groundMask]) {
+      c.destroy({ children: true });
+    }
   }
 
   get totalChunks() {

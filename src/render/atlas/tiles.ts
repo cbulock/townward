@@ -7,7 +7,7 @@ import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
-import { BUILDING_VARIANTS, buildingFrameSize, paintBuilding } from './buildingArt';
+import { BUILDING_ROTATIONS, BUILDING_VARIANTS, buildingFrameSize, paintBuilding } from './buildingArt';
 import {
   paintPerson,
   paintVehicle,
@@ -63,8 +63,8 @@ export interface TerrainTextures {
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Plain white diamond for tool previews (tinted at runtime). */
   selection: Texture;
-  /** Buildings, indexed by id then variant. Frames vary in size: see buildingFrameSize(). */
-  buildings: Readonly<Record<BuildingId, Texture[]>>;
+  /** Buildings, indexed by id, variant, then view rotation. Frames vary in size: see buildingFrameSize(). */
+  buildings: Readonly<Record<BuildingId, Texture[][]>>;
   fx: FxTextures;
   /** Vehicles, indexed by kind, then variant, then direction (0 NE, 1 SE, 2 SW, 3 NW). */
   vehicles: Readonly<Record<Exclude<AgentKind, 'person'>, Texture[][]>>;
@@ -206,7 +206,9 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('selection', W, H, paintSelection);
   for (const id of BUILDING_IDS) {
     const f = buildingFrameSize(id);
-    for (let v = 0; v < BUILDING_VARIANTS; v++) b.add(`bld_${id}_${v}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v));
+    for (let v = 0; v < BUILDING_VARIANTS; v++) {
+      for (const r of BUILDING_ROTATIONS) b.add(`bld_${id}_${v}_${r}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v, r));
+    }
   }
   for (const k of VEHICLE_KINDS) {
     for (let v = 0; v < VEHICLE_VARIANTS; v++) {
@@ -253,8 +255,11 @@ export function buildTerrainTextures(): TerrainTextures {
     ) as Record<BuildableRoad, Texture[]>,
     selection: get('selection'),
     buildings: Object.fromEntries(
-      BUILDING_IDS.map((id) => [id, range(BUILDING_VARIANTS, (v) => get(`bld_${id}_${v}`))]),
-    ) as Record<BuildingId, Texture[]>,
+      BUILDING_IDS.map((id) => [
+        id,
+        range(BUILDING_VARIANTS, (v) => BUILDING_ROTATIONS.map((r) => get(`bld_${id}_${v}_${r}`))),
+      ]),
+    ) as Record<BuildingId, Texture[][]>,
     vehicles: Object.fromEntries(
       VEHICLE_KINDS.map((k) => [k, range(VEHICLE_VARIANTS, (v) => range(4, (d) => get(`veh_${k}_${v}_${d}`)))]),
     ) as Record<Exclude<AgentKind, 'person'>, Texture[][]>,

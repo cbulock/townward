@@ -13,6 +13,8 @@ export interface GameEventMap {
   toolPreview: ToolPreviewInfo | null;
   notice: Notice;
   muted: boolean;
+  /** View rotation in quarter turns (0–3). */
+  rotation: number;
   city: CityInfo;
   /** Building shown in the info panel, or null when it's closed. */
   inspect: InspectInfo | null;

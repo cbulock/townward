@@ -3,6 +3,7 @@ import { BUILDINGS } from '../../sim/buildings/catalog';
 import type { World } from '../../sim/World';
 import { buildingHeadroom } from '../atlas/buildingArt';
 import { tileToWorld } from '../iso';
+import type { ViewRef } from '../Renderer';
 
 /** Floating badges above buildings that need attention (for now: no road access). */
 export class Indicators {
@@ -11,7 +12,10 @@ export class Indicators {
   private t = 0;
   private bases: number[] = [];
 
-  constructor(private readonly warnRoad: Texture) {}
+  constructor(
+    private readonly warnRoad: Texture,
+    private readonly viewRef: ViewRef,
+  ) {}
 
   /** Rebuild badges from the world; call after anything changes road access. */
   sync(world: World) {
@@ -28,7 +32,8 @@ export class Indicators {
         this.container.addChild(s);
       }
       // Above the roof: footprint centre, raised by most of the building's height.
-      const c = tileToWorld(b.x + w / 2, b.y + h / 2);
+      const centre = this.viewRef.current.pointToView(b.x + w / 2, b.y + h / 2);
+      const c = tileToWorld(centre.x, centre.y);
       const y = c.y - Math.max(18, buildingHeadroom(b.def) - 14);
       s.position.set(c.x, y);
       this.bases.push(y);

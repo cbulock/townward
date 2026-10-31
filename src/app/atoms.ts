@@ -20,3 +20,5 @@ export const mutedAtom = atom(false);
 export const buildingChoiceAtom = atom<BuildingId>('cottage');
 export const cityAtom = atom<CityInfo | null>(null);
 export const inspectAtom = atom<InspectInfo | null>(null);
+/** View rotation in quarter turns (0–3). */
+export const rotationAtom = atom(0);

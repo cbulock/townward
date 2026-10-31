@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { cityAtom, fundsAtom, gameAtom, mutedAtom } from '../atoms';
+import { cityAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -39,6 +39,7 @@ export function TopBar() {
   const city = useAtomValue(cityAtom);
   const muted = useAtomValue(mutedAtom);
   const game = useAtomValue(gameAtom);
+  const rotation = useAtomValue(rotationAtom);
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
 
@@ -93,6 +94,32 @@ export function TopBar() {
             )}
           </button>
         ))}
+      </div>
+      <span className="top-divider" />
+      <div className="rotate-group" role="group" aria-label="Rotate view">
+        <button type="button" className="icon-button" title="Rotate left (,)" aria-label="Rotate view left" onClick={() => game?.rotate(-1)}>
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+            <g {...icon}>
+              <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+              <path d="M4 4v4h4" />
+            </g>
+          </svg>
+        </button>
+        {/* Compass: the arrow points to the map's north as seen from this side. */}
+        <span className="compass" title="North" style={{ transform: `rotate(${45 + rotation * 90}deg)` }} aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M12 3l4 9h-8z" fill="#f87171" />
+            <path d="M12 21l-4-9h8z" fill="currentColor" opacity="0.55" />
+          </svg>
+        </span>
+        <button type="button" className="icon-button" title="Rotate right (.)" aria-label="Rotate view right" onClick={() => game?.rotate(1)}>
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+            <g {...icon}>
+              <path d="M20 12a8 8 0 1 1-2.4-5.7" />
+              <path d="M20 4v4h-4" />
+            </g>
+          </svg>
+        </button>
       </div>
       <span className="top-divider" />
       <button

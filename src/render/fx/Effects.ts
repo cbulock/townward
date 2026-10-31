@@ -1,6 +1,6 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
-import { HALF_H } from '../../shared/constants';
 import { tileToWorld } from '../iso';
+import type { ViewRef } from '../Renderer';
 
 export type BurstKind = 'dust' | 'leaves' | 'rocks' | 'splash';
 
@@ -49,7 +49,17 @@ export class Effects {
   private readonly pops: Pop[] = [];
   private readonly free: Sprite[] = [];
 
-  constructor(private readonly tex: FxTextures) {}
+  constructor(
+    private readonly tex: FxTextures,
+    private readonly viewRef: ViewRef,
+  ) {}
+
+  /** Centre of a world tile (fractional coords allowed) in world pixels of the current view. */
+  private tileCenter(x: number, y: number) {
+    const v = this.viewRef.current.pointToView(x + 0.5, y + 0.5);
+    const p = tileToWorld(v.x, v.y);
+    return { x: p.x, y: p.y };
+  }
 
   private sprite(texture: Texture): Sprite {
     const s = this.free.pop() ?? new Sprite();
@@ -72,7 +82,7 @@ export class Effects {
     tiles.forEach((t, k) => {
       const s = this.sprite(t.texture);
       s.anchor.set(0.5, t.anchorY ?? 0.5);
-      const c = tileCenter(t.x, t.y);
+      const c = this.tileCenter(t.x, t.y);
       s.position.set(c.x, c.y);
       s.blendMode = 'add';
       this.pops.push({ sprite: s, delay: k * stagger, age: 0 });
@@ -80,7 +90,7 @@ export class Effects {
   }
 
   burst(x: number, y: number, kind: BurstKind, count: number, delay = 0) {
-    const c = tileCenter(x, y);
+    const c = this.tileCenter(x, y);
     for (let k = 0; k < count && this.particles.length < MAX_PARTICLES; k++) {
       const a = Math.random() * Math.PI * 2;
       const speed = 10 + Math.random() * 22;
@@ -167,9 +177,4 @@ export class Effects {
   get active(): number {
     return this.particles.length + this.pops.length;
   }
-}
-
-function tileCenter(x: number, y: number) {
-  const p = tileToWorld(x, y);
-  return { x: p.x, y: p.y + HALF_H };
 }

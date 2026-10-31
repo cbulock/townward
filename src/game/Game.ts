@@ -1,4 +1,4 @@
-import { worldToTile } from '../render/iso';
+import { turn, type Rotation } from '../render/view/ViewTransform';
 import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildingArt';
 import { BRIDGE_ANCHOR_Y, GROUND_PAD } from '../render/atlas/geometry';
 import { Renderer } from '../render/Renderer';
@@ -127,13 +127,24 @@ export class Game {
     this.updatePreview();
   }
 
+  /** World tile under a screen point, clamped to the map (works in any view rotation). */
   private tileAt(screen: ScreenPoint): TilePos {
-    const w = this.renderer.camera.screenToWorld(screen.x, screen.y);
-    const t = worldToTile(w.x, w.y);
-    return {
-      x: Math.min(this.world.width - 1, Math.max(0, t.x)),
-      y: Math.min(this.world.height - 1, Math.max(0, t.y)),
-    };
+    return this.renderer.screenToTile(screen.x, screen.y, true) ?? { x: 0, y: 0 };
+  }
+
+  // ---------------------------------------------------------------- view rotation
+
+  get rotation(): Rotation {
+    return this.renderer.rotation;
+  }
+
+  /** Turn the camera a quarter turn (+1 or −1). The city itself doesn't change. */
+  rotate(step: 1 | -1) {
+    const r = turn(this.renderer.rotation, step);
+    this.renderer.setRotation(r);
+    this.sound.play('tool');
+    this.events.emit('rotation', r);
+    this.updatePreview();
   }
 
   private onPrimaryDown(screen: ScreenPoint, shift: boolean): boolean {
@@ -179,7 +190,7 @@ export class Game {
       this.notify('error', "Can't build there: needs clear land, no roads or water");
     } else if (result.ok && result.changed) {
       const c = result.changed;
-      this.renderer.ground.refresh(c.minX, c.minY, c.maxX, c.maxY);
+      this.renderer.refreshWorld({ x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 });
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
       this.afterWorldChange(p.kind !== 'place');
@@ -340,7 +351,7 @@ export class Game {
               // Fractional tile coords put the pop at the footprint's centre.
               x: b.x + (w - 1) / 2,
               y: b.y + (h - 1) / 2,
-              texture: this.renderer.textures.buildings[id][b.variant],
+              texture: this.renderer.textures.buildings[id][b.variant][this.renderer.rotation],
               anchorY: (buildingHeadroom(id) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
             },
           ],
@@ -354,12 +365,15 @@ export class Game {
 
     if (p.kind === 'road') {
       const tex = this.renderer.textures;
+      const view = this.renderer.view;
       const type = p.roadType;
       fx.pop(
         tiles.map((t) => ({
           x: t.x,
           y: t.y,
-          texture: t.bridge ? tex.bridges[type][t.bridge] : tex.roads[type][roadMask(this.world, t.x, t.y)],
+          texture: t.bridge
+            ? tex.bridges[type][view.bridgeAxis(t.bridge)]
+            : tex.roads[type][view.mask(roadMask(this.world, t.x, t.y))],
           anchorY: t.bridge ? BRIDGE_ANCHOR_Y : 0.5,
         })),
         stagger,
@@ -412,7 +426,7 @@ export class Game {
         })),
       );
     } else if (!p) this.renderer.toolPreview.clear();
-    else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p));
+    else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p, this.renderer.view));
     this.emitPreviewLabel();
   }
 
@@ -486,9 +500,7 @@ export class Game {
   private updateHover(screen: ScreenPoint | null) {
     let tile: TilePos | null = null;
     if (screen) {
-      const w = this.renderer.camera.screenToWorld(screen.x, screen.y);
-      const t = worldToTile(w.x, w.y);
-      if (this.world.inBounds(t.x, t.y)) tile = t;
+      tile = this.renderer.screenToTile(screen.x, screen.y, false);
     }
     if (screen && this.toolId === 'build') {
       this.lastPointer = screen;
@@ -504,6 +516,8 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
+    else if (code === 'Period') this.rotate(1);
+    else if (code === 'Comma') this.rotate(-1);
     else if (code === 'Space') this.togglePause();
     else if (code === 'BracketLeft') this.setSpeed(Math.max(1, this.speedIndex - 1));
     else if (code === 'BracketRight') this.setSpeed(this.speedIndex + 1);

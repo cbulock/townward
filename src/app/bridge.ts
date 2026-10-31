@@ -12,6 +12,7 @@ import {
   inspectAtom,
   mutedAtom,
   noticesAtom,
+  rotationAtom,
   toolPreviewAtom,
 } from './atoms';
 
@@ -28,6 +29,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
   store.set(activeToolAtom, game.tool);
   store.set(mutedAtom, game.muted);
   store.set(buildingChoiceAtom, game.building);
+  store.set(rotationAtom, game.rotation);
 
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const offs = [
@@ -38,6 +40,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('building', (b) => store.set(buildingChoiceAtom, b)),
     game.events.on('funds', (f) => store.set(fundsAtom, f)),
     game.events.on('muted', (m) => store.set(mutedAtom, m)),
+    game.events.on('rotation', (r) => store.set(rotationAtom, r)),
     game.events.on('city', (c) => store.set(cityAtom, c)),
     game.events.on('inspect', (i) => store.set(inspectAtom, i)),
     game.events.on('toolPreview', (p) => store.set(toolPreviewAtom, p)),

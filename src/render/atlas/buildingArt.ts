@@ -13,7 +13,9 @@ import { paintPine } from './treeArt';
  *   SW face (plane v = v1): lit,  on the left
  *   SE face (plane u = u1): shaded, on the right
  * Each building has a small recipe (BuildingArt) that the shared painter turns
- * into walls, windows, roof and extras.
+ * into walls, windows, roof and extras. Recipes are written in *local* space with
+ * the front at +v; the painter rotates them for each of the 4 view rotations, so
+ * front details (doors, shopfronts, signs) appear only when the front faces the camera.
  */
 
 export const BUILDING_VARIANTS = 3;
@@ -330,255 +332,456 @@ const GLASS = '#34506b';
 const GLASS_LIT = '#ffe39a';
 const FRAME = 'rgba(255, 255, 255, 0.35)';
 
+// ---------------------------------------------------------------- orientation
+
+/** Quarter turns of the view; matches render/view/ViewTransform's Rotation. */
+export type BuildingRotation = 0 | 1 | 2 | 3;
+export const BUILDING_ROTATIONS: readonly BuildingRotation[] = [0, 1, 2, 3];
+
+type Side = 'front' | 'right' | 'back' | 'left';
+const SIDES: readonly Side[] = ['front', 'right', 'back', 'left'];
+/** Outward normal of each side in local building space (the front faces +v). */
+const SIDE_DIR: Readonly<Record<Side, readonly [number, number]>> = {
+  front: [0, 1],
+  right: [1, 0],
+  back: [0, -1],
+  left: [-1, 0],
+};
+
+interface Box {
+  u0: number;
+  u1: number;
+  v0: number;
+  v1: number;
+}
+
+/**
+ * Local building space (footprint w × h, front = +v) → view space after `r` quarter
+ * turns, using the same mapping as ViewTransform so art and map rotate together.
+ */
+class Orient {
+  constructor(
+    readonly r: BuildingRotation,
+    readonly w: number,
+    readonly h: number,
+  ) {}
+
+  get vw(): number {
+    return this.r % 2 === 0 ? this.w : this.h;
+  }
+
+  get vh(): number {
+    return this.r % 2 === 0 ? this.h : this.w;
+  }
+
+  point(u: number, v: number): [number, number] {
+    switch (this.r) {
+      case 0:
+        return [u, v];
+      case 1:
+        return [this.h - v, u];
+      case 2:
+        return [this.w - u, this.h - v];
+      case 3:
+        return [v, this.w - u];
+    }
+  }
+
+  rect(b: Box): Box {
+    const [a0, c0] = this.point(b.u0, b.v0);
+    const [a1, c1] = this.point(b.u1, b.v1);
+    return { u0: Math.min(a0, a1), u1: Math.max(a0, a1), v0: Math.min(c0, c1), v1: Math.max(c0, c1) };
+  }
+
+  private dir(dx: number, dy: number): [number, number] {
+    switch (this.r) {
+      case 0:
+        return [dx, dy];
+      case 1:
+        return [-dy, dx];
+      case 2:
+        return [-dx, -dy];
+      case 3:
+        return [dy, -dx];
+    }
+  }
+
+  /** The camera-facing wall that shows a local side, or null if that side faces away. */
+  faceOf(side: Side): Face | null {
+    const [dx, dy] = this.dir(SIDE_DIR[side][0], SIDE_DIR[side][1]);
+    if (dx === 0 && dy === 1) return 'sw';
+    if (dx === 1 && dy === 0) return 'se';
+    return null;
+  }
+
+  /** Which local side a camera-facing wall shows. */
+  sideOf(face: Face): Side {
+    for (const s of SIDES) if (this.faceOf(s) === face) return s;
+    return 'front';
+  }
+
+  /** Axis a local-u feature (ridge, sawtooth) runs along in the view. */
+  get uAxis(): 'u' | 'v' {
+    return this.r % 2 === 0 ? 'u' : 'v';
+  }
+}
+
+/** A camera-facing wall of a box: its plane coordinate and the range along it (view space). */
+interface FaceRef {
+  face: Face;
+  at: number;
+  a0: number;
+  a1: number;
+}
+
+function faceRef(face: Face, b: Box): FaceRef {
+  return face === 'sw' ? { face, at: b.v1, a0: b.u0, a1: b.u1 } : { face, at: b.u1, a0: b.v0, a1: b.v1 };
+}
+
+/** View-space (u, v) of a point `a` along a face, `d` out from it. */
+function onFace(f: FaceRef, a: number, d: number): [number, number] {
+  return f.face === 'sw' ? [a, f.at + d] : [f.at + d, a];
+}
+
+function wallOn(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number, fill: string, out = 0) {
+  iso.wall(f.face, f.at + out, a0, a1, z0, z1, fill);
+}
+
+function floorOut(iso: IsoFrame, f: FaceRef, a0: number, a1: number, d0: number, d1: number, z: number, fill: string) {
+  if (f.face === 'sw') iso.floor(a0, a1, f.at + d0, f.at + d1, z, fill);
+  else iso.floor(f.at + d0, f.at + d1, a0, a1, z, fill);
+}
+
+function boxOut(iso: IsoFrame, f: FaceRef, a0: number, a1: number, d0: number, d1: number, z0: number, z1: number, lit: string, dark: string, top: string) {
+  if (f.face === 'sw') iso.box(a0, a1, f.at + d0, f.at + d1, z0, z1, lit, dark, top);
+  else iso.box(f.at + d0, f.at + d1, a0, a1, z0, z1, lit, dark, top);
+}
+
+function pOn(iso: IsoFrame, f: FaceRef, a: number, d: number, z: number): [number, number] {
+  const [u, v] = onFace(f, a, d);
+  return iso.p(u, v, z);
+}
+
+/**
+ * Something standing on the ground (parked car, crate, café table). Drawn before the
+ * building if it's behind it in the view, after if it's in front, so overlaps are right.
+ */
+interface Prop {
+  u: number;
+  v: number;
+  draw: () => void;
+}
+
+function inFront(p: Prop, b: Box): boolean {
+  return p.u >= b.u1 || p.v >= b.v1;
+}
+
 // ---------------------------------------------------------------- painter
 
-export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, variant: number) {
+export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, variant: number, rot: BuildingRotation = 0) {
   const { w, h } = BUILDINGS[id].size;
-  const iso = new IsoFrame(ctx, GROUND_PAD + h * HALF_W, GROUND_PAD + buildingHeadroom(id));
+  const o = new Orient(rot, w, h);
+  const iso = new IsoFrame(ctx, GROUND_PAD + o.vh * HALF_W, GROUND_PAD + buildingHeadroom(id));
   const rng = mulberry32(8000 + variant * 101 + id.length * 7 + id.charCodeAt(0));
-  if (id === 'park') return paintPark(iso, rng, variant);
-  if (id === 'town_hall') return paintTownHall(iso, rng, variant);
+  if (id === 'park') return paintPark(iso, o, rng, variant);
+  if (id === 'town_hall') return paintTownHall(iso, o, variant);
 
   const art = ART[id];
   const v = variant % BUILDING_VARIANTS;
-  const b = art.body ?? { u0: art.inset, u1: w - art.inset, v0: art.inset, v1: h - art.inset };
+  const local: Box = art.body ?? { u0: art.inset, u1: w - art.inset, v0: art.inset, v1: h - art.inset };
+  const b = o.rect(local);
+  const lot: Box = { u0: 0, u1: o.vw, v0: 0, v1: o.vh };
   const H = art.floors * art.floorH;
   const wall = art.walls[v];
-  const lit = wall;
-  const dark = shade(wall, -0.22);
   const roofColor = art.roofColors[v];
+  const front = o.faceOf('front');
 
-  paintGround(iso, art.ground, w, h, b);
-
-  // Soft contact shadow on the ground to the lower right.
+  paintGround(iso, o, art.ground, lot, local);
+  // Soft contact shadow on the ground to the lower right of the body.
   iso.poly(
     [iso.p(b.u1, b.v0 + 0.05), iso.p(b.u1 + 0.18, b.v0 + 0.2), iso.p(b.u1 + 0.18, b.v1 + 0.18), iso.p(b.u0 + 0.15, b.v1 + 0.18), iso.p(b.u0, b.v1)],
     'rgba(20, 50, 20, 0.22)',
   );
 
-  if (art.extras.includes('parking')) paintParking(iso, rng, w, h, b);
-  if (art.extras.includes('fence')) paintFence(iso, w, h);
-  if (art.extras.includes('smokestack')) paintSmokestack(iso, b, H, v);
+  const props = groundProps(iso, o, art, local, v, rng);
+  for (const p of props) if (!inFront(p, b)) p.draw();
 
-  // Walls.
-  iso.wall('sw', b.v1, b.u0, b.u1, 0, H, lit);
-  iso.wall('se', b.u1, b.v0, b.v1, 0, H, dark);
-  // Base plinth.
+  // A smokestack behind the body is drawn first so the walls cover its base.
+  const stack = art.extras.includes('smokestack') ? o.point(local.u1 - 0.35, local.v0 + 0.25) : null;
+  const stackInFront = stack !== null && stack[0] + stack[1] > (b.u0 + b.u1 + b.v0 + b.v1) / 2;
+  if (stack && !stackInFront) paintSmokestack(iso, stack, H, v);
+
+  // Walls and base plinth.
+  iso.wall('sw', b.v1, b.u0, b.u1, 0, H, wall);
+  iso.wall('se', b.u1, b.v0, b.v1, 0, H, shade(wall, -0.22));
   iso.wall('sw', b.v1, b.u0, b.u1, 0, 2, shade(wall, -0.35));
   iso.wall('se', b.u1, b.v0, b.v1, 0, 2, shade(wall, -0.45));
 
-  paintFacade(iso, art, b, H, v, rng);
-  paintRoof(iso, art, b, H, roofColor, wall, rng, v);
-  paintExtras(iso, art, b, H, v, rng);
+  for (const face of ['sw', 'se'] as const) paintFacade(iso, art, faceRef(face, b), o.sideOf(face), H, v, rng);
+  paintRoof(iso, art, b, o.uAxis, H, roofColor, wall);
+  paintExtras(iso, o, art, local, b, front, H, v, rng);
+  if (stack && stackInFront) paintSmokestack(iso, stack, H, v);
+
+  for (const p of props) if (inFront(p, b)) p.draw();
+  if (art.extras.includes('fence')) paintFence(iso, lot);
 }
 
-function paintGround(iso: IsoFrame, ground: Ground, w: number, h: number, b: { u0: number; u1: number; v0: number; v1: number }) {
+function paintGround(iso: IsoFrame, o: Orient, ground: Ground, lot: Box, local: Box) {
   if (ground === 'garden') {
-    iso.floor(0.04, w - 0.04, 0.04, h - 0.04, 0, '#6cc444');
-    iso.floor(b.u0 + (b.u1 - b.u0) * 0.35, b.u0 + (b.u1 - b.u0) * 0.65, b.v1, h - 0.02, 0, '#d9cfb8'); // path to door
+    iso.floor(lot.u0 + 0.04, lot.u1 - 0.04, lot.v0 + 0.04, lot.v1 - 0.04, 0, '#6cc444');
+    // Path from the front door to the lot edge.
+    const mid0 = local.u0 + (local.u1 - local.u0) * 0.35;
+    const mid1 = local.u0 + (local.u1 - local.u0) * 0.65;
+    // Local space: the lot's front edge is always at v = h.
+    const path = o.rect({ u0: mid0, u1: mid1, v0: local.v1, v1: o.h - 0.02 });
+    iso.floor(path.u0, path.u1, path.v0, path.v1, 0, '#d9cfb8');
   } else {
-    iso.floor(0.03, w - 0.03, 0.03, h - 0.03, 0, '#b9b6ae');
-    iso.floor(0.06, w - 0.06, 0.06, h - 0.06, 0, ground === 'parking' ? '#6f737a' : '#cfccc3');
+    iso.floor(lot.u0 + 0.03, lot.u1 - 0.03, lot.v0 + 0.03, lot.v1 - 0.03, 0, '#b9b6ae');
+    iso.floor(lot.u0 + 0.06, lot.u1 - 0.06, lot.v0 + 0.06, lot.v1 - 0.06, 0, ground === 'parking' ? '#6f737a' : '#cfccc3');
   }
 }
 
-function paintParking(iso: IsoFrame, rng: Rng, w: number, h: number, b: { u0: number; u1: number; v1: number }) {
-  const CAR_COLORS = ['#d64545', '#3d7dd8', '#f0c43a', '#ececec', '#3a3f47', '#4bb36b'];
-  for (let k = 0; k < 7; k++) {
-    const u = b.u0 + 0.12 + k * ((b.u1 - b.u0 - 0.2) / 7);
-    iso.wall('sw', h - 0.18, u, u + 0.012, 0, 0.6, 'rgba(255,255,255,0.8)');
-    iso.floor(u, u + 0.012, b.v1 + 0.12, h - 0.15, 0.1, 'rgba(255,255,255,0.75)');
-    if (rng() < 0.65) {
-      const c = CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)];
-      const cu = u + 0.05;
-      const cv = b.v1 + 0.25 + rng() * 0.2;
-      iso.box(cu, cu + 0.13, cv, cv + 0.32, 0, 3, c, shade(c, -0.3), shade(c, 0.15));
-      iso.floor(cu + 0.02, cu + 0.11, cv + 0.08, cv + 0.2, 4.5, 'rgba(40, 60, 80, 0.85)');
+/** Ground-level props in local space (parking, crates, tables), mapped into the view. */
+function groundProps(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, v: number, rng: Rng): Prop[] {
+  const props: Prop[] = [];
+  const ex = new Set(art.extras);
+  /** Local front edge of the lot. */
+  const lotV1 = o.h;
+
+  if (ex.has('parking')) {
+    const CAR_COLORS = ['#d64545', '#3d7dd8', '#f0c43a', '#ececec', '#3a3f47', '#4bb36b'];
+    for (let k = 0; k < 7; k++) {
+      const u = local.u0 + 0.12 + k * ((local.u1 - local.u0 - 0.2) / 7);
+      const line = o.rect({ u0: u, u1: u + 0.012, v0: local.v1 + 0.12, v1: lotV1 - 0.15 });
+      iso.floor(line.u0, line.u1, line.v0, line.v1, 0.1, 'rgba(255,255,255,0.75)');
+      if (rng() < 0.65) {
+        const c = CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)];
+        const cv = local.v1 + 0.25 + rng() * 0.2;
+        const car = o.rect({ u0: u + 0.05, u1: u + 0.18, v0: cv, v1: cv + 0.32 });
+        props.push({
+          u: car.u0,
+          v: car.v0,
+          draw: () => {
+            iso.box(car.u0, car.u1, car.v0, car.v1, 0, 3, c, shade(c, -0.3), shade(c, 0.15));
+            const g = 0.02;
+            iso.floor(car.u0 + g, car.u1 - g, car.v0 + g * 3, car.v1 - g * 3, 4.5, 'rgba(40, 60, 80, 0.85)');
+          },
+        });
+      }
     }
   }
-  void w;
+  if (ex.has('crates')) {
+    const colors = ['#a87a45', '#7a8a4a', '#3d6e9e'];
+    for (let k = 0; k < 3; k++) {
+      const cu = local.u1 + 0.05 + (k % 2) * 0.12;
+      const cv = local.v1 - 0.35 + k * 0.12;
+      const r = o.rect({ u0: cu, u1: cu + 0.1, v0: cv, v1: cv + 0.1 });
+      const c = colors[(k + v) % colors.length];
+      props.push({ u: r.u0, v: r.v0, draw: () => iso.box(r.u0, r.u1, r.v0, r.v1, 0, 3.5, c, shade(c, -0.3), shade(c, 0.15)) });
+    }
+  }
+  if (ex.has('tables')) {
+    for (const [tu, tv] of [
+      [local.u0 + 0.12, local.v1 + 0.2],
+      [local.u0 + 0.42, local.v1 + 0.24],
+    ] as const) {
+      const r = o.rect({ u0: tu, u1: tu + 0.04, v0: tv, v1: tv + 0.04 });
+      props.push({
+        u: r.u0,
+        v: r.v0,
+        draw: () => {
+          iso.box(r.u0, r.u1, r.v0, r.v1, 0, 5, '#7a7f86', '#5c6168', '#7a7f86');
+          const [x, y] = iso.p((r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2, 7);
+          const ctx = iso.ctx;
+          ctx.fillStyle = v === 0 ? '#e9554a' : '#f2c84b';
+          ctx.beginPath();
+          ctx.ellipse(x, y, 6, 2.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.15)';
+          ctx.beginPath();
+          ctx.ellipse(x, y + 1, 6, 1.5, 0, 0, Math.PI);
+          ctx.fill();
+        },
+      });
+    }
+  }
+  return props;
 }
 
-function paintFence(iso: IsoFrame, w: number, h: number) {
-  for (let a = 0.06; a < w - 0.04; a += 0.09) iso.wall('sw', h - 0.04, a, a + 0.03, 0, 4, '#fbf7ee');
-  iso.wall('sw', h - 0.04, 0.06, w - 0.06, 2.5, 3.3, '#fbf7ee');
-  for (let a = 0.06; a < h - 0.04; a += 0.09) iso.wall('se', w - 0.04, a, a + 0.03, 0, 4, '#e3ddcf');
-  iso.wall('se', w - 0.04, 0.06, h - 0.06, 2.5, 3.3, '#e3ddcf');
+/** Picket fence along the two lot edges nearest the camera. */
+function paintFence(iso: IsoFrame, lot: Box) {
+  for (let a = lot.u0 + 0.06; a < lot.u1 - 0.04; a += 0.09) iso.wall('sw', lot.v1 - 0.04, a, a + 0.03, 0, 4, '#fbf7ee');
+  iso.wall('sw', lot.v1 - 0.04, lot.u0 + 0.06, lot.u1 - 0.06, 2.5, 3.3, '#fbf7ee');
+  for (let a = lot.v0 + 0.06; a < lot.v1 - 0.04; a += 0.09) iso.wall('se', lot.u1 - 0.04, a, a + 0.03, 0, 4, '#e3ddcf');
+  iso.wall('se', lot.u1 - 0.04, lot.v0 + 0.06, lot.v1 - 0.06, 2.5, 3.3, '#e3ddcf');
 }
 
-function glazing(iso: IsoFrame, face: Face, at: number, a0: number, a1: number, z0: number, z1: number, lit: boolean) {
-  iso.wall(face, at, a0, a1, z0, z1, lit ? GLASS_LIT : face === 'sw' ? GLASS : shade(GLASS, -0.25));
-  iso.wall(face, at, a0, a1, z1 - 0.8, z1, FRAME);
+function glazing(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number, lit: boolean) {
+  wallOn(iso, f, a0, a1, z0, z1, lit ? GLASS_LIT : f.face === 'sw' ? GLASS : shade(GLASS, -0.25));
+  wallOn(iso, f, a0, a1, z1 - 0.8, z1, FRAME);
 }
 
-function paintFacade(iso: IsoFrame, art: BuildingArt, b: { u0: number; u1: number; v0: number; v1: number }, H: number, v: number, rng: Rng) {
+/** Windows and doors on one camera-facing wall. Front-only details go on the front side only. */
+function paintFacade(iso: IsoFrame, art: BuildingArt, f: FaceRef, side: Side, H: number, v: number, rng: Rng) {
   const fh = art.floorH;
-  const faces: [Face, number, number, number][] = [
-    ['sw', b.v1, b.u0, b.u1],
-    ['se', b.u1, b.v0, b.v1],
-  ];
-  for (const [face, at, a0, a1] of faces) {
-    const len = a1 - a0;
-    const cols = Math.max(2, Math.round(len * (art.facade === 'brick' ? 4 : 3.4)));
-    const step = len / cols;
+  const { a0, a1 } = f;
+  const len = a1 - a0;
+  const isFront = side === 'front';
+  const cols = Math.max(2, Math.round(len * (art.facade === 'brick' ? 4 : 3.4)));
+  const step = len / cols;
 
-    if (art.facade === 'curtain') {
-      iso.wall(face, at, a0 + 0.01, a1 - 0.01, 2, H, face === 'sw' ? shade(art.walls[v], -0.05) : shade(art.walls[v], -0.3));
-      for (let f = 1; f < art.floors; f++) iso.wall(face, at, a0, a1, f * fh, f * fh + 0.7, 'rgba(255,255,255,0.28)');
-      for (let c = 1; c < cols; c++) iso.wall(face, at, a0 + c * step, a0 + c * step + 0.012, 2, H, 'rgba(20,40,60,0.35)');
-      // Diagonal reflection streak.
-      if (face === 'sw') iso.poly([iso.p(a0 + len * 0.15, at, H * 0.9), iso.p(a0 + len * 0.3, at, H * 0.9), iso.p(a0 + len * 0.55, at, H * 0.25), iso.p(a0 + len * 0.4, at, H * 0.25)], 'rgba(255,255,255,0.14)');
-      for (let k = 0; k < art.floors; k++) {
-        if (rng() < 0.25) {
-          const c = Math.floor(rng() * cols);
-          iso.wall(face, at, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, k * fh + 1.5, (k + 1) * fh - 1, 'rgba(255, 228, 150, 0.55)');
-        }
+  if (art.facade === 'curtain') {
+    wallOn(iso, f, a0 + 0.01, a1 - 0.01, 2, H, f.face === 'sw' ? shade(art.walls[v], -0.05) : shade(art.walls[v], -0.3));
+    for (let k = 1; k < art.floors; k++) wallOn(iso, f, a0, a1, k * fh, k * fh + 0.7, 'rgba(255,255,255,0.28)');
+    for (let c = 1; c < cols; c++) wallOn(iso, f, a0 + c * step, a0 + c * step + 0.012, 2, H, 'rgba(20,40,60,0.35)');
+    if (f.face === 'sw') {
+      // Diagonal reflection streak on the lit side.
+      iso.poly([pOn(iso, f, a0 + len * 0.15, 0, H * 0.9), pOn(iso, f, a0 + len * 0.3, 0, H * 0.9), pOn(iso, f, a0 + len * 0.55, 0, H * 0.25), pOn(iso, f, a0 + len * 0.4, 0, H * 0.25)], 'rgba(255,255,255,0.14)');
+    }
+    for (let k = 0; k < art.floors; k++) {
+      if (rng() < 0.25) {
+        const c = Math.floor(rng() * cols);
+        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, k * fh + 1.5, (k + 1) * fh - 1, 'rgba(255, 228, 150, 0.55)');
+      }
+    }
+    return;
+  }
+
+  if (art.facade === 'bands') {
+    for (let k = 0; k < art.floors; k++) {
+      wallOn(iso, f, a0 + 0.03, a1 - 0.03, k * fh + 2, k * fh + fh - 1.5, f.face === 'sw' ? '#3f5f7d' : '#2e475e');
+      for (let c = 1; c < cols; c++) wallOn(iso, f, a0 + c * step, a0 + c * step + 0.012, k * fh + 2, k * fh + fh - 1.5, 'rgba(230,236,242,0.5)');
+      if (rng() < 0.3) {
+        const c = Math.floor(rng() * cols);
+        wallOn(iso, f, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, k * fh + 2.5, k * fh + fh - 2, 'rgba(255, 228, 150, 0.7)');
+      }
+    }
+    return;
+  }
+
+  if (art.facade === 'industrial') {
+    for (let c = 0; c < cols; c++) {
+      const s0 = a0 + c * step + step * 0.25;
+      glazing(iso, f, s0, s0 + step * 0.5, H - 6, H - 2.5, false);
+    }
+    return;
+  }
+
+  if (art.facade === 'townhouse' && isFront) {
+    const units = 3;
+    const uw = len / units;
+    const doorColors = ['#c0392b', '#2e6fb5', '#2f8f4e', '#e0a12d'];
+    for (let k = 0; k < units; k++) {
+      const s0 = a0 + k * uw;
+      const unitWall = art.walls[(v + k) % 3];
+      wallOn(iso, f, s0, s0 + uw, 2, H, f.face === 'sw' ? shade(unitWall, 0.05 * k) : shade(unitWall, -0.2 + 0.05 * k));
+      wallOn(iso, f, s0 + uw - 0.01, s0 + uw, 2, H, 'rgba(0,0,0,0.25)');
+      wallOn(iso, f, s0 + uw * 0.15, s0 + uw * 0.45, 2, 9, doorColors[(k + v) % doorColors.length]);
+      glazing(iso, f, s0 + uw * 0.55, s0 + uw * 0.85, 4, 8, false);
+      for (let fl = 1; fl < art.floors; fl++) {
+        glazing(iso, f, s0 + uw * 0.18, s0 + uw * 0.45, fl * fh + 2, fl * fh + fh - 2, rng() < 0.2);
+        glazing(iso, f, s0 + uw * 0.55, s0 + uw * 0.82, fl * fh + 2, fl * fh + fh - 2, rng() < 0.2);
+      }
+      wallOn(iso, f, s0, s0 + uw, H - 1.5, H, shade(unitWall, -0.3));
+    }
+    return;
+  }
+
+  if (art.facade === 'brick') {
+    for (let k = 0; k < art.floors; k++) wallOn(iso, f, a0, a1, k * fh, k * fh + 0.6, 'rgba(0,0,0,0.12)');
+  }
+
+  const shop = art.facade === 'shopfront';
+  for (let k = 0; k < art.floors; k++) {
+    const z0 = k * fh;
+    if (shop && k === 0) {
+      if (isFront) {
+        // Big shop window plus a door.
+        glazing(iso, f, a0 + 0.06, a1 - len * 0.32, 2, fh - 2.5, false);
+        wallOn(iso, f, a1 - len * 0.26, a1 - len * 0.1, 2, fh - 2.5, '#5b3a26');
+      } else {
+        glazing(iso, f, a0 + 0.08, a1 - 0.08, 2, fh - 2.5, false);
       }
       continue;
     }
-
-    if (art.facade === 'bands') {
-      for (let f = 0; f < art.floors; f++) {
-        iso.wall(face, at, a0 + 0.03, a1 - 0.03, f * fh + 2, f * fh + fh - 1.5, face === 'sw' ? '#3f5f7d' : '#2e475e');
-        for (let c = 1; c < cols; c++) iso.wall(face, at, a0 + c * step, a0 + c * step + 0.012, f * fh + 2, f * fh + fh - 1.5, 'rgba(230,236,242,0.5)');
-        if (rng() < 0.3) {
-          const c = Math.floor(rng() * cols);
-          iso.wall(face, at, a0 + c * step + 0.02, a0 + (c + 1) * step - 0.02, f * fh + 2.5, f * fh + fh - 2, 'rgba(255, 228, 150, 0.7)');
-        }
-      }
-      continue;
-    }
-
-    if (art.facade === 'industrial') {
-      for (let c = 0; c < cols; c++) {
-        const s0 = a0 + c * step + step * 0.25;
-        glazing(iso, face, at, s0, s0 + step * 0.5, H - 6, H - 2.5, false);
-      }
-      continue;
-    }
-
-    if (art.facade === 'townhouse' && face === 'sw') {
-      const units = 3;
-      const uw = len / units;
-      const doorColors = ['#c0392b', '#2e6fb5', '#2f8f4e', '#e0a12d'];
-      for (let k = 0; k < units; k++) {
-        const s0 = a0 + k * uw;
-        iso.wall('sw', at, s0, s0 + uw, 2, H, shade(art.walls[(v + k) % 3], 0.05 * k));
-        iso.wall('sw', at, s0 + uw - 0.01, s0 + uw, 2, H, 'rgba(0,0,0,0.25)');
-        iso.wall('sw', at, s0 + uw * 0.15, s0 + uw * 0.45, 2, 9, doorColors[(k + v) % doorColors.length]);
-        glazing(iso, 'sw', at, s0 + uw * 0.55, s0 + uw * 0.85, 4, 8, false);
-        for (let f = 1; f < art.floors; f++) {
-          glazing(iso, 'sw', at, s0 + uw * 0.18, s0 + uw * 0.45, f * fh + 2, f * fh + fh - 2, rng() < 0.2);
-          glazing(iso, 'sw', at, s0 + uw * 0.55, s0 + uw * 0.82, f * fh + 2, f * fh + fh - 2, rng() < 0.2);
-        }
-        iso.wall('sw', at, s0, s0 + uw, H - 1.5, H, shade(art.walls[(v + k) % 3], -0.3));
-      }
-      continue;
-    }
-
-    if (art.facade === 'brick') {
-      for (let f = 0; f < art.floors; f++) iso.wall(face, at, a0, a1, f * fh, f * fh + 0.6, 'rgba(0,0,0,0.12)');
-    }
-
-    const shop = art.facade === 'shopfront';
-    for (let f = 0; f < art.floors; f++) {
-      const z0 = f * fh;
-      if (shop && f === 0) {
-        // Big shop window plus a door on the street-facing wall.
-        if (face === 'sw') {
-          glazing(iso, face, at, a0 + 0.06, a1 - len * 0.32, 2, fh - 2.5, false);
-          iso.wall(face, at, a1 - len * 0.26, a1 - len * 0.1, 2, fh - 2.5, '#5b3a26');
-        } else {
-          glazing(iso, face, at, a0 + 0.08, a1 - 0.08, 2, fh - 2.5, false);
-        }
-        continue;
-      }
-      if (!shop && f === 0 && face === 'sw' && art.floors <= 4) {
-        // Front door on the ground floor.
-        const mid = a0 + len * 0.5;
-        iso.wall(face, at, mid - 0.07, mid + 0.07, 1.5, Math.min(fh - 1, 9), '#6b4428');
-        for (let c = 0; c < cols; c++) {
-          const s0 = a0 + c * step + step * 0.22;
-          if (Math.abs(s0 + step * 0.28 - mid) < step * 0.6) continue;
-          glazing(iso, face, at, s0, s0 + step * 0.56, z0 + 3, z0 + fh - 2.5, rng() < 0.15);
-        }
-        continue;
-      }
+    if (isFront && k === 0 && art.floors <= 4) {
+      const mid = a0 + len * 0.5;
+      wallOn(iso, f, mid - 0.07, mid + 0.07, 1.5, Math.min(fh - 1, 9), '#6b4428');
       for (let c = 0; c < cols; c++) {
         const s0 = a0 + c * step + step * 0.22;
-        glazing(iso, face, at, s0, s0 + step * 0.56, z0 + 2.5, z0 + fh - 2, rng() < 0.18);
+        if (Math.abs(s0 + step * 0.28 - mid) < step * 0.6) continue;
+        glazing(iso, f, s0, s0 + step * 0.56, z0 + 3, z0 + fh - 2.5, rng() < 0.15);
       }
+      continue;
+    }
+    for (let c = 0; c < cols; c++) {
+      const s0 = a0 + c * step + step * 0.22;
+      glazing(iso, f, s0, s0 + step * 0.56, z0 + 2.5, z0 + fh - 2, rng() < 0.18);
     }
   }
 }
 
-function paintRoof(
-  iso: IsoFrame,
-  art: BuildingArt,
-  b: { u0: number; u1: number; v0: number; v1: number },
-  H: number,
-  roofColor: string,
-  wall: string,
-  rng: Rng,
-  v: number,
-) {
-  const { u0, u1, v0, v1 } = b;
+/**
+ * Roofs drawn in view space. Pitched and sawtooth roofs run along `axis`
+ * (the local u axis after rotation); each case draws its far planes first.
+ */
+function paintRoof(iso: IsoFrame, art: BuildingArt, b: Box, axis: 'u' | 'v', H: number, roofColor: string, wall: string) {
   const rh = art.roofH ?? 0;
   const o = 0.06; // eave overhang
   if (art.roof === 'flat') {
-    iso.floor(u0, u1, v0, v1, H, shade(wall, -0.1));
-    iso.floor(u0 + 0.04, u1 - 0.04, v0 + 0.04, v1 - 0.04, H, roofColor);
-    // Parapet lip.
-    iso.wall('sw', v1, u0, u1, H, H + 1.5, shade(wall, 0.1));
-    iso.wall('se', u1, v0, v1, H, H + 1.5, shade(wall, -0.15));
+    iso.floor(b.u0, b.u1, b.v0, b.v1, H, shade(wall, -0.1));
+    iso.floor(b.u0 + 0.04, b.u1 - 0.04, b.v0 + 0.04, b.v1 - 0.04, H, roofColor);
+    iso.wall('sw', b.v1, b.u0, b.u1, H, H + 1.5, shade(wall, 0.1));
+    iso.wall('se', b.u1, b.v0, b.v1, H, H + 1.5, shade(wall, -0.15));
     return;
   }
+  // Along/across accessors so one routine handles both orientations.
+  const [A0, A1, C0, C1] = axis === 'u' ? [b.u0, b.u1, b.v0, b.v1] : [b.v0, b.v1, b.u0, b.u1];
+  const P = (a: number, c: number, z: number) => (axis === 'u' ? iso.p(a, c, z) : iso.p(c, a, z));
+  // The far slope faces away; the near slope faces SW (lit) for a u ridge, SE (shaded) for a v ridge.
+  const nearSlope = axis === 'u' ? roofColor : shade(roofColor, -0.12);
+  const farSlope = shade(roofColor, -0.25);
+  const endWall = axis === 'u' ? shade(wall, -0.22) : wall;
+  const cm = (C0 + C1) / 2;
+
   if (art.roof === 'gable') {
-    const vm = (v0 + v1) / 2;
-    const back = shade(roofColor, -0.25);
-    iso.poly([iso.p(u0 - o, v0 - o, H), iso.p(u1 + o, v0 - o, H), iso.p(u1 + o, vm, H + rh), iso.p(u0 - o, vm, H + rh)], back);
-    // Gable end (triangle of wall on the SE side).
-    iso.poly([iso.p(u1, v0, H), iso.p(u1, v1, H), iso.p(u1, vm, H + rh)], shade(wall, -0.22));
-    iso.poly([iso.p(u0 - o, v1 + o, H - 1), iso.p(u1 + o, v1 + o, H - 1), iso.p(u1 + o, vm, H + rh), iso.p(u0 - o, vm, H + rh)], roofColor);
-    // Shingle lines.
+    iso.poly([P(A0 - o, C0 - o, H), P(A1 + o, C0 - o, H), P(A1 + o, cm, H + rh), P(A0 - o, cm, H + rh)], farSlope);
+    iso.poly([P(A1, C0, H), P(A1, C1, H), P(A1, cm, H + rh)], endWall);
+    iso.poly([P(A0 - o, C1 + o, H - 1), P(A1 + o, C1 + o, H - 1), P(A1 + o, cm, H + rh), P(A0 - o, cm, H + rh)], nearSlope);
     for (let t = 0.25; t < 1; t += 0.25) {
-      const vv = v1 + o - (v1 + o - vm) * t;
-      iso.poly([iso.p(u0 - o, vv, H - 1 + (rh + 1) * t), iso.p(u1 + o, vv, H - 1 + (rh + 1) * t), iso.p(u1 + o, vv, H + (rh + 1) * t), iso.p(u0 - o, vv, H + (rh + 1) * t)], shade(roofColor, -0.15));
+      const cc = C1 + o - (C1 + o - cm) * t;
+      const z = H - 1 + (rh + 1) * t;
+      iso.poly([P(A0 - o, cc, z), P(A1 + o, cc, z), P(A1 + o, cc, z + 1), P(A0 - o, cc, z + 1)], shade(roofColor, axis === 'u' ? -0.15 : -0.27));
     }
-    iso.poly([iso.p(u0 - o, vm, H + rh), iso.p(u1 + o, vm, H + rh), iso.p(u1 + o, vm, H + rh + 1), iso.p(u0 - o, vm, H + rh + 1)], shade(roofColor, 0.25));
+    iso.poly([P(A0 - o, cm, H + rh), P(A1 + o, cm, H + rh), P(A1 + o, cm, H + rh + 1), P(A0 - o, cm, H + rh + 1)], shade(roofColor, 0.25));
     return;
   }
   if (art.roof === 'hip') {
-    const vm = (v0 + v1) / 2;
-    const d = (v1 - v0) / 2;
-    const r0 = u0 + d;
-    const r1 = u1 - d;
-    iso.poly([iso.p(u0 - o, v0 - o, H), iso.p(u1 + o, v0 - o, H), iso.p(r1, vm, H + rh), iso.p(r0, vm, H + rh)], shade(roofColor, -0.25));
-    iso.poly([iso.p(u1 + o, v0 - o, H), iso.p(u1 + o, v1 + o, H), iso.p(r1, vm, H + rh)], shade(roofColor, -0.18));
-    iso.poly([iso.p(u0 - o, v1 + o, H), iso.p(u1 + o, v1 + o, H), iso.p(r1, vm, H + rh), iso.p(r0, vm, H + rh)], roofColor);
-    iso.poly([iso.p(r0, vm, H + rh), iso.p(r1, vm, H + rh), iso.p(r1, vm, H + rh + 1), iso.p(r0, vm, H + rh + 1)], shade(roofColor, 0.25));
+    const d = (C1 - C0) / 2;
+    const r0 = A0 + d;
+    const r1 = A1 - d;
+    iso.poly([P(A0 - o, C0 - o, H), P(A1 + o, C0 - o, H), P(r1, cm, H + rh), P(r0, cm, H + rh)], farSlope);
+    iso.poly([P(A1 + o, C0 - o, H), P(A1 + o, C1 + o, H), P(r1, cm, H + rh)], axis === 'u' ? shade(roofColor, -0.18) : roofColor);
+    iso.poly([P(A0 - o, C1 + o, H), P(A1 + o, C1 + o, H), P(r1, cm, H + rh), P(r0, cm, H + rh)], nearSlope);
+    iso.poly([P(r0, cm, H + rh), P(r1, cm, H + rh), P(r1, cm, H + rh + 1), P(r0, cm, H + rh + 1)], shade(roofColor, 0.25));
     return;
   }
-  // Sawtooth: teeth along u, each with a sloped roof and a glazed vertical face.
-  const teeth = Math.max(2, Math.round((u1 - u0) * 3));
-  const tw = (u1 - u0) / teeth;
-  iso.floor(u0, u1, v0, v1, H, shade(roofColor, -0.2));
+  // Sawtooth: teeth along the axis, glazed faces toward the camera.
+  const teeth = Math.max(2, Math.round((A1 - A0) * 3));
+  const tw = (A1 - A0) / teeth;
+  iso.floor(b.u0, b.u1, b.v0, b.v1, H, shade(roofColor, -0.2));
   for (let k = 0; k < teeth; k++) {
-    const a = u0 + k * tw;
+    const a = A0 + k * tw;
     const c = a + tw;
-    iso.poly([iso.p(a, v0, H), iso.p(c, v0, H + rh), iso.p(c, v1, H + rh), iso.p(a, v1, H)], roofColor);
-    iso.poly([iso.p(c, v0, H), iso.p(c, v0, H + rh), iso.p(c, v1, H + rh), iso.p(c, v1, H)], k === teeth - 1 ? shade(wall, -0.22) : '#7fa4c2');
-    iso.poly([iso.p(a, v1, H), iso.p(c, v1, H), iso.p(c, v1, H + rh)], shade(wall, 0.02));
+    iso.poly([P(a, C0, H), P(c, C0, H + rh), P(c, C1, H + rh), P(a, C1, H)], roofColor);
+    iso.poly([P(c, C0, H), P(c, C0, H + rh), P(c, C1, H + rh), P(c, C1, H)], k === teeth - 1 ? endWall : '#7fa4c2');
+    iso.poly([P(a, C1, H), P(c, C1, H), P(c, C1, H + rh)], axis === 'u' ? shade(wall, 0.02) : shade(wall, -0.2));
   }
-  void rng;
-  void v;
 }
 
-function paintSmokestack(iso: IsoFrame, b: { u0: number; u1: number; v0: number }, H: number, v: number) {
-  const su = b.u1 - 0.35;
-  const sv = b.v0 + 0.25;
+function paintSmokestack(iso: IsoFrame, at: readonly [number, number], H: number, v: number) {
   const top = H + 30;
-  const [cx, cyBase] = iso.p(su, sv, 0);
+  const [cx, cyBase] = iso.p(at[0], at[1], 0);
   const ctx = iso.ctx;
   const r = 4.5;
   ctx.fillStyle = '#8a4a3a';
@@ -595,101 +798,84 @@ function paintSmokestack(iso: IsoFrame, b: { u0: number; u1: number; v0: number 
   ctx.fill();
 }
 
-function paintExtras(iso: IsoFrame, art: BuildingArt, b: { u0: number; u1: number; v0: number; v1: number }, H: number, v: number, rng: Rng) {
-  const { u0, u1, v0, v1 } = b;
+function paintExtras(iso: IsoFrame, o: Orient, art: BuildingArt, local: Box, b: Box, front: Face | null, H: number, v: number, rng: Rng) {
   const fh = art.floorH;
   const ex = new Set(art.extras);
+  const lf = front ? faceRef(front, b) : null;
 
   if (ex.has('chimney')) {
-    const cu = u0 + (u1 - u0) * 0.72;
-    const cv = v0 + (v1 - v0) * 0.3;
-    const top = H + (art.roofH ?? 0) + 4;
-    iso.box(cu, cu + 0.1, cv, cv + 0.1, H - 2, top, '#9b4b3c', '#7a3a2f', '#5a2c24');
+    const [cu, cv] = o.point(local.u0 + (local.u1 - local.u0) * 0.72, local.v0 + (local.v1 - local.v0) * 0.3);
+    iso.box(cu - 0.05, cu + 0.05, cv - 0.05, cv + 0.05, H - 2, H + (art.roofH ?? 0) + 4, '#9b4b3c', '#7a3a2f', '#5a2c24');
   }
-  if (ex.has('porch')) {
-    const mid = (u0 + u1) / 2;
-    iso.floor(mid - 0.2, mid + 0.2, v1, v1 + 0.14, 1.5, '#cdbfa6');
-    iso.box(mid - 0.2, mid + 0.2, v1, v1 + 0.14, 8.5, 9.5, '#efe6d6', '#cfc4b0', '#a7493a');
-    for (const a of [mid - 0.19, mid + 0.17]) iso.wall('sw', v1 + 0.13, a, a + 0.02, 1.5, 8.5, '#f6f1e6');
+  if (ex.has('porch') && lf) {
+    const mid = (lf.a0 + lf.a1) / 2;
+    floorOut(iso, lf, mid - 0.2, mid + 0.2, 0, 0.14, 1.5, '#cdbfa6');
+    boxOut(iso, lf, mid - 0.2, mid + 0.2, 0, 0.14, 8.5, 9.5, '#efe6d6', '#cfc4b0', '#a7493a');
+    for (const a of [mid - 0.19, mid + 0.17]) wallOn(iso, lf, a, a + 0.02, 1.5, 8.5, '#f6f1e6', 0.13);
   }
-  if (ex.has('awning')) {
+  if (ex.has('awning') && lf) {
     const colors = ['#d94a3d', '#2e8a5a', '#2d6fc4'];
     const c = colors[v % colors.length];
     const z = fh - 1.5;
     const stripes = 8;
-    const len = u1 - u0;
+    const len = lf.a1 - lf.a0;
     for (let k = 0; k < stripes; k++) {
-      const a = u0 + (len / stripes) * k;
+      const a = lf.a0 + (len / stripes) * k;
       const a2 = a + len / stripes;
-      iso.poly([iso.p(a, v1, z), iso.p(a2, v1, z), iso.p(a2, v1 + 0.16, z - 4), iso.p(a, v1 + 0.16, z - 4)], k % 2 ? '#f8f4ec' : c);
+      iso.poly([pOn(iso, lf, a, 0, z), pOn(iso, lf, a2, 0, z), pOn(iso, lf, a2, 0.16, z - 4), pOn(iso, lf, a, 0.16, z - 4)], k % 2 ? '#f8f4ec' : c);
     }
-    iso.wall('sw', v1 + 0.16, u0, u1, z - 5.5, z - 4, shade(c, -0.2));
+    wallOn(iso, lf, lf.a0, lf.a1, z - 5.5, z - 4, shade(c, -0.2), 0.16);
   }
-  if (art.sign && art.facade === 'shopfront') {
+  if (art.sign && art.facade === 'shopfront' && lf) {
     const sc = art.signColors?.[v] ?? '#333';
-    const z = art.floors === 1 ? fh + 1 : fh + 1.5;
+    const mid = (lf.a0 + lf.a1) / 2;
     if (art.floors === 1) {
-      // Sign board on top of the parapet.
-      iso.wall('sw', v1 - 0.02, u0 + 0.1, u1 - 0.1, H, H + 7, sc);
-      iso.text('sw', v1 - 0.02, (u0 + u1) / 2, H + 3.6, art.sign, 5.5, '#ffffff');
+      wallOn(iso, lf, lf.a0 + 0.1, lf.a1 - 0.1, H, H + 7, sc, -0.02);
+      iso.text(lf.face, lf.at - 0.02, mid, H + 3.6, art.sign, 5.5, '#ffffff');
     } else {
-      iso.wall('sw', v1, u0 + 0.06, u1 - 0.06, z, z + 5, sc);
-      iso.text('sw', v1, (u0 + u1) / 2, z + 2.6, art.sign, 4.5, '#ffffff');
-    }
-  }
-  if (ex.has('tables')) {
-    for (const [tu, tv] of [
-      [u0 + 0.12, v1 + 0.2],
-      [u0 + 0.42, v1 + 0.24],
-    ] as const) {
-      iso.box(tu, tu + 0.04, tv, tv + 0.04, 0, 5, '#7a7f86', '#5c6168', '#7a7f86');
-      const [x, y] = iso.p(tu + 0.02, tv + 0.02, 7);
-      const ctx = iso.ctx;
-      ctx.fillStyle = v === 0 ? '#e9554a' : '#f2c84b';
-      ctx.beginPath();
-      ctx.ellipse(x, y, 6, 2.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.beginPath();
-      ctx.ellipse(x, y + 1, 6, 1.5, 0, 0, Math.PI);
-      ctx.fill();
+      wallOn(iso, lf, lf.a0 + 0.06, lf.a1 - 0.06, fh + 1.5, fh + 6.5, sc);
+      iso.text(lf.face, lf.at, mid, fh + 4.1, art.sign, 4.5, '#ffffff');
     }
   }
   if (ex.has('balconies')) {
-    const len = u1 - u0;
-    const cols = Math.max(2, Math.round(len * 3.4));
-    const step = len / cols;
-    for (let f = 1; f < art.floors; f++) {
-      for (let c = 0; c < cols; c += 2) {
-        const a = u0 + c * step + step * 0.12;
-        const z = f * fh + 0.5;
-        iso.floor(a, a + step * 0.76, v1, v1 + 0.08, z, '#d8d4cc');
-        iso.wall('sw', v1 + 0.08, a, a + step * 0.76, z, z + 3, 'rgba(70, 76, 84, 0.75)');
+    // Balconies on every visible side, so the building reads the same from any angle.
+    for (const face of ['sw', 'se'] as const) {
+      const f = faceRef(face, b);
+      const len = f.a1 - f.a0;
+      const cols = Math.max(2, Math.round(len * 3.4));
+      const step = len / cols;
+      for (let k = 1; k < art.floors; k++) {
+        for (let c = 0; c < cols; c += 2) {
+          const a = f.a0 + c * step + step * 0.12;
+          const z = k * fh + 0.5;
+          floorOut(iso, f, a, a + step * 0.76, 0, 0.08, z, '#d8d4cc');
+          wallOn(iso, f, a, a + step * 0.76, z, z + 3, 'rgba(70, 76, 84, 0.75)', 0.08);
+        }
       }
     }
   }
   if (ex.has('terraces')) {
-    for (let f = 3; f < art.floors; f += 3) {
-      iso.wall('sw', v1 + 0.06, u0 - 0.02, u1 + 0.02, f * fh, f * fh + 2.5, 'rgba(230, 240, 245, 0.7)');
-      iso.wall('se', u1 + 0.06, v0 - 0.02, v1 + 0.02, f * fh, f * fh + 2.5, 'rgba(200, 212, 220, 0.7)');
+    for (let k = 3; k < art.floors; k += 3) {
+      iso.wall('sw', b.v1 + 0.06, b.u0 - 0.02, b.u1 + 0.02, k * fh, k * fh + 2.5, 'rgba(230, 240, 245, 0.7)');
+      iso.wall('se', b.u1 + 0.06, b.v0 - 0.02, b.v1 + 0.02, k * fh, k * fh + 2.5, 'rgba(200, 212, 220, 0.7)');
     }
   }
-  if (ex.has('canopy')) {
-    const mid = (u0 + u1) / 2;
-    iso.floor(mid - 0.3, mid + 0.3, v1, v1 + 0.3, 9, '#2c2f36');
-    iso.wall('sw', v1 + 0.3, mid - 0.3, mid + 0.3, 7.5, 9, '#c9a447');
-    for (const a of [mid - 0.28, mid + 0.26]) iso.wall('sw', v1 + 0.28, a, a + 0.02, 0, 7.5, '#c9a447');
+  if (ex.has('canopy') && lf) {
+    const mid = (lf.a0 + lf.a1) / 2;
+    floorOut(iso, lf, mid - 0.3, mid + 0.3, 0, 0.3, 9, '#2c2f36');
+    wallOn(iso, lf, mid - 0.3, mid + 0.3, 7.5, 9, '#c9a447', 0.3);
+    for (const a of [mid - 0.28, mid + 0.26]) wallOn(iso, lf, a, a + 0.02, 0, 7.5, '#c9a447', 0.28);
   }
   if (ex.has('acunits')) {
     for (let k = 0; k < 2; k++) {
-      const au = u0 + 0.15 + rng() * Math.max(0.05, u1 - u0 - 0.4);
-      const av = v0 + 0.12 + rng() * Math.max(0.05, v1 - v0 - 0.35);
-      iso.box(au, au + 0.14, av, av + 0.12, H, H + 3.5, '#c9cdd2', '#a2a7ad', '#e2e5e8');
+      const lu = local.u0 + 0.15 + rng() * Math.max(0.05, local.u1 - local.u0 - 0.4);
+      const lv = local.v0 + 0.12 + rng() * Math.max(0.05, local.v1 - local.v0 - 0.35);
+      const r = o.rect({ u0: lu, u1: lu + 0.14, v0: lv, v1: lv + 0.12 });
+      iso.box(r.u0, r.u1, r.v0, r.v1, H, H + 3.5, '#c9cdd2', '#a2a7ad', '#e2e5e8');
     }
   }
   if (ex.has('watertank')) {
-    const tu = u0 + (u1 - u0) * 0.3;
-    const tv = v0 + (v1 - v0) * 0.3;
+    const [tu, tv] = o.point(local.u0 + (local.u1 - local.u0) * 0.3, local.v0 + (local.v1 - local.v0) * 0.3);
     const [x, y] = iso.p(tu, tv, H);
     const ctx = iso.ctx;
     ctx.fillStyle = '#5a4a3a';
@@ -708,137 +894,175 @@ function paintExtras(iso: IsoFrame, art: BuildingArt, b: { u0: number; u1: numbe
   }
   if (ex.has('crown')) {
     const d = 0.12;
-    iso.box(u0 + d, u1 - d, v0 + d, v1 - d, H, H + 5, shade(art.walls[v], -0.15), shade(art.walls[v], -0.4), '#4a535c');
-    iso.wall('sw', v1 - d, u0 + d, u1 - d, H + 3.5, H + 5, 'rgba(255, 240, 190, 0.9)');
-    iso.wall('se', u1 - d, v0 + d, v1 - d, H + 3.5, H + 5, 'rgba(255, 230, 170, 0.7)');
-    const [x, y] = iso.p((u0 + u1) / 2, (v0 + v1) / 2, H + 5);
+    iso.box(b.u0 + d, b.u1 - d, b.v0 + d, b.v1 - d, H, H + 5, shade(art.walls[v], -0.15), shade(art.walls[v], -0.4), '#4a535c');
+    iso.wall('sw', b.v1 - d, b.u0 + d, b.u1 - d, H + 3.5, H + 5, 'rgba(255, 240, 190, 0.9)');
+    iso.wall('se', b.u1 - d, b.v0 + d, b.v1 - d, H + 3.5, H + 5, 'rgba(255, 230, 170, 0.7)');
+    const [x, y] = iso.p((b.u0 + b.u1) / 2, (b.v0 + b.v1) / 2, H + 5);
     iso.ctx.fillStyle = '#5b6169';
     iso.ctx.fillRect(x - 0.5, y - 12, 1.5, 12);
     iso.ctx.fillStyle = '#ff5a4a';
     iso.ctx.fillRect(x - 1, y - 13, 2.5, 2);
   }
   if (art.sign && art.facade !== 'shopfront') {
-    // Rooftop sign on a frame (hotel).
+    // Rooftop sign parallel to the front; it faces whichever camera-facing wall shares its axis.
     const sc = art.signColors?.[v] ?? '#c33';
-    const mid = (u0 + u1) / 2;
-    const half = (u1 - u0) * 0.38;
-    const vv = v0 + (v1 - v0) * 0.55;
-    for (const a of [mid - half + 0.05, mid + half - 0.07]) iso.wall('sw', vv, a, a + 0.02, H, H + 4, '#4a4f56');
-    iso.wall('sw', vv, mid - half, mid + half, H + 4, H + 12, sc);
-    iso.wall('sw', vv, mid - half, mid + half, H + 11.2, H + 12, 'rgba(255,255,255,0.5)');
-    iso.text('sw', vv, mid, H + 8, art.sign, 6.5, '#fff7d6');
+    const mid = (local.u0 + local.u1) / 2;
+    const half = (local.u1 - local.u0) * 0.38;
+    const vv = local.v0 + (local.v1 - local.v0) * 0.55;
+    const [pu0, pv0] = o.point(mid - half, vv);
+    const [pu1, pv1] = o.point(mid + half, vv);
+    const sf: FaceRef =
+      Math.abs(pv0 - pv1) < 1e-6
+        ? { face: 'sw', at: pv0, a0: Math.min(pu0, pu1), a1: Math.max(pu0, pu1) }
+        : { face: 'se', at: pu0, a0: Math.min(pv0, pv1), a1: Math.max(pv0, pv1) };
+    const smid = (sf.a0 + sf.a1) / 2;
+    for (const a of [sf.a0 + 0.05, sf.a1 - 0.07]) wallOn(iso, sf, a, a + 0.02, H, H + 4, '#4a4f56');
+    wallOn(iso, sf, sf.a0, sf.a1, H + 4, H + 12, sc);
+    wallOn(iso, sf, sf.a0, sf.a1, H + 11.2, H + 12, 'rgba(255,255,255,0.5)');
+    iso.text(sf.face, sf.at, smid, H + 8, art.sign, 6.5, '#fff7d6');
   }
-  if (ex.has('loadingdock')) {
-    const doors = Math.max(2, Math.round((v1 - v0) * 2));
-    const step = (v1 - v0) / doors;
+  const right = o.faceOf('right');
+  if (ex.has('loadingdock') && right) {
+    const f = faceRef(right, b);
+    const doors = Math.max(2, Math.round((f.a1 - f.a0) * 2));
+    const step = (f.a1 - f.a0) / doors;
     for (let k = 0; k < doors; k++) {
-      const a = v0 + k * step + step * 0.18;
-      iso.wall('se', u1, a, a + step * 0.64, 0, 9, '#4f555c');
-      for (let z = 1.5; z < 9; z += 2) iso.wall('se', u1, a, a + step * 0.64, z, z + 0.6, 'rgba(255,255,255,0.18)');
+      const a = f.a0 + k * step + step * 0.18;
+      wallOn(iso, f, a, a + step * 0.64, 0, 9, '#4f555c');
+      for (let z = 1.5; z < 9; z += 2) wallOn(iso, f, a, a + step * 0.64, z, z + 0.6, 'rgba(255,255,255,0.18)');
     }
-    iso.floor(u1, u1 + 0.18, v0, v1, 0.5, 'rgba(242, 196, 58, 0.55)');
+    floorOut(iso, f, f.a0, f.a1, 0, 0.18, 0.5, 'rgba(242, 196, 58, 0.55)');
   }
-  if (ex.has('garagedoor')) {
-    const mid = (u0 + u1) / 2;
-    iso.wall('sw', v1, mid - 0.22, mid + 0.22, 0, 9, '#5d636b');
-    for (let z = 1.5; z < 9; z += 1.8) iso.wall('sw', v1, mid - 0.22, mid + 0.22, z, z + 0.5, 'rgba(255,255,255,0.18)');
-  }
-  if (ex.has('crates')) {
-    const colors = ['#a87a45', '#7a8a4a', '#3d6e9e'];
-    for (let k = 0; k < 3; k++) {
-      const cu = u1 + 0.05 + (k % 2) * 0.12;
-      const cv = v1 - 0.35 + k * 0.12;
-      const c = colors[(k + v) % colors.length];
-      iso.box(cu, cu + 0.1, cv, cv + 0.1, 0, 3.5, c, shade(c, -0.3), shade(c, 0.15));
-    }
+  if (ex.has('garagedoor') && lf) {
+    const mid = (lf.a0 + lf.a1) / 2;
+    wallOn(iso, lf, mid - 0.22, mid + 0.22, 0, 9, '#5d636b');
+    for (let z = 1.5; z < 9; z += 1.8) wallOn(iso, lf, mid - 0.22, mid + 0.22, z, z + 0.5, 'rgba(255,255,255,0.18)');
   }
 }
 
 // ---------------------------------------------------------------- civic
 
-function paintPark(iso: IsoFrame, rng: Rng, variant: number) {
-  // Paved edge, then a clipped hedge, so the park reads as a park against plain grass.
-  iso.floor(0.02, 0.98, 0.02, 0.98, 0, '#d8d0bd');
-  iso.floor(0.07, 0.93, 0.07, 0.93, 0, '#7bd552');
-  iso.wall('sw', 0.93, 0.07, 0.42, 0, 3.5, '#3f8f2c');
-  iso.wall('sw', 0.93, 0.58, 0.93, 0, 3.5, '#3f8f2c');
-  iso.wall('se', 0.93, 0.07, 0.42, 0, 3.5, '#2f7322');
-  iso.wall('se', 0.93, 0.58, 0.93, 0, 3.5, '#2f7322');
-  iso.floor(0.07, 0.42, 0.9, 0.93, 3.5, '#5cb53c');
-  iso.floor(0.58, 0.93, 0.9, 0.93, 3.5, '#5cb53c');
-  iso.floor(0.9, 0.93, 0.07, 0.42, 3.5, '#5cb53c');
-  iso.floor(0.9, 0.93, 0.58, 0.93, 3.5, '#5cb53c');
-  // Crossing paths.
-  iso.floor(0.44, 0.56, 0.04, 0.96, 0.1, '#e2d6b8');
-  iso.floor(0.04, 0.96, 0.44, 0.56, 0.1, '#e2d6b8');
-  // Fountain in the middle.
-  const [x, y] = iso.p(0.5, 0.5, 0);
-  const ctx = iso.ctx;
-  ctx.fillStyle = '#b9b4a8';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 9, 4.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#5aa8e0';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 0.5, 7, 3.3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#d6f1ff';
-  ctx.fillRect(x - 0.75, y - 7, 1.5, 6);
-  ctx.beginPath();
-  ctx.ellipse(x, y - 7, 2.5, 1.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Benches.
-  iso.box(0.2, 0.34, 0.6, 0.66, 0, 2.5, '#8a5a34', '#6b4426', '#a8744a');
-  iso.box(0.62, 0.76, 0.6, 0.66, 0, 2.5, '#8a5a34', '#6b4426', '#a8744a');
-  // Flower beds.
-  const flowers = ['#f2d33c', '#f3f1e8', '#e8576a'];
-  for (let k = 0; k < 10; k++) {
-    const [fx, fy] = iso.p(0.12 + rng() * 0.25, 0.68 + rng() * 0.25, 0);
-    ctx.fillStyle = flowers[(k + variant) % flowers.length];
-    ctx.fillRect(Math.round(fx), Math.round(fy) - 1, 2, 2);
+/** Hedge with a gap in the middle of each camera-facing lot edge (the park entrances). */
+function paintHedges(iso: IsoFrame, lot: Box) {
+  const e = 0.07;
+  const span = (a0: number, a1: number): [number, number][] => [
+    [a0 + e, a0 + (a1 - a0) * 0.42],
+    [a0 + (a1 - a0) * 0.58, a1 - e],
+  ];
+  for (const [s0, s1] of span(lot.u0, lot.u1)) {
+    iso.wall('sw', lot.v1 - e, s0, s1, 0, 3.5, '#3f8f2c');
+    iso.floor(s0, s1, lot.v1 - e - 0.03, lot.v1 - e, 3.5, '#5cb53c');
   }
-  // Trees in the back corners.
-  for (const [u, v] of [
-    [0.22, 0.2],
-    [0.78, 0.22],
-    [0.8, 0.78],
-  ] as const) {
-    const [tx, ty] = iso.p(u, v, 0);
-    paintPine(ctx, Math.round(tx), Math.round(ty), 0.8, variant + Math.floor(u * 3));
+  for (const [s0, s1] of span(lot.v0, lot.v1)) {
+    iso.wall('se', lot.u1 - e, s0, s1, 0, 3.5, '#2f7322');
+    iso.floor(lot.u1 - e - 0.03, lot.u1 - e, s0, s1, 3.5, '#5cb53c');
   }
 }
 
-function paintTownHall(iso: IsoFrame, rng: Rng, variant: number) {
+function paintPark(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
+  const lot: Box = { u0: 0, u1: o.vw, v0: 0, v1: o.vh };
+  // Paved edge, then a clipped hedge, so the park reads as a park against plain grass.
+  iso.floor(0.02, 0.98, 0.02, 0.98, 0, '#d8d0bd');
+  iso.floor(0.07, 0.93, 0.07, 0.93, 0, '#7bd552');
+  iso.floor(0.44, 0.56, 0.04, 0.96, 0.1, '#e2d6b8');
+  iso.floor(0.04, 0.96, 0.44, 0.56, 0.1, '#e2d6b8');
+  const ctx = iso.ctx;
+  // Flower bed in the local front-left corner.
+  const flowers = ['#f2d33c', '#f3f1e8', '#e8576a'];
+  for (let k = 0; k < 10; k++) {
+    const [fu, fv] = o.point(0.12 + rng() * 0.25, 0.68 + rng() * 0.25);
+    const [fx, fy] = iso.p(fu, fv, 0);
+    ctx.fillStyle = flowers[(k + variant) % flowers.length];
+    ctx.fillRect(Math.round(fx), Math.round(fy) - 1, 2, 2);
+  }
+  // Everything that stands up, drawn back to front.
+  const items: { depth: number; draw: () => void }[] = [];
+  const [cx, cy] = iso.p(0.5, 0.5, 0);
+  items.push({
+    depth: 1,
+    draw: () => {
+      ctx.fillStyle = '#b9b4a8';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 9, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5aa8e0';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 0.5, 7, 3.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d6f1ff';
+      ctx.fillRect(cx - 0.75, cy - 7, 1.5, 6);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 7, 2.5, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    },
+  });
+  for (const bench of [
+    { u0: 0.2, u1: 0.34, v0: 0.6, v1: 0.66 },
+    { u0: 0.62, u1: 0.76, v0: 0.6, v1: 0.66 },
+  ]) {
+    const r = o.rect(bench);
+    items.push({ depth: r.u0 + r.v0, draw: () => iso.box(r.u0, r.u1, r.v0, r.v1, 0, 2.5, '#8a5a34', '#6b4426', '#a8744a') });
+  }
+  [
+    [0.22, 0.2],
+    [0.78, 0.22],
+    [0.8, 0.78],
+  ].forEach(([u, v], k) => {
+    const [tu, tv] = o.point(u, v);
+    const [tx, ty] = iso.p(tu, tv, 0);
+    items.push({ depth: tu + tv, draw: () => paintPine(ctx, Math.round(tx), Math.round(ty), 0.8, variant + k) });
+  });
+  items.sort((a, b) => a.depth - b.depth);
+  for (const it of items) it.draw();
+  paintHedges(iso, lot);
+}
+
+function paintTownHall(iso: IsoFrame, o: Orient, variant: number) {
   const stone = ['#efe7d6', '#e6e2da', '#f1e4d2'][variant % 3];
   const dark = shade(stone, -0.22);
   // Plaza.
   iso.floor(0.03, 1.97, 0.03, 1.97, 0, '#c9c3b5');
   iso.floor(0.08, 1.92, 0.08, 1.92, 0, '#ddd6c6');
   for (let a = 0.2; a < 1.9; a += 0.25) iso.floor(a, a + 0.01, 0.1, 1.9, 0.1, 'rgba(0,0,0,0.06)');
-  // Main hall.
-  const u0 = 0.25, u1 = 1.75, v0 = 0.25, v1 = 1.35;
+  const b = o.rect({ u0: 0.25, u1: 1.75, v0: 0.25, v1: 1.35 });
   const H = 26;
-  iso.box(u0, u1, v0, v1, 0, H, stone, dark, shade(stone, -0.08));
-  // Steps.
-  for (let k = 0; k < 3; k++) iso.box(u0 + 0.35, u1 - 0.35, v1, v1 + 0.08 + k * 0.05, 0, 3 - k, shade(stone, 0.05), dark, shade(stone, 0.1));
-  // Columns and portico on the front.
-  const cols = 6;
-  for (let k = 0; k < cols; k++) {
-    const a = u0 + 0.4 + k * ((u1 - u0 - 0.8) / (cols - 1));
-    iso.wall('sw', v1 + 0.12, a - 0.025, a + 0.025, 3, H - 6, '#fbf8f1');
-    iso.wall('sw', v1 + 0.12, a + 0.01, a + 0.025, 3, H - 6, 'rgba(0,0,0,0.12)');
+  const front = o.faceOf('front');
+
+  const [fu, fv] = o.point(1.85, 1.85);
+  const flagInFront = fu >= b.u1 || fv >= b.v1;
+  const flag = () => {
+    const [fx, fy] = iso.p(fu, fv, 0);
+    iso.ctx.fillStyle = '#6b7079';
+    iso.ctx.fillRect(fx, fy - 30, 1.2, 30);
+    iso.ctx.fillStyle = INK.grassDark;
+    iso.ctx.fillRect(fx + 1.2, fy - 30, 8, 5);
+  };
+  if (!flagInFront) flag();
+
+  iso.box(b.u0, b.u1, b.v0, b.v1, 0, H, stone, dark, shade(stone, -0.08));
+  // Windows on the camera-facing sides that aren't the portico front.
+  for (const face of ['sw', 'se'] as const) {
+    if (face === front) continue;
+    const f = faceRef(face, b);
+    const n = Math.max(3, Math.round((f.a1 - f.a0) * 3.5));
+    const step = (f.a1 - f.a0) / n;
+    for (let k = 0; k < n; k++) glazing(iso, f, f.a0 + k * step + step * 0.25, f.a0 + k * step + step * 0.75, 8, 18, false);
   }
-  iso.box(u0 + 0.3, u1 - 0.3, v1, v1 + 0.16, H - 6, H - 2, shade(stone, 0.05), dark, stone);
-  // Pediment.
-  const mid = (u0 + u1) / 2;
-  iso.poly([iso.p(u0 + 0.3, v1 + 0.16, H - 2), iso.p(u1 - 0.3, v1 + 0.16, H - 2), iso.p(mid, v1 + 0.16, H + 7)], shade(stone, 0.06));
-  // Side windows.
-  for (let k = 0; k < 4; k++) {
-    const a = v0 + 0.15 + k * 0.25;
-    iso.wall('se', u1, a, a + 0.12, 8, 18, GLASS);
+  if (front) {
+    const f = faceRef(front, b);
+    const mid = (f.a0 + f.a1) / 2;
+    for (let k = 0; k < 3; k++) boxOut(iso, f, f.a0 + 0.35, f.a1 - 0.35, 0, 0.08 + k * 0.05, 0, 3 - k, shade(stone, 0.05), dark, shade(stone, 0.1));
+    const cols = 6;
+    for (let k = 0; k < cols; k++) {
+      const a = f.a0 + 0.4 + k * ((f.a1 - f.a0 - 0.8) / (cols - 1));
+      wallOn(iso, f, a - 0.025, a + 0.025, 3, H - 6, '#fbf8f1', 0.12);
+      wallOn(iso, f, a + 0.01, a + 0.025, 3, H - 6, 'rgba(0,0,0,0.12)', 0.12);
+    }
+    boxOut(iso, f, f.a0 + 0.3, f.a1 - 0.3, 0, 0.16, H - 6, H - 2, shade(stone, 0.05), dark, stone);
+    iso.poly([pOn(iso, f, f.a0 + 0.3, 0.16, H - 2), pOn(iso, f, f.a1 - 0.3, 0.16, H - 2), pOn(iso, f, mid, 0.16, H + 7)], shade(stone, 0.06));
   }
   // Dome with clock.
-  const [dx, dy] = iso.p(mid, (v0 + v1) / 2, H);
+  const [dx, dy] = iso.p((b.u0 + b.u1) / 2, (b.v0 + b.v1) / 2, H);
   const ctx = iso.ctx;
   ctx.fillStyle = dark;
   ctx.fillRect(dx - 11, dy - 10, 22, 10);
@@ -866,11 +1090,5 @@ function paintTownHall(iso: IsoFrame, rng: Rng, variant: number) {
   ctx.moveTo(dx - 4, dy - 5);
   ctx.lineTo(dx - 2.6, dy - 5);
   ctx.stroke();
-  // Flag.
-  const [fx, fy] = iso.p(1.85, 1.85, 0);
-  ctx.fillStyle = '#6b7079';
-  ctx.fillRect(fx, fy - 30, 1.2, 30);
-  ctx.fillStyle = INK.grassDark;
-  ctx.fillRect(fx + 1.2, fy - 30, 8, 5);
-  void rng;
+  if (flagInFront) flag();
 }

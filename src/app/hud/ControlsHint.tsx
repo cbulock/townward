@@ -5,6 +5,7 @@ const HINTS: [string, string][] = [
   ['Esc', 'Cancel'],
   ['Space', 'Pause'],
   ['[ ]', 'Speed'],
+  [', .', 'Rotate'],
   ['G', 'Grid'],
   ['M', 'Mute'],
   ['N', 'New map'],

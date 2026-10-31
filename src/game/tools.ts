@@ -2,7 +2,7 @@ import type { PreviewTile } from '../render/overlays/ToolPreview';
 import { buildingHeadroom } from '../render/atlas/buildingArt';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import type { TerrainTextures } from '../render/atlas/tiles';
-import { HALF_W } from '../shared/constants';
+import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, type Plan, type PlacePlan } from '../sim/commands';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
@@ -64,8 +64,11 @@ export function planTool(
   }
 }
 
-/** Ghost sprites for a plan. Road ghosts are auto-tiled as if the plan were already built. */
-export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan): PreviewTile[] {
+/**
+ * Ghost sprites for a plan, in world tiles (ToolPreview places them in the view).
+ * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
+ */
+export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform): PreviewTile[] {
   if (p.kind === 'clear') {
     return p.plan.tiles.map((t) => ({
       x: t.x,
@@ -88,8 +91,8 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan): P
     const ghost: PreviewTile = {
       x: origin.x,
       y: origin.y,
-      texture: tex.buildings[building][0],
-      offsetX: (BUILDINGS[building].size.h - 1) * HALF_W,
+      texture: tex.buildings[building][0][view.r],
+      footprint: BUILDINGS[building].size,
       offsetY: buildingHeadroom(building),
       tint: ok ? 0xffffff : TINT_INVALID,
       alpha: ok ? 0.8 : 0.55,
@@ -105,7 +108,11 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan): P
   return p.plan.tiles.map((t) => {
     const mask =
       (hasRoad(t.x, t.y - 1) ? 1 : 0) | (hasRoad(t.x + 1, t.y) ? 2 : 0) | (hasRoad(t.x, t.y + 1) ? 4 : 0) | (hasRoad(t.x - 1, t.y) ? 8 : 0);
-    const texture = !t.valid ? tex.selection : t.bridge ? tex.bridges[roadType][t.bridge] : roads[mask];
+    const texture = !t.valid
+      ? tex.selection
+      : t.bridge
+        ? tex.bridges[roadType][view.bridgeAxis(t.bridge)]
+        : roads[view.mask(mask)];
     return {
       x: t.x,
       y: t.y,
