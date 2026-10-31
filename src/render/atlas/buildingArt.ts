@@ -2,7 +2,7 @@ import { HALF_H, HALF_W } from '../../shared/constants';
 import { mulberry32 } from '../../shared/rng';
 import { ART_VARIANTS, BUILDINGS, type BuildingId } from '../../sim/buildings/catalog';
 import { ART, type BuildingArt, type CustomArtId, type Extra, type Facade, type RecipeId } from './buildingRecipes';
-import { CIVIC_ART } from './civicArt';
+import { CIVIC_ART, type SmokeSource } from './civicArt';
 import { GROUND_PAD } from './geometry';
 import {
   boxOut,
@@ -25,6 +25,7 @@ import {
 } from './isoPaint';
 
 export { BUILDING_ROTATIONS, type BuildingRotation } from './isoPaint';
+export type { SmokeSource } from './civicArt';
 
 /**
  * Procedural building art (docs/specs/buildings.md, docs/specs/city-art.md).
@@ -80,6 +81,37 @@ export function buildingFrameSize(id: BuildingId, variant = 0): { w: number; h: 
   const { w, h } = BUILDINGS[id].size;
   return { w: (w + h) * HALF_W + GROUND_PAD * 2, h: (w + h) * HALF_H + GROUND_PAD * 2 + buildingHeadroom(id, variant) };
 }
+
+const smokeCache = new Map<string, readonly SmokeSource[]>();
+
+/**
+ * Smokestack and cooling-tower tops of a building in view space (tile units from the
+ * footprint's view origin, z in px), so render/fx/Smoke.ts can emit plumes from the art.
+ */
+export function smokeSources(id: BuildingId, variant: number, rot: BuildingRotation): readonly SmokeSource[] {
+  const key = `${id}:${variant}:${rot}`;
+  const hit = smokeCache.get(key);
+  if (hit) return hit;
+  const { w, h } = BUILDINGS[id].size;
+  const o = new Orient(rot, w, h);
+  let out: SmokeSource[];
+  if (isCustom(id)) {
+    const c = CIVIC_ART[id];
+    out = c.smoke?.(o, variant % c.variants) ?? [];
+  } else {
+    const art = recipe(id, variant);
+    const ms = resolveMasses(art, o);
+    const slim = art.extras.includes('smokestacks');
+    out = stackPositions(art, ms[0].local).map(([lu, lv]) => {
+      const [u, v] = o.point(lu, lv);
+      return { u, v, z: ms[ms.length - 1].z1 + stackHeight(slim), kind: 'smoke' };
+    });
+  }
+  smokeCache.set(key, out);
+  return out;
+}
+
+const stackHeight = (slim: boolean) => (slim ? 26 : 30);
 
 const GLASS = '#34506b';
 const GLASS_LIT = '#ffe39a';
@@ -723,7 +755,7 @@ function stackPositions(art: BuildingArt, local: Box): [number, number][] {
 }
 
 function paintSmokestack(iso: IsoFrame, at: readonly [number, number], H: number, slim: boolean) {
-  const top = H + (slim ? 26 : 30);
+  const top = H + stackHeight(slim);
   const r = slim ? 0.07 : 0.09;
   iso.round(at[0], at[1], 0, top, (t) => r * (1 - t * 0.2), '#a8543f', null);
   for (const z of [top - 6, top - 13]) {

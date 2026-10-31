@@ -1,4 +1,3 @@
-import { HALF_W } from '../../shared/constants';
 import type { CustomArtId } from './buildingRecipes';
 import {
   boxOut,
@@ -22,10 +21,20 @@ import { paintPine } from './treeArt';
  * `Orient`, and standing items are drawn back to front by view depth.
  */
 
+/** Where an animated plume leaves a building (render/fx/Smoke.ts): view tile point plus height in px. */
+export interface SmokeSource {
+  u: number;
+  v: number;
+  z: number;
+  kind: 'smoke' | 'steam';
+}
+
 export interface CivicArt {
   variants: number;
   headroom: (variant: number) => number;
   paint: (iso: IsoFrame, o: Orient, rng: Rng, variant: number) => void;
+  /** Plume sources in view space (local layout mapped through `o`). */
+  smoke?: (o: Orient, variant: number) => SmokeSource[];
 }
 
 /** Something standing on the lot, drawn in depth order (u + v of its base, view space). */
@@ -471,23 +480,6 @@ function coolingProfile(r0: number) {
   return (t: number) => r0 * (0.62 + 0.38 * ((t - 0.75) / 0.75) ** 2);
 }
 
-function steam(iso: IsoFrame, u: number, v: number, z: number, size: number) {
-  const [x, y] = iso.p(u, v, z);
-  const c = iso.ctx;
-  const puffs: readonly (readonly [number, number, number, number])[] = [
-    [0, -4, 7, 0.75],
-    [-4, -10, 6, 0.6],
-    [3, -13, 7, 0.5],
-    [-1, -19, 5, 0.35],
-  ];
-  for (const [dx, dy, r, a] of puffs) {
-    c.fillStyle = `rgba(250, 252, 255, ${a})`;
-    c.beginPath();
-    c.arc(x + dx * size, y + dy * size, r * size, 0, Math.PI * 2);
-    c.fill();
-  }
-}
-
 /** Transformer yard: gravel, a few transformers and two lattice pylons. */
 function transformerYard(iso: IsoFrame, o: Orient, b: Box): Item[] {
   localFloor(iso, o, b, 0.1, '#a9a69c');
@@ -532,6 +524,37 @@ function transformerYard(iso: IsoFrame, o: Orient, b: Box): Item[] {
   return items;
 }
 
+/** Power plant layout shared by the painter and the smoke sources (local space). */
+const CHIMNEY = [0.3, 0.3] as const;
+const CHIMNEY_H = 64;
+const GAS_STACKS: readonly (readonly [number, number])[] = [
+  [0.75, 1.15],
+  [0.95, 1.15],
+];
+const GAS_STACK_H = 46;
+
+/** Cooling towers per variant: local u, v, base radius, height. Variant 1 (gas) has none. */
+function coolingTowers(variant: number): readonly (readonly [number, number, number, number])[] {
+  if (variant === 1) return [];
+  return variant === 0
+    ? [[1.42, 1.32, 0.42, 48]]
+    : [
+        [1.45, 0.62, 0.3, 38],
+        [1.45, 1.42, 0.3, 38],
+      ];
+}
+
+function powerPlantSmoke(o: Orient, variant: number): SmokeSource[] {
+  const src = (u: number, v: number, z: number, kind: SmokeSource['kind']): SmokeSource => {
+    const [vu, vv] = o.point(u, v);
+    return { u: vu, v: vv, z, kind };
+  };
+  const out = [src(CHIMNEY[0], CHIMNEY[1], CHIMNEY_H, 'smoke')];
+  for (const [u, v, , h] of coolingTowers(variant)) out.push(src(u, v, h, 'steam'));
+  if (variant === 1) for (const [u, v] of GAS_STACKS) out.push(src(u, v, GAS_STACK_H, 'smoke'));
+  return out;
+}
+
 function paintPowerPlant(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
   iso.floor(0.03, 1.97, 0.03, 1.97, 0, '#a7a49b');
   iso.floor(0.06, 1.94, 0.06, 1.94, 0, '#c6c2b8');
@@ -569,11 +592,11 @@ function paintPowerPlant(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
       }
     },
   });
-  const sp = at(o, 0.3, 0.3);
+  const sp = at(o, CHIMNEY[0], CHIMNEY[1]);
   items.push({
     depth: sp.depth,
     draw: () => {
-      const top = 64;
+      const top = CHIMNEY_H;
       iso.round(sp.u, sp.v, 0, top, (t) => 0.1 * (1 - t * 0.3), '#d8d4cc', null);
       for (const z of [top - 6, top - 16, top - 26]) {
         const [x, y] = iso.p(sp.u, sp.v, z);
@@ -581,12 +604,6 @@ function paintPowerPlant(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
         iso.ctx.fillStyle = '#d23b2b';
         iso.ctx.fillRect(x - rx, y - 4, rx * 2, 4);
       }
-      iso.ctx.fillStyle = 'rgba(120, 120, 120, 0.35)';
-      const [x, y] = iso.p(sp.u, sp.v, top);
-      iso.ctx.beginPath();
-      iso.ctx.arc(x + 3, y - 5, 4, 0, Math.PI * 2);
-      iso.ctx.arc(x + 7, y - 9, 3, 0, Math.PI * 2);
-      iso.ctx.fill();
     },
   });
 
@@ -609,20 +626,13 @@ function paintPowerPlant(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
         },
       });
     }
-    for (const u of [0.75, 0.95]) {
-      const p = at(o, u, 1.15);
-      items.push({ depth: p.depth, draw: () => iso.round(p.u, p.v, 0, 46, () => 0.055, '#b7bcc2', null) });
+    for (const [u, v] of GAS_STACKS) {
+      const p = at(o, u, v);
+      items.push({ depth: p.depth, draw: () => iso.round(p.u, p.v, 0, GAS_STACK_H, () => 0.055, '#b7bcc2', null) });
     }
     items.push(...transformerYard(iso, o, { u0: 0.12, u1: 0.98, v0: 1.3, v1: 1.88 }));
   } else {
-    const towers: readonly (readonly [number, number, number, number])[] =
-      variant === 0
-        ? [[1.42, 1.32, 0.42, 48]]
-        : [
-            [1.45, 0.62, 0.3, 38],
-            [1.45, 1.42, 0.3, 38],
-          ];
-    for (const [u, v, r, h] of towers) {
+    for (const [u, v, r, h] of coolingTowers(variant)) {
       const p = at(o, u, v);
       items.push({
         depth: p.depth,
@@ -633,7 +643,6 @@ function paintPowerPlant(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
           const { rx } = IsoFrame.ellipse(r * 0.7);
           iso.ctx.fillStyle = 'rgba(0,0,0,0.05)';
           for (let k = -2; k <= 2; k++) iso.ctx.fillRect(x + (k * rx) / 3, y - h * 0.9, 1, h * 0.85);
-          steam(iso, p.u, p.v, h + 2, r * 2.2);
         },
       });
     }
@@ -775,9 +784,6 @@ function paintWaterTower(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
 export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   park: { variants: 6, headroom: () => 34, paint: paintPark },
   town_hall: { variants: 3, headroom: () => 72, paint: paintTownHall },
-  power_plant: { variants: 3, headroom: (v) => (v === 0 ? 92 : 90), paint: paintPowerPlant },
+  power_plant: { variants: 3, headroom: () => 92, paint: paintPowerPlant, smoke: powerPlantSmoke },
   water_tower: { variants: 3, headroom: (v) => (v === 0 ? 62 : v === 1 ? 56 : 30), paint: paintWaterTower },
 };
-
-/** Exported for tests: the frame width used by civic art (2× tile half-width per footprint tile). */
-export const CIVIC_HALF_W = HALF_W;

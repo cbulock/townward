@@ -18,6 +18,7 @@ import { mapWorldBounds, tileToWorld, worldToTileFloat } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
 import { ToolPreview } from './overlays/ToolPreview';
 import { Effects } from './fx/Effects';
+import { Smoke } from './fx/Smoke';
 import { AgentRenderer } from './agents/AgentRenderer';
 import { Indicators } from './overlays/Indicators';
 
@@ -68,6 +69,8 @@ export class Renderer {
   hover!: HoverHighlight;
   textures!: TerrainTextures;
   effects!: Effects;
+  /** Animated plumes from smokestacks and cooling towers. */
+  smoke!: Smoke;
   agents!: AgentRenderer;
   indicators!: Indicators;
   private viewWorld!: ViewWorld;
@@ -160,6 +163,7 @@ export class Renderer {
     this.timings.atlas = performance.now() - t0;
     this.textures = tex;
     this.effects = new Effects(tex.fx, this.viewRef);
+    this.smoke = new Smoke(tex.fx.puff, this.viewRef);
     this.agents = new AgentRenderer(tex, this.viewRef);
     this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater }, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
@@ -171,7 +175,7 @@ export class Renderer {
 
     this.daylight.blendMode = 'multiply';
     this.daylight.visible = false;
-    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.effects.container, this.daylight, this.overlay);
+    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.smoke.container, this.effects.container, this.daylight, this.overlay);
     this.app.stage.addChild(this.worldRoot);
 
     this.camera.setScreenSize(this.app.screen.width, this.app.screen.height);
@@ -189,6 +193,7 @@ export class Renderer {
     this.viewWorld = new ViewWorld(this.view, this.world.seed);
     this.viewWorld.sync(this.world);
     this.viewRef.ground = this.viewWorld;
+    this.smoke?.invalidate();
     this.ground = new ChunkRenderer(this.viewWorld, this.textures);
     this.border = new BorderRenderer(this.ext, this.ring, this.viewWorld, this.view.r, this.textures);
     this.terrain.addChild(
@@ -344,6 +349,7 @@ export class Renderer {
     this.hover.update(dt);
     this.toolPreview.update(dt);
     this.effects.update(dt);
+    this.smoke.update(dt, viewRect, cam.zoom);
     this.indicators.update(dt);
 
     this.drawCallCounter = 0;
