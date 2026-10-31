@@ -703,7 +703,6 @@ export class Game {
     this.sim.frame(dt * GAME_SPEEDS[this.speedIndex]);
     const hour = this.visibleHour();
     this.renderer.setDaylight(hour === null ? 0xffffff : daylightTint(hour));
-    // Agents move every frame (smooth), scaled by game speed.
     this.renderer.render(dt);
 
     this.statsFrames++;
