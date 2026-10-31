@@ -1,6 +1,20 @@
 import { useAtomValue } from 'jotai';
 import { SERVICE_KINDS as ALL_SERVICES, type ServiceKind } from '../../sim/buildings/catalog';
+import type { NeedKind } from '../../sim/systems/needs';
 import { gameAtom, inspectAtom } from '../atoms';
+
+const NEED_LABEL: Readonly<Record<NeedKind, string>> = {
+  jobs: 'Jobs',
+  shopping: 'Shopping',
+  safety: 'Safety',
+  health: 'Health',
+  education: 'Education',
+  commute: 'Commute',
+  air: 'Clean air',
+  parks: 'Parks',
+  workers: 'Workers',
+  customers: 'Customers',
+};
 
 const SERVICE_LABEL: Readonly<Record<ServiceKind, string>> = {
   police: 'Police',
@@ -71,6 +85,26 @@ export function InfoPanel() {
             {info.provides.power ? `${info.provides.power.toLocaleString()} power` : ''}
             {info.provides.water ? `${info.provides.water.toLocaleString()} water` : ''}
           </strong>
+        </div>
+      )}
+      {info.abandoned && <div className="info-status warn">Abandoned: fix what its people need and they'll come back</div>}
+      {info.needs && (
+        <div className="info-needs">
+          <div className="info-row">
+            <span>Happiness</span>
+            <strong>{Math.round(info.needs.happiness * 100)}%</strong>
+          </div>
+          <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(info.needs.happiness * 100)}>
+            <div className={`meter-fill ${info.needs.happiness < 0.45 ? 'is-short' : ''}`} style={{ width: `${Math.round(info.needs.happiness * 100)}%` }} />
+          </div>
+          <div className="info-services-list">
+            {info.needs.scores.map((s) => (
+              <span key={s.kind} className={`info-pill ${s.score >= 0.7 ? 'ok' : s.score >= 0.4 ? '' : 'warn'}`} title={`${Math.round(s.score * 100)}%`}>
+                {NEED_LABEL[s.kind]}
+              </span>
+            ))}
+          </div>
+          {info.needs.complaint && <p className="info-complaint">“{info.needs.complaint}”</p>}
         </div>
       )}
       {info.commuteMinutes !== null && (

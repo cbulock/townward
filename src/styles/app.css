@@ -1245,3 +1245,99 @@ button.funds:hover {
 .traffic-summary {
   color: var(--text);
 }
+
+/* ---------- Happiness & Citizens say ---------- */
+.happy-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.happy-stat:hover,
+.happy-stat.is-on {
+  background: var(--bg-panel-hover);
+  color: var(--text);
+}
+.happy-stat.is-on {
+  border-color: rgba(79, 209, 197, 0.45);
+}
+.citizens {
+  top: 84px;
+  left: 16px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 8px 10px;
+  animation-name: hint-in;
+}
+.citizens-header {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.citizens-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.citizens-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.citizens-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.citizens-count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.citizens-show {
+  padding: 2px 7px;
+  border: 1px solid var(--border-panel);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.citizens-show:hover {
+  background: var(--bg-panel-hover);
+}
+.info-needs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.info-complaint {
+  margin: 0;
+  color: #fcd34d;
+  font-size: 12px;
+  font-style: italic;
+}

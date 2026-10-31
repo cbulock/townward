@@ -43,6 +43,8 @@ import {
   type RoadAxis,
 } from './streetArt';
 import { paintSite, SITE_SIZES, SITE_STAGES, siteFrameSize, type SiteSize } from './constructionArt';
+import { BUBBLE_H, BUBBLE_KINDS, BUBBLE_W, paintBubble } from './bubbleArt';
+import type { ComplaintKind } from '../../sim/systems/needs';
 
 const ALL_TERRAINS: readonly TerrainId[] = [
   Terrain.DeepWater,
@@ -98,6 +100,8 @@ export interface TerrainTextures {
   warnWater: Texture;
   /** Traffic-light pole (lamp tinted red/green). */
   lamp: Texture;
+  /** Complaint speech bubbles, by complaint kind. */
+  bubbles: Readonly<Record<ComplaintKind, Texture>>;
   hover: Texture;
   gridLine: Texture;
   /** The atlas pages (so their mesh shaders can be released). */
@@ -361,6 +365,7 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('warn_power', 18, 20, paintWarnPower);
   b.add('warn_water', 18, 20, paintWarnWater);
   b.add('lamp', 7, 16, paintLamp);
+  for (const k of BUBBLE_KINDS) b.add(`bubble_${k}`, BUBBLE_W, BUBBLE_H, (ctx) => paintBubble(ctx, k));
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
   b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
@@ -420,6 +425,7 @@ export function buildTerrainTextures(): TerrainTextures {
     warnPower: get('warn_power'),
     warnWater: get('warn_water'),
     lamp: get('lamp'),
+    bubbles: Object.fromEntries(BUBBLE_KINDS.map((k) => [k, get(`bubble_${k}`)])) as Record<ComplaintKind, Texture>,
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),

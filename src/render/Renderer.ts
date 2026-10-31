@@ -7,6 +7,8 @@ import type { TileRect } from './view/ViewTransform';
 import { ViewTransform, type Point, type Rotation } from './view/ViewTransform';
 import { ViewWorld } from './view/ViewWorld';
 import { Camera } from './Camera';
+import { Bubbles } from './overlays/Bubbles';
+import type { BuildingNeeds } from '../sim/systems/needs';
 import { BorderRenderer } from './BorderRenderer';
 import { borderRing, generateBorderlands } from '../sim/terrain/borderlands';
 import { releaseTileShaders } from './ground/TileMesh';
@@ -27,6 +29,18 @@ export interface ViewRef {
   current: ViewTransform;
   /** The world re-laid out in view space (heights for lifting things onto the terrain). */
   ground: World;
+}
+
+/** One tile of a data view: a world tile index and its colour. */
+export interface OverlayTile {
+  tile: number;
+  color: number;
+}
+
+/** Happiness colour: red (miserable) → yellow → green (happy); abandoned is near-black. */
+export function happinessColor(h: number, abandoned: boolean): number {
+  if (abandoned) return 0x2b2b30;
+  return h < 0.3 ? 0xef4444 : h < 0.45 ? 0xfb923c : h < 0.6 ? 0xfacc15 : h < 0.75 ? 0xa3e635 : 0x22c55e;
 }
 
 /** Congestion colour: green, yellow, orange, red (docs/specs/traffic.md). */
@@ -81,9 +95,11 @@ export class Renderer {
   private agentSource: () => readonly Agent[] = () => [];
   private stopSource: () => readonly BusStop[] = () => [];
   private lightSource: () => readonly TrafficLight[] = () => [];
+  private needsSource: () => ReadonlyMap<number, BuildingNeeds> = () => new Map();
+  bubbles!: Bubbles;
   /** Traffic overlay: road tiles tinted by congestion (null = off). */
   private readonly trafficLayer = new Container();
-  private trafficLevels: Float32Array | null = null;
+  private overlayTiles: readonly OverlayTile[] | null = null;
   private rotateFade = 0;
   /** Multiply layer for the day/night tint, over the world but under tool overlays. */
   private readonly daylight = new Sprite(Texture.WHITE);
@@ -134,24 +150,40 @@ export class Renderer {
     this.lightSource = lights;
   }
 
-  /**
-   * Show road congestion (per world tile, volume ÷ capacity) as coloured road tiles, or hide
-   * it with null. Call again whenever the numbers change; rotation redraws it automatically.
-   */
+  /** Where the complaint bubbles read each building's needs from. */
+  setNeedsSource(source: () => ReadonlyMap<number, BuildingNeeds>) {
+    this.needsSource = source;
+  }
+
+  /** Show road congestion (per world tile, volume ÷ capacity) as coloured road tiles, or hide it with null. */
   setTrafficOverlay(congestion: Float32Array | null) {
-    this.trafficLevels = congestion;
-    this.trafficLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
-    // Buildings and trees fade so the coloured roads between them can be seen.
-    this.objects.alpha = congestion ? TRAFFIC_VIEW_FADE : 1;
-    if (!congestion) return;
+    if (!congestion) return this.setDataOverlay(null);
     const w = this.world;
-    const batch = new QuadBatch();
+    const tiles: OverlayTile[] = [];
     for (let i = 0; i < w.road.length; i++) {
       if (w.road[i] === 0 || w.bridge[i] !== 0) continue;
-      const x = i % w.width;
-      const y = (i - x) / w.width;
+      tiles.push({ tile: i, color: congestionColor(congestion[i]) });
+    }
+    this.setDataOverlay(tiles);
+  }
+
+  /**
+   * A data view (traffic, happiness …): world tiles tinted on the ground, with buildings and
+   * trees faded so the colours show between them. null hides it. Call again whenever the
+   * numbers change; rotation redraws it automatically.
+   */
+  setDataOverlay(tiles: readonly OverlayTile[] | null) {
+    this.overlayTiles = tiles;
+    this.trafficLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    this.objects.alpha = tiles ? TRAFFIC_VIEW_FADE : 1;
+    if (!tiles) return;
+    const w = this.world;
+    const batch = new QuadBatch();
+    for (const t of tiles) {
+      const x = t.tile % w.width;
+      const y = (t.tile - x) / w.width;
       const v = this.view.tileToView(x, y);
-      const color = tintColor(congestionColor(congestion[i]), 1);
+      const color = tintColor(t.color, 1);
       batch.add({ texture: this.textures.selection, points: tileQuadPoints(this.viewWorld, v.x, v.y), colors: [color, color, color, color, color], grow: 0 });
     }
     if (!batch.empty) this.trafficLayer.addChild(batch.build());
@@ -171,7 +203,8 @@ export class Renderer {
     this.ext = generateBorderlands(this.world, this.ring);
     this.buildTerrain();
     this.timings.chunks = performance.now() - t0;
-    this.overlay.addChild(this.toolPreview.container, this.hover.container, this.indicators.container);
+    this.bubbles = new Bubbles(tex.bubbles, this.viewRef);
+    this.overlay.addChild(this.toolPreview.container, this.hover.container, this.indicators.container, this.bubbles.container);
 
     this.daylight.blendMode = 'multiply';
     this.daylight.visible = false;
@@ -206,7 +239,7 @@ export class Renderer {
       this.ground.gridRoot,
       this.trafficLayer,
     );
-    if (this.trafficLevels) this.setTrafficOverlay(this.trafficLevels);
+    if (this.overlayTiles) this.setDataOverlay(this.overlayTiles);
     this.ground.zonesRoot.alpha = this.zoneView ? 1 : ZONE_ALPHA;
     // Ring trees behind the map draw before its objects, the ones in front after.
     this.objects.addChild(this.border.backObjects, this.ground.objectsRoot, this.border.frontObjects);
@@ -351,6 +384,7 @@ export class Renderer {
     this.effects.update(dt);
     this.smoke.update(dt, viewRect, cam.zoom);
     this.indicators.update(dt);
+    this.bubbles.update(dt, this.world, this.needsSource(), viewRect, cam.zoom);
 
     this.drawCallCounter = 0;
     this.app.render();

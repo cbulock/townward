@@ -19,6 +19,8 @@ import { serviceBit } from '../sim/systems/coverage';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
 import { needsUtilities } from '../sim/systems/utilities';
+import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
+import { happinessColor, type OverlayTile } from '../render/Renderer';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
@@ -97,8 +99,8 @@ export class Game {
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
   private dayNightMode = readDayNight();
-  /** Traffic overlay on (roads tinted by congestion). */
-  private trafficViewOn = false;
+  /** The data view shown over the city, if any (roads by congestion, buildings by happiness). */
+  private dataView: 'traffic' | 'happiness' | null = null;
   /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
   private worldVersion = 0;
   /** Utility hints already shown this game. */
@@ -125,6 +127,7 @@ export class Game {
       () => this.traffic.stops,
       () => this.traffic.lights(),
     );
+    renderer.setNeedsSource(() => this.sim.needs.byBuilding);
     this.loop = new GameLoop(
       SIM_TICK_HZ,
       () => this.tick(),
@@ -299,7 +302,7 @@ export class Game {
   /** The systems are up to date: refresh the minimap, badges, hints and panels. */
   private afterSimChange() {
     this.bumpWorld();
-    if (this.trafficViewOn) this.renderer.setTrafficOverlay(this.sim.commute.congestion);
+    this.refreshDataView();
     this.renderer.indicators.sync(this.world);
     this.hintUtilities();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
@@ -334,7 +337,7 @@ export class Game {
     const out = this.sim.day();
     this.showDay(out);
     // Congestion changes every day, even when no buildings did.
-    if (this.trafficViewOn && out.changed.length === 0) this.renderer.setTrafficOverlay(this.sim.commute.congestion);
+    if (out.changed.length === 0) this.refreshDataView();
     const r = out.budget;
     if (r) {
       this.events.emit('funds', this.city.funds);
@@ -364,6 +367,16 @@ export class Game {
     for (const id of out.completed) {
       const b = this.world.buildings.get(id);
       if (b) this.popBuilding(b, 0);
+    }
+    if (out.abandoned.length > 0) {
+      const first = this.world.buildings.get(out.abandoned[0]);
+      const name = first ? BUILDINGS[first.def].name : 'building';
+      this.notify(
+        'error',
+        out.abandoned.length === 1
+          ? `A ${name} was abandoned: its people were unhappy. See "Citizens say".`
+          : `${out.abandoned.length} buildings were abandoned. See "Citizens say".`,
+      );
     }
     if (out.burned.length > 0) {
       for (const b of out.burned) {
@@ -421,15 +434,69 @@ export class Game {
   }
 
   get trafficView(): boolean {
-    return this.trafficViewOn;
+    return this.dataView === 'traffic';
   }
 
   /** Show or hide the traffic overlay (roads coloured by congestion). */
   setTrafficView(on: boolean) {
-    this.trafficViewOn = on;
-    this.renderer.setTrafficOverlay(on ? this.sim.commute.congestion : null);
+    this.showDataView(on ? 'traffic' : null);
+  }
+
+  get happinessView(): boolean {
+    return this.dataView === 'happiness';
+  }
+
+  /** Show or hide the happiness view (buildings coloured green → red). */
+  setHappinessView(on: boolean) {
+    this.showDataView(on ? 'happiness' : null);
+  }
+
+  private showDataView(view: 'traffic' | 'happiness' | null) {
+    this.dataView = view;
+    this.refreshDataView();
     this.sound.play('tool');
-    this.events.emit('trafficView', on);
+    this.events.emit('trafficView', view === 'traffic');
+    this.events.emit('happinessView', view === 'happiness');
+  }
+
+  /** Redraw the active data view from today's numbers. */
+  private refreshDataView() {
+    if (this.dataView === 'traffic') this.renderer.setTrafficOverlay(this.sim.commute.congestion);
+    else if (this.dataView === 'happiness') this.renderer.setDataOverlay(this.happinessTiles());
+    else this.renderer.setDataOverlay(null);
+  }
+
+  /** Every zoned building's footprint, coloured by its happiness. */
+  private happinessTiles(): OverlayTile[] {
+    const w = this.world;
+    const tiles: OverlayTile[] = [];
+    for (const b of w.buildings.values()) {
+      const n = this.sim.needs.byBuilding.get(b.id);
+      if (!n) continue;
+      const color = happinessColor(n.happiness, b.abandoned);
+      const { w: bw, h: bh } = BUILDINGS[b.def].size;
+      for (let y = b.y; y < b.y + bh; y++) for (let x = b.x; x < b.x + bw; x++) tiles.push({ tile: w.index(x, y), color });
+    }
+    return tiles;
+  }
+
+  /** A building's happiness and need scores for the info panel (null for civic buildings). */
+  private needsInfo(id: number): InspectInfo['needs'] {
+    const n = this.sim.needs.byBuilding.get(id);
+    if (!n) return null;
+    return {
+      happiness: n.happiness,
+      scores: NEED_KINDS.flatMap((kind) => {
+        const score = n.scores[kind];
+        return score === undefined ? [] : [{ kind, score }];
+      }),
+      complaint: n.complaint ? COMPLAINT_TEXT[n.complaint] : null,
+    };
+  }
+
+  /** Glide the camera to a world tile (the Citizens panel's "Show me"). */
+  focusTile(x: number, y: number) {
+    this.lookAt(this.renderer.view.pointToView(x, y));
   }
 
   get dayNight(): DayNightMode {
@@ -500,6 +567,7 @@ export class Game {
       ...s,
       demand: this.sim.growth.demand(),
       traffic: this.sim.commute.report,
+      needs: this.sim.needs.report,
       power: this.sim.utilities.report.power,
       water: this.sim.utilities.report.water,
       date: this.city.date,
@@ -553,6 +621,8 @@ export class Game {
       provides: d.service ? { kind: 'service', service: d.service, radius: d.radius ?? 0 } : d.supplies ? { kind: 'utility', ...d.supplies } : null,
       upkeep: d.upkeep ?? 0,
       commuteMinutes: d.category === 'residential' ? (this.sim.commute.commuteMinutes.get(b.id) ?? null) : null,
+      needs: this.needsInfo(b.id),
+      abandoned: b.abandoned,
     };
     this.events.emit('inspect', info);
   }
@@ -791,7 +861,8 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
-    else if (code === 'KeyT') this.setTrafficView(!this.trafficViewOn);
+    else if (code === 'KeyT') this.setTrafficView(this.dataView !== 'traffic');
+    else if (code === 'KeyY') this.setHappinessView(this.dataView !== 'happiness');
     else if (code === 'KeyL') this.setDayNight(DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length]);
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);

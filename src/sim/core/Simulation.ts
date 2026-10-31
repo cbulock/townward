@@ -70,7 +70,7 @@ export class Simulation {
     this.fire.onDay(out);
     this.worldChanged({ roads: false });
     this.commute.onDay();
-    this.needs.onDay();
+    this.needs.onDay(out);
     this.population.onDay();
     this.traffic.onDay();
     if (this.city.day % BALANCE.daysPerMonth === 0) this.budget.onMonth(out);

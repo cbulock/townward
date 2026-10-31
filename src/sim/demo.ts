@@ -244,11 +244,11 @@ function blockUse(bx: number, by: number, rng: () => number): BlockUse {
   const c = BLOCKS - 0.5;
   const ring = Math.max(Math.abs(bx - c), Math.abs(by - c)) - 0.5;
   if (ring === 0 && bx === BLOCKS - 1 && by === BLOCKS - 1) return { kind: 'hall' };
+  // A service block every three blocks keeps everything covered, the industrial corner included.
+  if (bx % 3 === 1 && by % 3 === 1) return { kind: 'services' };
   // Industry and utilities in the far corner.
   if (bx >= 2 * BLOCKS - 2 && by >= 2 * BLOCKS - 2) return bx === 2 * BLOCKS - 1 && by === 2 * BLOCKS - 1 ? { kind: 'utilities' } : { kind: 'zone', zone: ZoneType.Industrial };
   if (bx >= 2 * BLOCKS - 3 && by >= 2 * BLOCKS - 3) return bx === 2 * BLOCKS - 3 && by === 2 * BLOCKS - 3 ? { kind: 'utilities' } : { kind: 'zone', zone: ZoneType.Industrial };
-  // A service block every three blocks keeps everything covered.
-  if (bx % 3 === 1 && by % 3 === 1) return { kind: 'services' };
   const roll = rng();
   if (roll < 0.07 && ring > 0) return { kind: 'park' };
   if (ring <= 1) return { kind: 'zone', zone: roll < 0.55 ? ZoneType.CommercialHigh : ZoneType.ResidentialHigh };

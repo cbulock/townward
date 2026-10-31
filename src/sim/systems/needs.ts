@@ -1,6 +1,6 @@
 import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
-import type { SimSystem } from '../core/System';
+import type { DayOutcome, SimSystem } from '../core/System';
 import { RoadType } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
@@ -17,6 +17,8 @@ import { cityStats } from './population';
  */
 
 export type NeedKind = 'jobs' | 'shopping' | 'safety' | 'health' | 'education' | 'commute' | 'air' | 'parks' | 'workers' | 'customers';
+
+export const NEED_KINDS: readonly NeedKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers'];
 
 /** Complaint shown for a need, plus one for abandoned buildings. */
 export type ComplaintKind = NeedKind | 'abandoned';
@@ -101,11 +103,12 @@ export class NeedsSystem implements SimSystem {
     this.score();
   }
 
-  /** Daily: re-score, then move the abandonment streaks on by one day. */
-  onDay() {
+  /** Daily: re-score, then move the abandonment streaks on by one day. Buildings that flip are redrawn. */
+  onDay(out?: DayOutcome) {
     this.score();
     for (const b of this.world.buildings.values()) {
       if (!this.byBuilding.has(b.id)) continue;
+      const was = b.abandoned;
       if (!b.abandoned) {
         b.moodDays = b.happiness < BALANCE.abandonLine ? b.moodDays + 1 : 0;
         if (b.moodDays >= BALANCE.abandonDays) {
@@ -120,8 +123,13 @@ export class NeedsSystem implements SimSystem {
           b.moodDays = 0;
         }
       }
+      if (b.abandoned !== was && out) {
+        const { w, h } = BUILDINGS[b.def].size;
+        out.changed.push({ x: b.x, y: b.y, w, h });
+        (b.abandoned ? out.abandoned : out.recovered).push(b.id);
+      }
     }
-    this.summarise();
+    this.score();
   }
 
   /** Score every working zoned building's needs and set its happiness. */
@@ -160,7 +168,8 @@ export class NeedsSystem implements SimSystem {
       if (!weights || !isActive(b)) continue;
       const c = centre(b);
       const scores: Partial<Record<NeedKind, number>> = {};
-      for (const kind of Object.keys(weights) as NeedKind[]) {
+      const kinds = NEED_KINDS.filter((k) => weights[k] !== undefined);
+      for (const kind of kinds) {
         scores[kind] = this.needScore(kind, b, {
           jobCover,
           workerShare,
@@ -183,7 +192,8 @@ export class NeedsSystem implements SimSystem {
       let happiness = 0;
       let worst: NeedKind | null = null;
       let worstShortfall = 0;
-      for (const [kind, weight] of Object.entries(weights) as [NeedKind, number][]) {
+      for (const kind of kinds) {
+        const weight = weights[kind] ?? 0;
         const s = scores[kind] ?? 1;
         happiness += weight * s;
         const shortfall = weight * (1 - s);

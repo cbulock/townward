@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
-import { budgetOpenAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -159,6 +159,8 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
   const rotation = useAtomValue(rotationAtom);
   const setBudgetOpen = useSetAtom(budgetOpenAtom);
   const trafficView = useAtomValue(trafficViewAtom);
+  const happinessView = useAtomValue(happinessViewAtom);
+  const happy = city?.needs.happiness ?? 1;
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
 
@@ -196,6 +198,22 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
           <span className="stat-dim">/{(city?.jobs ?? 0).toLocaleString()}</span>
         </span>
       </Stat>
+      <button
+        type="button"
+        className={`happy-stat ${happinessView ? 'is-on' : ''}`}
+        title={`City happiness · click for the happiness view (Y)${city?.needs.abandoned ? ` · ${city.needs.abandoned} abandoned` : ''}`}
+        aria-pressed={happinessView}
+        onClick={() => game?.setHappinessView(!happinessView)}
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+          <g {...icon}>
+            <circle cx="12" cy="12" r="8.5" />
+            {happy >= 0.6 ? <path d="M8.5 14c1 1.5 2.2 2.2 3.5 2.2s2.5-.7 3.5-2.2" /> : happy >= 0.45 ? <path d="M8.5 15h7" /> : <path d="M8.5 16.2c1-1.5 2.2-2.2 3.5-2.2s2.5.7 3.5 2.2" />}
+            <path d="M9.3 9.8h.01M14.7 9.8h.01" strokeWidth="2.6" />
+          </g>
+        </svg>
+        <span className="stat-value">{Math.round(happy * 100)}%</span>
+      </button>
       <DemandMeter demand={city?.demand} />
       <button
         type="button"

@@ -3,6 +3,7 @@ import type { ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
 import type { UtilityTotals } from '../sim/systems/utilities';
 import type { CommuteReport } from '../sim/systems/commute';
+import type { NeedKind, NeedsReport } from '../sim/systems/needs';
 import type { ServiceKind } from '../sim/buildings/catalog';
 import type { ToolId } from './tools';
 
@@ -25,6 +26,7 @@ export interface GameEventMap {
   clock: number;
   dayNight: DayNightMode;
   trafficView: boolean;
+  happinessView: boolean;
   /** Version counter, bumped when tiles or buildings change (minimap repaint). */
   worldChanged: number;
   budget: BudgetInfo;
@@ -52,6 +54,8 @@ export interface CityInfo {
   water: UtilityTotals;
   /** Commuters, average commute and jammed road tiles (docs/specs/traffic.md). */
   traffic: CommuteReport;
+  /** City happiness, abandoned buildings and the top complaints (docs/specs/needs.md). */
+  needs: NeedsReport;
 }
 
 export interface BudgetInfo {
@@ -96,6 +100,9 @@ export interface InspectInfo {
   upkeep: number;
   /** Homes: average commute of its workers (minutes), null if unknown. */
   commuteMinutes: number | null;
+  /** Zoned buildings: happiness, each need's score and the current complaint. */
+  needs: { happiness: number; scores: readonly { kind: NeedKind; score: number }[]; complaint: string | null } | null;
+  abandoned: boolean;
 }
 
 export interface ToolPreviewInfo {

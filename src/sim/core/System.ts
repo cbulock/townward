@@ -33,10 +33,13 @@ export interface DayOutcome {
   completed: number[];
   /** Buildings lost to fire (already removed). */
   burned: BuildingInstance[];
+  /** Buildings abandoned today, and abandoned ones that recovered (ids). */
+  abandoned: number[];
+  recovered: number[];
   /** Set on the last day of a month. */
   budget: BudgetReport | null;
 }
 
 export function emptyOutcome(): DayOutcome {
-  return { changed: [], started: [], completed: [], burned: [], budget: null };
+  return { changed: [], started: [], completed: [], burned: [], abandoned: [], recovered: [], budget: null };
 }

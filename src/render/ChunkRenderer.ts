@@ -27,6 +27,8 @@ import { computeDualCell, isWaterTerrain } from './transitions';
 
 /** Ground cells over-draw their neighbours by this much (px), so the sloped meshes never seam. */
 const CELL_GROW = 1.5;
+/** Multiply tint for abandoned buildings. */
+const ABANDONED_TINT = 0x6f665c;
 /** Zoned lots with no road within reach: grey, so it's clear they won't grow. */
 const STRANDED_TINT = 0x9aa6b8;
 /** Seconds per water animation frame. */
@@ -355,6 +357,8 @@ export class ChunkRenderer {
     s.x = p.x - h * HALF_W - GROUND_PAD;
     // Footprints are flat (docs/specs/elevation.md), so the origin tile's level lifts the whole building.
     s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def, b.variant)) - tileLift(this.world, b.x, b.y);
+    // Abandoned buildings look run-down: dark and drab (docs/specs/needs.md).
+    if (b.abandoned) s.tint = ABANDONED_TINT;
     objects.addChild(s);
   }
 

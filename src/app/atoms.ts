@@ -24,6 +24,7 @@ export const dayNightAtom = atom<DayNightMode>('cycle');
 export const budgetAtom = atom<BudgetInfo | null>(null);
 export const budgetOpenAtom = atom(false);
 export const trafficViewAtom = atom(false);
+export const happinessViewAtom = atom(false);
 /** Hour of day on the clock (0–24). */
 export const clockAtom = atom(7);
 /** Bumped when the world changes; the minimap repaints on it. */
