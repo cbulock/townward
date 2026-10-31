@@ -71,6 +71,7 @@ src/
     overlays/              hover, tool ghost preview
     fx/                    build pops + pooled particles
     agents/                car and pedestrian sprites (pooled, culled, LOD)
+    view/                  ViewTransform (world ↔ view for 4 rotations), ViewWorld (rotated tile copy)
   shared/                  constants, rng, math utils
 tests/
 docs/

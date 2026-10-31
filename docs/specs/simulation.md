@@ -10,7 +10,7 @@ Status: **Implemented (first version).** Tuning numbers live in `src/shared/bala
 
 ## Road Access
 
-- A building has access if any tile around its footprint is a land road (bridges don't count). The first one found, front edges first, is its **entrance**: where its cars and people join the network.
+- A building has access if a land road (bridges don't count) is within **3 tiles** of its footprint. The nearest one, front edges first, is its **entrance**: where its cars and people join the network.
 - Without access, a building stays empty, shows a bobbing **orange road badge**, and its info panel says why.
 - Rechecked after every build, clear or demolish.
 
@@ -64,6 +64,5 @@ Status: **Implemented (first version).** Tuning numbers live in `src/shared/bala
 
 ## Later
 
-- Zoning and growth (Phase 4b): the same `simulateDay` loop will spawn and upgrade buildings.
 - Commute timing (rush hours), car queuing at junctions, parking, buses with stops.
 - Happiness, land value, services and pollution (Phases 7–9).

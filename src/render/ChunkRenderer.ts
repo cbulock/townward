@@ -7,9 +7,12 @@ import type { Rect } from './Camera';
 import { DECOR_VARIANTS } from './atlas/decorArt';
 import { buildingHeadroom } from './atlas/buildingArt';
 import { BUILDINGS } from '../sim/buildings/catalog';
+import { constructionStage } from '../sim/growth';
+import { isZoned } from '../sim/zones';
+import { siteHeadroom } from './atlas/constructionArt';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { WATER_PHASES } from './atlas/groundArt';
-import { GROUND_BASE, hexToNumber } from './atlas/palette';
+import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/palette';
 import type { TerrainTextures } from './atlas/tiles';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
 import { TREE_VARIANTS } from './atlas/treeArt';
@@ -35,6 +38,7 @@ interface Chunk {
   y1: number;
   base: Container;
   overlay: Container;
+  zones: Container;
   roads: Container;
   objects: Container;
   grid: Container | null;
@@ -62,6 +66,8 @@ export class ChunkRenderer {
   /** Pass 1: every cell's base terrain. Pass 2: transitions and surf, which cover pass-1 over-draw. */
   private readonly baseRoot = new Container();
   private readonly overlayRoot = new Container();
+  /** Zoned-lot tints, under roads and objects. Its alpha switches for the zone view. */
+  readonly zonesRoot = new Container();
   readonly roadsRoot = new Container();
   readonly gridRoot = new Container();
   readonly objectsRoot = new Container();
@@ -104,6 +110,7 @@ export class ChunkRenderer {
 
     const base = new Container({ isRenderGroup: true });
     const overlay = new Container({ isRenderGroup: true });
+    const zones = new Container({ isRenderGroup: true });
     const roads = new Container({ isRenderGroup: true });
     const objects = new Container({ isRenderGroup: true });
     const water: WaterTile[] = [];
@@ -129,16 +136,32 @@ export class ChunkRenderer {
 
     this.baseRoot.addChild(base);
     this.overlayRoot.addChild(overlay);
+    this.zonesRoot.addChild(zones);
     this.roadsRoot.addChild(roads);
     this.objectsRoot.addChild(objects);
-    const chunk: Chunk = { x0, y0, x1, y1, base, overlay, roads, objects, grid: null, water, bounds, visible: true };
+    const chunk: Chunk = { x0, y0, x1, y1, base, overlay, zones, roads, objects, grid: null, water, bounds, visible: true };
     this.fillRoadsAndObjects(chunk);
     this.chunks.push(chunk);
   }
 
-  /** Roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
+  /** Zones, roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
   private fillRoadsAndObjects(c: Chunk) {
     const w = this.world;
+    for (let y = c.y0; y < c.y1; y++) {
+      for (let x = c.x0; x < c.x1; x++) {
+        const i = w.index(x, y);
+        const z = w.zone[i];
+        if (!isZoned(z)) continue;
+        const p = tileToWorld(x, y);
+        const s = new Sprite(this.tex.zoneLot);
+        s.x = p.x - HALF_W - GROUND_PAD;
+        s.y = p.y - GROUND_PAD;
+        s.tint = ZONE_TINT[z];
+        // Developed lots show only a faint tint around the building.
+        s.alpha = w.building[i] === -1 ? 0.75 : 0.35;
+        c.zones.addChild(s);
+      }
+    }
     for (let y = c.y0; y < c.y1; y++) {
       for (let x = c.x0; x < c.x1; x++) {
         const type = w.road[w.index(x, y)];
@@ -162,14 +185,15 @@ export class ChunkRenderer {
   }
 
   /**
-   * Rebuild roads and objects for every chunk touching the tile rectangle, grown by one tile
-   * because a road change alters its neighbours' connection masks.
+   * Rebuild zones, roads and objects for every chunk touching any of the view-tile rectangles
+   * (each grown by one tile, because a road change alters its neighbours' connection masks).
+   * A chunk touched by several rectangles is rebuilt once.
    */
-  refresh(minX: number, minY: number, maxX: number, maxY: number) {
+  refresh(rects: readonly { minX: number; minY: number; maxX: number; maxY: number }[]) {
     for (const c of this.chunks) {
-      if (c.x1 <= minX - 1 || c.x0 > maxX + 1 || c.y1 <= minY - 1 || c.y0 > maxY + 1) continue;
-      c.roads.removeChildren().forEach((s) => s.destroy());
-      c.objects.removeChildren().forEach((s) => s.destroy());
+      const hit = rects.some((r) => !(c.x1 <= r.minX - 1 || c.x0 > r.maxX + 1 || c.y1 <= r.minY - 1 || c.y0 > r.maxY + 1));
+      if (!hit) continue;
+      for (const layer of [c.zones, c.roads, c.objects]) layer.removeChildren().forEach((s) => s.destroy());
       this.fillRoadsAndObjects(c);
     }
   }
@@ -248,9 +272,11 @@ export class ChunkRenderer {
     const h = r % 2 === 0 ? size.h : size.w;
     if (x !== b.x + w - 1 || y !== b.y + h - 1) return;
     const p = tileToWorld(b.x, b.y);
-    const s = new Sprite(this.tex.buildings[b.def][b.variant][r]);
+    // Grown footprints are square (1×1 or 2×2), so a site frame fits any rotation.
+    const site = b.construction > 0 && (size.w === 1 || size.w === 2) ? size.w : null;
+    const s = new Sprite(site ? this.tex.sites[site][constructionStage(b)] : this.tex.buildings[b.def][b.variant][r]);
     s.x = p.x - h * HALF_W - GROUND_PAD;
-    s.y = p.y - GROUND_PAD - buildingHeadroom(b.def);
+    s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def));
     objects.addChild(s);
   }
 
@@ -377,6 +403,7 @@ export class ChunkRenderer {
         c.visible = vis;
         c.base.visible = vis;
         c.overlay.visible = vis;
+        c.zones.visible = vis;
         c.roads.visible = vis;
         c.objects.visible = vis;
         if (c.grid) c.grid.visible = vis;
@@ -384,7 +411,11 @@ export class ChunkRenderer {
       if (vis) {
         chunks++;
         sprites +=
-          c.base.children.length + c.overlay.children.length + c.roads.children.length + c.objects.children.length;
+          c.base.children.length +
+          c.overlay.children.length +
+          c.zones.children.length +
+          c.roads.children.length +
+          c.objects.children.length;
       }
     }
     this.visibleChunks = chunks;
@@ -393,7 +424,7 @@ export class ChunkRenderer {
 
   /** Free every display object (used when the view rotates and the terrain is rebuilt). */
   destroy() {
-    for (const c of [this.groundRoot, this.roadsRoot, this.gridRoot, this.objectsRoot, this.slab, this.groundMask]) {
+    for (const c of [this.groundRoot, this.zonesRoot, this.roadsRoot, this.gridRoot, this.objectsRoot, this.slab, this.groundMask]) {
       c.destroy({ children: true });
     }
   }

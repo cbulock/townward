@@ -90,12 +90,21 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Clear tool removes whole buildings
 - [x] Pop, dust and sound on placement; tests (59 total)
 
-## Phase 4b — Zoning & Growth ⬜ (next)
+## View Rotation ✅  (D-032, D-033)
 
-- [ ] Zone tool: R / C / I paint by drag-rectangle; zone tint and zone view
-- [ ] Growth: zoned tiles near roads develop over time and level up (house → apartments → towers); lots merge
-- [ ] Construction animation (scaffold → building)
-- [ ] Info panel; population and jobs in the top bar
+- [x] `ViewTransform` + `ViewWorld`: draw the map from any of 4 sides; sim stays in world space
+- [x] Buildings in 4 orientations from one recipe (front details only when the front faces you)
+- [x] Roads, bridges, terrain, trees, cars, people, previews, effects, badges and picking all rotation-aware
+- [x] Controls: `,` / `.` and top-bar ⟲ ⟳ with a compass; camera keeps its centre; fade transition
+- [x] Atlas pages (≤4096 px) for the bigger atlas; tests for transforms and view sync (85 total)
+
+## Phase 4b — Zoning & Growth ✅  → [specs/buildings.md](specs/buildings.md)
+
+- [x] Zone tools: R / C / I / Dezone (`1`–`4`), drag-rectangle, $5/tile; zone tint, full-strength zone view while zoning
+- [x] Growth: zoned tiles within 3 tiles of a road develop and level up (house → walk-up → tower); 2×2 lots merge
+- [x] Construction animation (foundation → scaffold, crane on 2×2 → building pops in)
+- [x] Info panel (construction status, grown vs placed); R/C/I demand meter in the top bar
+- [x] Growth tests (9 new, 94 total)
 
 ## Phase 4c — Simulation, Moving Cars & People ✅  → [specs/simulation.md](specs/simulation.md)
 
@@ -134,6 +143,6 @@ We focus on **one** terrain and make it look great before adding presets or menu
 | 7 | Core simulation: power grid, water, RCI demand, budget & taxes |
 | 8 | Services: police, fire, health, education, coverage overlays |
 | 9 | Traffic & pollution, data map overlays |
-| 10 | Save/Load (IndexedDB), settings, multiple cities |
+| 10 | Save/Load: Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
 | 11 | Disasters, events, achievements |
 | 12 | Performance pass: sim in a Web Worker, 256×256+ maps |

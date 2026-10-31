@@ -34,4 +34,30 @@ export const BALANCE = {
   highwayUpkeep: 1.2,
   bridgeUpkeep: 2,
   civicUpkeepShare: 0.01,
+  /** A land road within this many tiles of a footprint gives road access. */
+  roadAccessRange: 3,
+
+  // --- Zoning & growth (sim/growth.ts, docs/specs/buildings.md) ---
+  /** Cost per tile to zone (dezoning is free). */
+  zoneCost: 5,
+  /** Days a construction site takes; the first half is the foundation, the second the scaffold. */
+  constructionDays: 4,
+  /** New lots per zone per day at full demand. */
+  growthPerDay: 2,
+  /** Upgrades per zone per day at full demand. */
+  upgradesPerDay: 1,
+  /** A building must be at least this full ... */
+  upgradeOccupancy: 0.8,
+  /** ... for this many days in a row before it can level up. */
+  upgradeAfterDays: 20,
+  /** City population needed before buildings can reach each level (index = level). */
+  levelPopulation: [0, 0, 150, 1000],
+  /** Demand model: share of the workforce that works in shops and offices (the rest in industry). */
+  commercialJobShare: 0.3,
+  /** Housing wanted per resident the jobs could employ (> 1 so the city keeps growing). */
+  housingSlack: 1.15,
+  /** Demand that a new town starts with: residents, shop jobs and industrial jobs. */
+  seedHousing: 40,
+  seedCommercialJobs: 6,
+  seedIndustrialJobs: 20,
 } as const;

@@ -41,7 +41,18 @@ export class World {
 
   /** Register a building and stamp its id over its footprint. Caller has validated the footprint. */
   addBuilding(b: NewBuilding, w: number, h: number): BuildingInstance {
-    const instance: BuildingInstance = { ...b, id: this.nextBuildingId++, occupants: 0, entrance: -1 };
+    const instance: BuildingInstance = {
+      id: this.nextBuildingId++,
+      def: b.def,
+      x: b.x,
+      y: b.y,
+      variant: b.variant,
+      occupants: b.occupants ?? 0,
+      entrance: -1,
+      grown: b.grown ?? false,
+      construction: b.construction ?? 0,
+      fullDays: 0,
+    };
     this.buildings.set(instance.id, instance);
     for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) this.building[this.index(x, y)] = instance.id;
     return instance;

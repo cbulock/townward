@@ -1,6 +1,6 @@
 # Spec: Buildings, Zoning & Growth
 
-Status: **4a done** (catalog, art, Build tool). 4b zoning/growth and 4c cars follow.
+Status: **4a done** (catalog, art, Build tool), **4b done** (zoning and growth), 4c done (cars).
 
 Try every building with plenty of money: `http://localhost:5173/?funds=100000`.
 
@@ -74,6 +74,39 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
   - facade: punched windows, window bands or a curtain wall, with a few lit windows;
   - extras: chimney, awning, sign, balconies, water tank, AC units, loading dock, smokestack, canopy, crown, parking, garden.
 
-## Growth (Phase 4b, planned)
+## Zoning (Phase 4b)
 
-Same as before: zoned tiles within 3 of a road develop at level 1, upgrade over time and merge into 2×2 buildings. Later the RCI demand, power and land value from Phase 7 drive it. `chooseBuilding(zone, level, size)` picks from this catalog.
+- **Tools:** Zone R (`1`), Zone C (`2`), Zone I (`3`) and Dezone (`4`). Drag a rectangle to apply, the same way Clear works. While a zone tool is active the zone layer is shown at full strength ("zone view"). The rest of the time it shows as a soft tint.
+- **Data:** `World.zone[i]` holds a `ZoneType` (`sim/zones.ts`): 0 none, 1 R, 2 C, 3 I.
+- **What can be zoned:** land that isn't rock and has no road. A tile can also be zoned if it holds a *grown* building of another zone. Rezoning it removes that building. Placed buildings and roads block zoning.
+- **Cost:** $5 per tile (`BALANCE.zoneCost`). Tiles that already have this zone are free and left unchanged. Dezoning is free and removes the zone together with any grown building on it.
+- **Interactions with other tools:**
+  - Building a road over a zoned tile removes its zone.
+  - Placing a building with the Build tool clears the zone under its footprint. Placed buildings never grow or level up.
+  - Clear (bulldoze) removes a grown building but keeps the zone, so the lot grows back later.
+
+## Growth (Phase 4b, `sim/growth.ts`, once per day)
+
+1. **Construction:** every site under construction counts down 1 day. The sequence is foundation, then scaffold, then the finished building, which pops in. A site takes **4 days** (`BALANCE.constructionDays`). Buildings under construction have no residents or jobs.
+2. **Demand** (−1 … 1 per zone, shown as R/C/I bars in the top bar). It's worked out from the capacity of finished buildings:
+   - jobs wanted: commercial = housing × 0.6 × 0.3 + 6, industrial = housing × 0.6 × 0.7 + 20;
+   - housing wanted = all jobs ÷ 0.6 × 1.15 + 40;
+   - demand = (wanted − built) ÷ max(wanted, floor).
+
+   So homes need jobs to keep growing, and jobs follow homes. A new town gets about 40 homes' worth of R, plus a shop and a workshop, before the cycle takes over.
+3. **New lots:** for each zone with demand > 0, up to ⌈demand × 2⌉ empty zoned tiles start a level-1 1×1 building of that zone. Tiles are picked at random from those with road access. Trees and rocks on the lot are cleared for free.
+4. **Level up:** a grown, finished building that has been at least **80% occupied for 20 days** can upgrade when its zone has demand and the city is big enough (level 2 from 150 residents, level 3 from 1,000). At most ⌈demand × 1⌉ upgrade per zone per day. An upgrade rebuilds the lot as a construction site, keeping its occupants for when it finishes.
+   - **In place:** a 1×1 becomes a 1×1 of the next level, or a 2×2 becomes a 2×2 of the next level.
+   - **Merge:** a 2×2 square of the same zone, holding only empty lots and finished grown 1×1 buildings no higher than this one's level, becomes a 2×2 of the next level.
+   - Level paths:
+     - R: cottage/family house → townhouses/walk-up → apartment block/condo tower (merge).
+     - C: corner shop/café → small office, or supermarket (merge) → hotel/office tower (merge or in place).
+     - I: workshop → warehouse (merge) → factory (in place).
+   - `chooseBuilding(zone, level, size, rng)` picks from the catalog.
+5. Growth uses a seeded RNG, so the same actions on the same map grow the same town.
+
+Pacing (a 48×48 test town with 720 zoned tiles, at 1×): about one new lot per second at first, level 2 within the first month (1 real minute), level 3 by month 3. Growth levels off once the land is used up, about 9,000 residents by month 7. All the numbers live in `BALANCE` (`src/shared/balance.ts`).
+
+## Road Access (changed in 4b)
+
+A building has access if a land road is within **3 tiles** of its footprint (`BALANCE.roadAccessRange`). Nearer roads win; at the same distance, the front edge is checked first. Before 4b a road had to touch the footprint. The range lets zones three tiles deep develop.

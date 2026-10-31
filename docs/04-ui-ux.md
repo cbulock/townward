@@ -64,6 +64,7 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 | Inspect building | Click (Select tool) | `Esc` closes |
 | Build | — | `E` |
 | Mute | Speaker button | `M` |
+| Rotate view | Top-bar ⟲ ⟳ (compass shows north) | `,` / `.` |
 | Debug overlay | — | `F3` |
 
 ## Feedback Rules

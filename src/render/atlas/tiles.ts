@@ -32,6 +32,7 @@ import {
   type MaskShape,
 } from './transitionArt';
 import { paintTreeCluster, TREE_VARIANTS } from './treeArt';
+import { paintSite, SITE_SIZES, SITE_STAGES, siteFrameSize, type SiteSize } from './constructionArt';
 
 const ALL_TERRAINS: readonly TerrainId[] = [
   Terrain.DeepWater,
@@ -63,6 +64,10 @@ export interface TerrainTextures {
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Plain white diamond for tool previews (tinted at runtime). */
   selection: Texture;
+  /** Zoned-lot diamond with an outline (tinted by zone at runtime). */
+  zoneLot: Texture;
+  /** Construction sites, indexed by footprint size then stage (0 foundation, 1 scaffold). */
+  sites: Readonly<Record<SiteSize, readonly Texture[]>>;
   /** Buildings, indexed by id, variant, then view rotation. Frames vary in size: see buildingFrameSize(). */
   buildings: Readonly<Record<BuildingId, Texture[][]>>;
   fx: FxTextures;
@@ -148,6 +153,15 @@ function paintWarnRoad(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(8.5, 10, 1, 2);
 }
 
+function paintZoneLot(ctx: CanvasRenderingContext2D) {
+  diamondPath(ctx, -1.5);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.lineWidth = 1.25;
+  ctx.stroke();
+}
+
 function paintGridLine(ctx: CanvasRenderingContext2D) {
   diamondPath(ctx, -0.25);
   ctx.strokeStyle = 'rgba(10, 40, 10, 0.22)';
@@ -204,6 +218,11 @@ export function buildTerrainTextures(): TerrainTextures {
     for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis));
   }
   b.add('selection', W, H, paintSelection);
+  b.add('zone_lot', W, H, paintZoneLot);
+  for (const size of SITE_SIZES) {
+    const f = siteFrameSize(size);
+    for (const stage of SITE_STAGES) b.add(`site_${size}_${stage}`, f.w, f.h, (ctx) => paintSite(ctx, size, stage));
+  }
   for (const id of BUILDING_IDS) {
     const f = buildingFrameSize(id);
     for (let v = 0; v < BUILDING_VARIANTS; v++) {
@@ -254,6 +273,8 @@ export function buildTerrainTextures(): TerrainTextures {
       ROAD_TYPES.map((t) => [t, [Texture.EMPTY, get(`bridge_${t}_${BridgeAxis.X}`), get(`bridge_${t}_${BridgeAxis.Y}`)]]),
     ) as Record<BuildableRoad, Texture[]>,
     selection: get('selection'),
+    zoneLot: get('zone_lot'),
+    sites: { 1: SITE_STAGES.map((st) => get(`site_1_${st}`)), 2: SITE_STAGES.map((st) => get(`site_2_${st}`)) },
     buildings: Object.fromEntries(
       BUILDING_IDS.map((id) => [
         id,

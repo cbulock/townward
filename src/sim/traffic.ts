@@ -1,5 +1,6 @@
 import { mulberry32 } from '../shared/rng';
 import { BUILDINGS } from './buildings/catalog';
+import { isActive } from './population';
 import { roadMask, RoadType } from './roads';
 import type { World } from './World';
 
@@ -162,7 +163,7 @@ export class Traffic {
     this.destinations = [];
     this.population = 0;
     for (const b of this.world.buildings.values()) {
-      if (b.entrance === -1) continue;
+      if (!isActive(b)) continue;
       const d = BUILDINGS[b.def];
       if (d.category === 'residential') {
         if (b.occupants > 0) this.homes.push(b.entrance);

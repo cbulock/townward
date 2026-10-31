@@ -191,6 +191,9 @@ export const BUILDINGS = {
 
 export type BuildingId = keyof typeof BUILDINGS;
 
+/** Colour variants each building is painted in (render/atlas/buildingArt.ts). */
+export const ART_VARIANTS = 3;
+
 export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
 
 export const CATEGORY_ORDER: readonly BuildingCategory[] = ['residential', 'commercial', 'industrial', 'civic'];
@@ -209,12 +212,37 @@ export interface BuildingInstance {
   variant: number;
   /** Residents (housing) or workers (everything else). Updated by sim/population.ts. */
   occupants: number;
-  /** Tile index of a road touching the footprint, or −1 if the building has no road access. */
+  /** Tile index of the road the building uses (within roadAccessRange), or −1 if it has no road access. */
   entrance: number;
+  /** Grew on a zone (vs placed with the Build tool). Only grown buildings level up. */
+  grown: boolean;
+  /** Days of construction left; 0 once finished. Sites have no residents or jobs. */
+  construction: number;
+  /** Consecutive days at or above BALANCE.upgradeOccupancy. */
+  fullDays: number;
 }
 
-/** What a caller supplies when placing; the runtime fields start empty. */
-export type NewBuilding = Pick<BuildingInstance, 'def' | 'x' | 'y' | 'variant'>;
+/** What a caller supplies when placing or growing; the runtime fields start empty. */
+export interface NewBuilding extends Pick<BuildingInstance, 'def' | 'x' | 'y' | 'variant'> {
+  grown?: boolean;
+  construction?: number;
+  /** Residents or workers carried over from the lots an upgrade replaced. */
+  occupants?: number;
+}
+
+/** Zoned buildings of a zone, level and square footprint size (1 or 2), in catalog order. */
+export function zonedBuildings(zone: Zone, level: number, size: number): BuildingId[] {
+  return BUILDING_IDS.filter((id) => {
+    const d: BuildingDef = BUILDINGS[id];
+    return d.zone === zone && d.level === level && d.size.w === size && d.size.h === size;
+  });
+}
+
+/** Pick a random zoned building, or null if the catalog has none for that zone/level/size. */
+export function chooseBuilding(zone: Zone, level: number, size: number, rng: () => number): BuildingId | null {
+  const ids = zonedBuildings(zone, level, size);
+  return ids.length === 0 ? null : ids[Math.floor(rng() * ids.length)];
+}
 
 /** Top-left (north) tile of a footprint whose "centre" tile is under the cursor. */
 export function footprintOrigin(id: BuildingId, cx: number, cy: number): { x: number; y: number } {

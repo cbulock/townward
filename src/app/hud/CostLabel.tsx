@@ -1,4 +1,5 @@
 import { useAtomValue } from 'jotai';
+import { isZoneTool } from '../../game/tools';
 import { toolPreviewAtom } from '../atoms';
 
 const CURSOR_GAP = 18;
@@ -27,12 +28,12 @@ export function CostLabel() {
       {p.blocked ? (
         <span className="cost-dim">can't build here</span>
       ) : empty ? (
-        <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : 'build'}</span>
+        <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : isZoneTool(p.tool) ? 'zone' : 'build'}</span>
       ) : p.tool === 'build' ? (
         <span className="cost-value">${p.cost.toLocaleString()}</span>
       ) : (
         <>
-          <span className="cost-value">${p.cost.toLocaleString()}</span>
+          <span className="cost-value">{p.cost === 0 ? 'Free' : `$${p.cost.toLocaleString()}`}</span>
           <span className="cost-dim">
             {p.count} tile{p.count === 1 ? '' : 's'}
           </span>

@@ -1,6 +1,6 @@
 import { HALF_H, HALF_W } from '../../shared/constants';
 import { mulberry32 } from '../../shared/rng';
-import { BUILDINGS, type BuildingId } from '../../sim/buildings/catalog';
+import { ART_VARIANTS, BUILDINGS, type BuildingId } from '../../sim/buildings/catalog';
 import { GROUND_PAD } from './geometry';
 import { hexToRgb, INK } from './palette';
 import { paintPine } from './treeArt';
@@ -18,7 +18,7 @@ import { paintPine } from './treeArt';
  * front details (doors, shopfronts, signs) appear only when the front faces the camera.
  */
 
-export const BUILDING_VARIANTS = 3;
+export const BUILDING_VARIANTS = ART_VARIANTS;
 
 type Rng = () => number;
 type Face = 'sw' | 'se';

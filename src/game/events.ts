@@ -1,4 +1,5 @@
 import type { BuildingId } from '../sim/buildings/catalog';
+import type { ZoneDemand } from '../sim/growth';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -31,6 +32,8 @@ export interface CityInfo {
   speed: number;
   cars: number;
   people: number;
+  /** R/C/I demand, each in [−1, 1]. */
+  demand: ZoneDemand;
 }
 
 export interface InspectInfo {
@@ -45,6 +48,10 @@ export interface InspectInfo {
   occupantLabel: string;
   hasRoad: boolean;
   size: { w: number; h: number };
+  /** Grew on a zone (vs placed with the Build tool). */
+  grown: boolean;
+  /** Days of construction left; 0 when finished. */
+  constructionDays: number;
 }
 
 export interface ToolPreviewInfo {

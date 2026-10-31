@@ -1,4 +1,5 @@
 import { Terrain, type TerrainId } from '../../sim/terrain/types';
+import { ZoneType, type ZonedType } from '../../sim/zones';
 
 /**
  * Bright, saturated pixel-art palette (see docs/04-ui-ux.md, "World art").
@@ -25,6 +26,13 @@ export const INK = {
   foam: 'rgb(196, 238, 255)',
   sparkle: 'rgb(200, 236, 255)',
 } as const;
+
+/** Zone tints (match --zone-r/c/i in styles/tokens.css). */
+export const ZONE_TINT: Readonly<Record<ZonedType, number>> = {
+  [ZoneType.Residential]: 0x4ade80,
+  [ZoneType.Commercial]: 0x60a5fa,
+  [ZoneType.Industrial]: 0xfacc15,
+};
 
 export function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);

@@ -4,11 +4,26 @@ import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import type { TerrainTextures } from '../render/atlas/tiles';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
-import { planClear, planPlace, planRoad, type Plan, type PlacePlan } from '../sim/commands';
+import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
+import { isZoned, ZoneType, type ZoneTypeId } from '../sim/zones';
+import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
 
-export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build';
+export type ZoneToolId = 'zone-r' | 'zone-c' | 'zone-i' | 'dezone';
+export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId;
+
+/** What each zone tool paints (dezone paints "no zone"). */
+export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZoneTypeId>> = {
+  'zone-r': ZoneType.Residential,
+  'zone-c': ZoneType.Commercial,
+  'zone-i': ZoneType.Industrial,
+  dezone: ZoneType.None,
+};
+
+export function isZoneTool(tool: ToolId): tool is ZoneToolId {
+  return tool in ZONE_TOOLS;
+}
 
 /** Keyboard shortcuts, also shown in the toolbar. */
 export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
@@ -17,6 +32,10 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   road: 'KeyR',
   highway: 'KeyH',
   build: 'KeyE',
+  'zone-r': 'Digit1',
+  'zone-c': 'Digit2',
+  'zone-i': 'Digit3',
+  dezone: 'Digit4',
 };
 
 export interface ToolDrag {
@@ -29,6 +48,7 @@ export interface ToolDrag {
 export type ToolPlan =
   | { kind: 'road'; tool: 'road' | 'highway'; plan: Plan; roadType: BuildableRoad }
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
+  | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZoneTypeId }
   | { kind: 'place'; tool: 'build'; plan: PlacePlan };
 
 const TINT_VALID = 0x8ff7ec;
@@ -61,6 +81,13 @@ export function planTool(
       return { kind: 'clear', tool, plan: planClear(world, rectTiles(anchor.start, anchor.current)) };
     case 'build':
       return { kind: 'place', tool, plan: planPlace(world, building, anchor.current.x, anchor.current.y) };
+    case 'zone-r':
+    case 'zone-c':
+    case 'zone-i':
+    case 'dezone': {
+      const zone = ZONE_TOOLS[tool];
+      return { kind: 'zone', tool, plan: planZone(world, rectTiles(anchor.start, anchor.current), zone), zone };
+    }
   }
 }
 
@@ -69,6 +96,17 @@ export function planTool(
  * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
  */
 export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform): PreviewTile[] {
+  if (p.kind === 'zone') {
+    const tint = isZoned(p.zone) ? ZONE_TINT[p.zone] : TINT_CLEAR;
+    return p.plan.tiles.map((t) => ({
+      x: t.x,
+      y: t.y,
+      texture: tex.zoneLot,
+      tint: t.valid ? tint : 0xffffff,
+      alpha: t.valid ? 0.85 : 0.25,
+    }));
+  }
+
   if (p.kind === 'clear') {
     return p.plan.tiles.map((t) => ({
       x: t.x,

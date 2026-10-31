@@ -21,6 +21,8 @@ export interface ViewRef {
 
 /** Seconds for the fade-in after a rotation. */
 const ROTATE_FADE = 0.28;
+/** Zone layer strength outside the zone view (zone tools show it at full strength). */
+const ZONE_ALPHA = 0.45;
 
 /**
  * Owns the Pixi application and the world scene graph:
@@ -54,6 +56,7 @@ export class Renderer {
   private viewWorld!: ViewWorld;
   private agentSource: () => readonly Agent[] = () => [];
   private rotateFade = 0;
+  private zoneView = false;
   /** Boot timings (ms) for the debug overlay. */
   readonly timings = { atlas: 0, chunks: 0 };
 
@@ -128,7 +131,15 @@ export class Renderer {
     this.viewWorld = new ViewWorld(this.view, this.world.seed);
     this.viewWorld.sync(this.world);
     this.ground = new ChunkRenderer(this.viewWorld, this.textures);
-    this.terrain.addChild(this.ground.slab, this.ground.groundMask, this.ground.groundRoot, this.ground.roadsRoot, this.ground.gridRoot);
+    this.terrain.addChild(
+      this.ground.slab,
+      this.ground.groundMask,
+      this.ground.groundRoot,
+      this.ground.zonesRoot,
+      this.ground.roadsRoot,
+      this.ground.gridRoot,
+    );
+    this.ground.zonesRoot.alpha = this.zoneView ? 1 : ZONE_ALPHA;
     this.objects.addChild(this.ground.objectsRoot);
     this.ground.setGrid(grid);
     this.camera.setBounds(mapWorldBounds(this.view.viewW, this.view.viewH));
@@ -153,11 +164,22 @@ export class Renderer {
     this.rotateFade = ROTATE_FADE;
   }
 
-  /** World changed inside `rect` (world tiles): re-sync the view copy and rebuild touched chunks. */
-  refreshWorld(rect: TileRect) {
+  /** World changed inside these rects (world tiles): re-sync the view copy once and rebuild touched chunks. */
+  refreshWorld(...rects: TileRect[]) {
+    if (rects.length === 0) return;
     this.viewWorld.sync(this.world);
-    const r = this.view.rectToView(rect);
-    this.ground.refresh(r.x, r.y, r.x + r.w - 1, r.y + r.h - 1);
+    this.ground.refresh(
+      rects.map((rect) => {
+        const r = this.view.rectToView(rect);
+        return { minX: r.x, minY: r.y, maxX: r.x + r.w - 1, maxY: r.y + r.h - 1 };
+      }),
+    );
+  }
+
+  /** Show zones at full strength (while a zone tool is active). */
+  setZoneView(on: boolean) {
+    this.zoneView = on;
+    this.ground.zonesRoot.alpha = on ? 1 : ZONE_ALPHA;
   }
 
   /** World tile under a screen point (CSS px), clamped to the map. */

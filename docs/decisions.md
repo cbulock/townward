@@ -9,7 +9,7 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 ## Accepted
 
 - **D-002 — Isometric 2:1 view.** 2026-10-31. Looks much richer than top-down and fits the "very cool UI" goal.
-- **D-003 — Map rotation deferred until after Phase 5.** 2026-10-31. Rotation means every building needs 4 views, which doubles the art and sorting work.
+- **D-003 — Map rotation deferred until after Phase 5.** 2026-10-31. Rotation means every building needs 4 views, which doubles the art and sorting work. *Superseded by D-032: built early at the user's request, while the renderer is still small.*
 - **D-010 — TypeScript + Vite + PixiJS v8 + React HUD.** 2026-10-31. Pixi gives batched WebGL sprite rendering for smooth large maps, and React suits a rich, animated HUD. They are kept in separate layers.
 - **D-011 — All art generated procedurally in code.** 2026-10-31. Original, deterministic assets with no licensing issues and a tiny download. We can swap in hand-drawn art later if we want.
 - **D-012 — Struct-of-arrays world state (typed arrays).** 2026-10-31. Fast, cache-friendly, trivially serializable, and Worker-ready.
@@ -32,3 +32,23 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 - **D-029 — Simple, readable economy first.** 2026-10-31. Homes fill toward a target set by job cover (45% with no jobs, 100% with full cover), and jobs take workers in proportion to capacity. Taxes per resident and worker, upkeep per road tile. It's easy to reason about and tune now; land value, happiness and services refine it in Phases 7–9.
 - **D-030 — Agents are simulated in sim/, drawn in render/.** 2026-10-31. `Traffic` holds plain agent data (path, segment, progress) and `agentPose()` computes position and heading, including right-hand lane offsets. The renderer only maps poses to pooled sprites. Agents move per frame with dt × speed (smooth), while population and budget step daily on the fixed tick.
 - **D-031 — Agents draw under the objects layer.** 2026-10-31. Agents are depth-sorted among themselves only. Buildings and trees in front of a road then correctly hide cars behind them, with no global sort of every sprite each frame.
+- **D-032 — View rotation through a rotated view copy of the world.** 2026-10-31.
+  - The simulation, tools and traffic always work in world tiles. `ViewTransform` maps world to view for 4 quarter turns: points, tiles, rectangles, headings, connection masks and bridge axes. `ViewWorld` is the world's tile layers re-laid out in view space, re-synced after each edit (typed-array copies, well under 1 ms).
+  - The chunk, road, bridge and dual-grid renderers draw that copy unchanged.
+  - Overlays, effects, agents and picking convert through a shared `viewRef`.
+  - On rotation the terrain is rebuilt (about 20 ms on 128×128), the camera keeps the same world point centred, and the view fades in.
+  - Trees and rocks hash their *world* tile, so they look the same from every side.
+- **D-033 — Buildings painted in 4 orientations from one recipe.** 2026-10-31.
+  - Recipes stay in local space (front = +v). The painter rotates the layout into the view and draws whatever walls face the camera, lit from the same side every time.
+  - Front-only details (door, shopfront, sign, awning, porch, canopy, parking, garden path) appear only when the front faces the camera, so rotating shows real backs. Balconies go on every side so tall homes read the same from any angle.
+  - The atlas now splits into ≤4096 px pages (`AtlasBuilder`) to fit the 204 building frames.
+- **D-034 — Saving: Express + SQLite backend, email/password accounts, seed-plus-changes save format.** 2026-10-31. Agreed now, built later (after Phase 4b).
+  - The server is Express 5 in TypeScript. Request bodies are validated with zod. Saves are stored as a JSON blob in one SQLite `saves` table that also has metadata columns. This gives atomic writes and a straightforward move to Postgres.
+  - Accounts use email and password, chosen by the user over anonymous device ids.
+  - A save holds only the seed, the generator version, `funds`/`day`, the `road`/`bridge`/`zone` layers plus a cleared mask for `tree`/`decor` (base64 run-length-encoded typed arrays), and buildings as `{ def, x, y, variant }`. Terrain is regenerated from the seed, and occupants, entrances and traffic are rebuilt on load. Every save carries a version number so old saves can be migrated.
+  - Buildings also need `grown`, `construction` and `fullDays` (added in 4b) in the save.
+  - Pure `serialize`/`deserialize` live in `sim/save.ts`. The client goes through a `SaveStore` interface: IndexedDB for autosave, HTTP for the server.
+  - We rejected replaying a command log. Any change to the rules would silently alter old cities.
+- **D-035 — Growth driven by capacity-based R/C/I demand.** 2026-10-31. Demand compares *built* capacity, construction sites included, with what the other zones imply: homes need jobs, jobs follow homes, plus a small seed so a new town starts. Counting sites stops growth overshooting. Using capacity rather than occupants avoids the stall where homes that aren't yet full hold back jobs. Land value, services and pollution refine this in Phases 7–9.
+- **D-036 — Road access reaches 3 tiles.** 2026-10-31. Zones are usually painted 2–3 tiles deep. A touching-only rule would leave the back rows empty forever. One rule applies to grown and placed buildings alike, and traffic uses the nearest road tile as the entrance.
+- **D-037 — The Build tool still places zoned buildings (sandbox).** 2026-10-31. Placed buildings clear the zone under them and never level up, so they don't interfere with growth. We may restrict them to civic buildings later.

@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 4c — Simulation, cars & people ✅ (population, jobs, budget, traffic) |
-| **Next phase** | Phase 4b — Zoning & growth |
+| **Current phase** | Phase 4b ✅ zoning & growth (Phases 4a–4c done) |
+| **Next phase** | Phase 5 — HUD & polish (then Phase 10 save/load is agreed: D-034) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It

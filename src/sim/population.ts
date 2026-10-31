@@ -1,5 +1,6 @@
 import { BALANCE } from '../shared/balance';
 import { BUILDINGS } from './buildings/catalog';
+import type { BuildingInstance } from './buildings/catalog';
 import type { City } from './City';
 import { BridgeAxis, RoadType } from './roads';
 import type { World } from './World';
@@ -25,33 +26,56 @@ export interface BudgetReport {
   net: number;
 }
 
+/** A land road tile (bridges have no kerb to stop at, so they never count as an entrance). */
+function isLandRoad(world: World, i: number): boolean {
+  return world.road[i] !== RoadType.None && world.bridge[i] === BridgeAxis.None;
+}
+
 /**
- * Give every building the index of a road tile touching its footprint (its "entrance"),
- * or −1. Prefers the road nearest the front (south) of the building.
+ * Index of the nearest land road within `range` tiles of the footprint (x, y, w, h), or −1.
+ * Rings are searched outward. Within a ring the road with the fewest straight steps to the
+ * footprint wins (so a road in front beats one at a corner); ties go to the front (south)
+ * edge, then east, north and west.
  */
+export function findEntrance(world: World, x: number, y: number, w: number, h: number, range: number): number {
+  for (let d = 1; d <= range; d++) {
+    const x0 = x - d;
+    const y0 = y - d;
+    const x1 = x + w - 1 + d;
+    const y1 = y + h - 1 + d;
+    let best = -1;
+    let bestSteps = Infinity;
+    const check = (tx: number, ty: number) => {
+      if (!world.inBounds(tx, ty) || !isLandRoad(world, world.index(tx, ty))) return;
+      // Straight-line (Manhattan) steps from the footprint's edge.
+      const steps = Math.max(0, x - tx, tx - (x + w - 1)) + Math.max(0, y - ty, ty - (y + h - 1));
+      if (steps < bestSteps) {
+        best = world.index(tx, ty);
+        bestSteps = steps;
+      }
+    };
+    for (let tx = x0; tx <= x1; tx++) check(tx, y1);
+    for (let ty = y1 - 1; ty >= y0; ty--) check(x1, ty);
+    for (let tx = x1 - 1; tx >= x0; tx--) check(tx, y0);
+    for (let ty = y0 + 1; ty < y1; ty++) check(x0, ty);
+    if (best !== -1) return best;
+  }
+  return -1;
+}
+
+/** Give every building its entrance road tile (within BALANCE.roadAccessRange), or −1. */
 export function updateRoadAccess(world: World) {
   for (const b of world.buildings.values()) {
     const { w, h } = BUILDINGS[b.def].size;
-    let entrance = -1;
-    // Walk the ring around the footprint, front edges first.
-    const ring: [number, number][] = [];
-    for (let x = b.x; x < b.x + w; x++) ring.push([x, b.y + h]);
-    for (let y = b.y; y < b.y + h; y++) ring.push([b.x + w, y]);
-    for (let x = b.x; x < b.x + w; x++) ring.push([x, b.y - 1]);
-    for (let y = b.y; y < b.y + h; y++) ring.push([b.x - 1, y]);
-    for (const [x, y] of ring) {
-      if (!world.inBounds(x, y)) continue;
-      const i = world.index(x, y);
-      // Bridges have no kerb to stop at; only land roads count as an entrance.
-      if (world.road[i] !== RoadType.None && world.bridge[i] === BridgeAxis.None) {
-        entrance = i;
-        break;
-      }
-    }
-    b.entrance = entrance;
+    b.entrance = findEntrance(world, b.x, b.y, w, h, BALANCE.roadAccessRange);
     // A building cut off from the roads empties out.
-    if (entrance === -1) b.occupants = 0;
+    if (b.entrance === -1) b.occupants = 0;
   }
+}
+
+/** Finished and connected: the building can have residents or jobs. */
+export function isActive(b: BuildingInstance): boolean {
+  return b.construction === 0 && b.entrance !== -1;
 }
 
 export function cityStats(world: World): CityStats {
@@ -60,6 +84,8 @@ export function cityStats(world: World): CityStats {
   let jobs = 0;
   let workers = 0;
   for (const b of world.buildings.values()) {
+    // Construction sites keep carried-over occupants for later but don't count yet.
+    if (b.construction > 0) continue;
     const d = BUILDINGS[b.def];
     if (d.category === 'residential') {
       population += b.occupants;
@@ -86,7 +112,7 @@ export function simulateDay(world: World) {
 
   for (const b of world.buildings.values()) {
     const d = BUILDINGS[b.def];
-    if (d.category !== 'residential' || b.entrance === -1) continue;
+    if (d.category !== 'residential' || !isActive(b)) continue;
     const target = Math.round(d.capacity * fill);
     if (b.occupants < target) b.occupants += Math.max(1, Math.round((target - b.occupants) * BALANCE.moveInRate));
     else if (b.occupants > target) b.occupants -= Math.max(1, Math.round((b.occupants - target) * BALANCE.moveInRate));
@@ -99,7 +125,7 @@ export function simulateDay(world: World) {
   const share = after.jobs === 0 ? 0 : Math.min(1, available / after.jobs);
   for (const b of world.buildings.values()) {
     const d = BUILDINGS[b.def];
-    if (d.category === 'residential') continue;
+    if (d.category === 'residential' || b.construction > 0) continue;
     b.occupants = b.entrance === -1 ? 0 : Math.floor(d.capacity * share);
   }
 }

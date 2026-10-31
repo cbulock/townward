@@ -7,7 +7,10 @@ import { HALF_H, SIM_TICK_HZ } from '../shared/constants';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
-import { applyClear, applyPlace, applyRoad, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { growDay, zoneDemand } from '../sim/growth';
+import { mulberry32, subSeed } from '../shared/rng';
+import type { BuildingInstance } from '../sim/buildings/catalog';
 import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/population';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Traffic } from '../sim/traffic';
@@ -18,7 +21,7 @@ import { SoundBoard } from './audio';
 import { EventBus, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
+import { isZoneTool, planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
   size: number;
@@ -35,6 +38,8 @@ const MAX_RIPPLE_TIME = 0.5;
 const PARTICLE_BUDGET = 900;
 /** Sim-time multipliers for pause, 1×, 2×, 3× (the fastest step is 4× for a real jump). */
 export const GAME_SPEEDS = [0, 1, 2, 4] as const;
+/** Cursor-label names for the zone tools. */
+const ZONE_TOOL_LABEL = { 'zone-r': 'Residential', 'zone-c': 'Commercial', 'zone-i': 'Industrial', dezone: 'Dezone' } as const;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
@@ -46,6 +51,8 @@ export class Game {
   private readonly renderer: Renderer;
   private readonly input: InputController;
   private readonly loop: GameLoop;
+  /** Seeded so the same actions on the same map grow the same town. */
+  private readonly growthRng: () => number;
 
   private simTick = 0;
   private hovered: TilePos | null = null;
@@ -74,6 +81,7 @@ export class Game {
       onClick: (p) => this.onClick(p),
     });
     this.traffic = new Traffic(city.world, city.world.seed);
+    this.growthRng = mulberry32(subSeed(city.world.seed, 0x6077));
     renderer.setAgentSource(() => this.traffic.agents);
     this.loop = new GameLoop(
       SIM_TICK_HZ,
@@ -123,6 +131,7 @@ export class Game {
     this.drag = null;
     this.renderer.app.canvas.style.cursor = tool === 'select' ? '' : 'crosshair';
     this.renderer.hover.set(tool === 'select' ? this.hovered : null);
+    this.renderer.setZoneView(isZoneTool(tool));
     this.events.emit('tool', tool);
     this.updatePreview();
   }
@@ -180,9 +189,17 @@ export class Game {
   private execute(p: ToolPlan) {
     // What's on each tile before it changes decides the particles (leaves, grit, dust).
     const debris = this.debrisOf(p.plan.tiles);
+    // Rezoning or dezoning removes grown buildings; they get a puff of dust.
+    if (p.kind === 'zone') {
+      for (const t of p.plan.tiles) {
+        const i = this.world.index(t.x, t.y);
+        if (t.valid && this.world.building[i] !== -1) debris.set(i, 'dust');
+      }
+    }
     let result: ApplyResult;
     if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType);
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
+    else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
     else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
 
     if (p.kind === 'place' && !p.plan.ok) {
@@ -193,7 +210,7 @@ export class Game {
       this.renderer.refreshWorld({ x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 });
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
-      this.afterWorldChange(p.kind !== 'place');
+      this.afterWorldChange(p.kind === 'road' || p.kind === 'clear');
     } else if (result.reason === 'insufficient-funds') {
       this.sound.play('error');
       this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
@@ -237,6 +254,7 @@ export class Game {
   private newDay() {
     const city = this.city;
     city.day++;
+    this.grow();
     simulateDay(this.world);
     this.traffic.refreshDemand();
     if (city.day % BALANCE.daysPerMonth === 0) {
@@ -250,6 +268,43 @@ export class Game {
     this.emitInspect();
   }
 
+  /** A day of zoned growth: refresh what changed, with dust for new sites and a pop for finished ones. */
+  private grow() {
+    const g = growDay(this.world, this.growthRng);
+    if (g.changed.length === 0) return;
+    this.renderer.refreshWorld(...g.changed);
+    const fx = this.renderer.effects;
+    for (const id of g.started) {
+      const b = this.world.buildings.get(id);
+      if (!b) continue;
+      const { w, h } = BUILDINGS[b.def].size;
+      for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 3, Math.random() * 0.3);
+    }
+    for (const id of g.completed) {
+      const b = this.world.buildings.get(id);
+      if (b) this.popBuilding(b, 0);
+    }
+    this.afterWorldChange(false);
+  }
+
+  /** The "pop" a building makes when it appears. */
+  private popBuilding(b: BuildingInstance, delay: number) {
+    const { w, h } = BUILDINGS[b.def].size;
+    const frame = buildingFrameSize(b.def);
+    this.renderer.effects.pop(
+      [
+        {
+          // Fractional tile coords put the pop at the footprint's centre.
+          x: b.x + (w - 1) / 2,
+          y: b.y + (h - 1) / 2,
+          texture: this.renderer.textures.buildings[b.def][b.variant][this.renderer.rotation],
+          anchorY: (buildingHeadroom(b.def) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
+        },
+      ],
+      delay,
+    );
+  }
+
   /** Push current city stats to listeners (also used by the UI bridge on connect). */
   emitCity() {
     const s = cityStats(this.world);
@@ -257,6 +312,7 @@ export class Game {
     for (const a of this.traffic.agents) if (a.kind !== 'person') cars++;
     this.events.emit('city', {
       ...s,
+      demand: zoneDemand(this.world),
       date: this.city.date,
       speed: this.speedIndex,
       cars,
@@ -299,6 +355,8 @@ export class Game {
       occupantLabel: d.category === 'residential' ? 'Residents' : 'Workers',
       hasRoad: b.entrance !== -1,
       size: d.size,
+      grown: b.grown,
+      constructionDays: b.construction,
     };
     this.events.emit('inspect', info);
   }
@@ -340,26 +398,20 @@ export class Game {
     });
 
     if (p.kind === 'place') {
-      const id = p.plan.building;
-      const { w, h } = BUILDINGS[id].size;
       const b = this.world.buildings.get(this.world.building[this.world.index(p.plan.origin.x, p.plan.origin.y)]);
-      if (b) {
-        const frame = buildingFrameSize(id);
-        fx.pop(
-          [
-            {
-              // Fractional tile coords put the pop at the footprint's centre.
-              x: b.x + (w - 1) / 2,
-              y: b.y + (h - 1) / 2,
-              texture: this.renderer.textures.buildings[id][b.variant][this.renderer.rotation],
-              anchorY: (buildingHeadroom(id) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
-            },
-          ],
-          0,
-        );
-      }
+      if (b) this.popBuilding(b, 0);
       tiles.forEach((t, k) => fx.burst(t.x, t.y, 'dust', 6, k * 0.03));
       this.sound.play('build', 0, 0.8);
+      return;
+    }
+
+    if (p.kind === 'zone') {
+      tiles.forEach((t, k) => {
+        if (debris.has(this.world.index(t.x, t.y))) fx.burst(t.x, t.y, 'dust', perTile, k * stagger);
+      });
+      if (debris.size > 0) this.sound.play('clear');
+      const ticks = Math.min(6, n);
+      for (let k = 0; k < ticks; k++) this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
       return;
     }
 
@@ -439,7 +491,7 @@ export class Game {
     }
     this.events.emit('toolPreview', {
       tool: this.toolId,
-      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : null,
+      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' ? ZONE_TOOL_LABEL[p.tool] : null,
       blocked: p.kind === 'place' && !p.plan.ok,
       screen: this.lastPointer,
       cost: p.plan.cost,

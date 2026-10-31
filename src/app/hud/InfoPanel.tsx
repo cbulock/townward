@@ -45,8 +45,17 @@ export function InfoPanel() {
         </div>
       )}
 
+      {info.constructionDays > 0 && (
+        <div className="info-status building">
+          Under construction · {info.constructionDays} day{info.constructionDays === 1 ? '' : 's'} left
+        </div>
+      )}
       <div className={`info-status ${info.hasRoad ? 'ok' : 'warn'}`}>
-        {info.hasRoad ? 'Connected to the road network' : 'No road access: build a road next to it'}
+        {info.hasRoad ? 'Connected to the road network' : 'No road access: build a road within 3 tiles'}
+      </div>
+      <div className="info-row dim">
+        <span>Origin</span>
+        <span>{info.grown ? 'Grew on a zone' : 'Placed'}</span>
       </div>
       <div className="info-row dim">
         <span>Footprint</span>

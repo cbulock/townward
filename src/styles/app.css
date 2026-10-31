@@ -240,6 +240,18 @@ kbd {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* Zone tools wear their zone colour; active ones get a tinted fill. */
+.tool-button.tone-r { --tone: var(--zone-r); }
+.tool-button.tone-c { --tone: var(--zone-c); }
+.tool-button.tone-i { --tone: var(--zone-i); }
+.tool-button[class*='tone-'] svg {
+  color: var(--tone);
+}
+.tool-button[class*='tone-'].is-active {
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  border-color: color-mix(in srgb, var(--tone) 50%, transparent);
+  color: var(--tone);
+}
 .tool-label {
   font-size: 11px;
   font-weight: 600;
@@ -605,6 +617,10 @@ kbd {
   background: rgba(79, 209, 197, 0.1);
   color: var(--accent);
 }
+.info-status.building {
+  background: rgba(240, 138, 36, 0.12);
+  color: #fdba74;
+}
 .info-status.warn {
   background: rgba(248, 113, 113, 0.12);
   color: #fecaca;
@@ -648,4 +664,50 @@ kbd {
   height: 22px;
   color: var(--text-dim);
   transition: transform 280ms var(--ease-out);
+}
+
+/* ---------- Zone demand (top bar) ---------- */
+.demand {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+}
+.demand-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 9px;
+  color: var(--tone);
+}
+.demand-col.tone-r { --tone: var(--zone-r); }
+.demand-col.tone-c { --tone: var(--zone-c); }
+.demand-col.tone-i { --tone: var(--zone-i); }
+.demand-track {
+  position: relative;
+  width: 6px;
+  height: 16px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+}
+/* Positive demand grows up from the midline, negative grows down. */
+.demand-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 50%;
+  border-radius: 2px;
+  background: var(--tone);
+  transition: height 400ms var(--ease-out);
+}
+.demand-bar.is-neg {
+  top: 50%;
+  bottom: auto;
+  opacity: 0.45;
+}
+.demand-letter {
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
 }

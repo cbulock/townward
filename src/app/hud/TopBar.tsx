@@ -1,5 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { CityInfo } from '../../game/events';
 import { cityAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -32,6 +33,39 @@ function Stat({ title, glyph, children, flash }: { title: string; glyph: ReactNo
 }
 
 const SPEED_LABELS = ['Pause', '1×', '2×', '3×'] as const;
+
+const DEMAND_BARS = [
+  ['r', 'R', 'Residential'],
+  ['c', 'C', 'Commercial'],
+  ['i', 'I', 'Industrial'],
+] as const;
+
+function demandWord(d: number): string {
+  return d > 0.5 ? 'high' : d > 0.1 ? 'some' : d > -0.1 ? 'balanced' : 'oversupplied';
+}
+
+/** R/C/I demand: bars grow up from the midline when the city wants more, down when it has too much. */
+function DemandMeter({ demand }: { demand: CityInfo['demand'] | undefined }) {
+  const title = demand
+    ? DEMAND_BARS.map(([k, , name]) => `${name}: ${demandWord(demand[k])}`).join(' · ')
+    : 'Zone demand';
+  return (
+    <span className="demand" title={title} aria-label={title}>
+      {DEMAND_BARS.map(([k, letter]) => {
+        const d = demand?.[k] ?? 0;
+        const h = Math.round(Math.abs(d) * 100) / 2;
+        return (
+          <span key={k} className={`demand-col tone-${k}`}>
+            <span className="demand-track">
+              <span className={`demand-bar ${d < 0 ? 'is-neg' : ''}`} style={{ height: `${h}%` }} />
+            </span>
+            <span className="demand-letter">{letter}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 /** Floating top bar: city, date, population, jobs, funds, speed and sound. */
 export function TopBar() {
@@ -68,6 +102,7 @@ export function TopBar() {
           <span className="stat-dim">/{(city?.jobs ?? 0).toLocaleString()}</span>
         </span>
       </Stat>
+      <DemandMeter demand={city?.demand} />
       <span className={`funds ${fundsFlash ? `flash-${fundsFlash === 'down' ? 'spend' : 'gain'}` : ''}`} title="Funds">
         <span className="funds-sign">$</span>
         {funds.toLocaleString()}

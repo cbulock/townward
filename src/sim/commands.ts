@@ -4,6 +4,7 @@ import type { City } from './City';
 import { BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
+import { ZoneType, type ZoneTypeId } from './zones';
 
 /**
  * Every world mutation goes through a plan → apply pair (docs/decisions.md D-014).
@@ -141,6 +142,7 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad): ApplyRes
     w.bridge[i] = t.bridge ?? BridgeAxis.None;
     w.tree[i] = 0;
     w.decor[i] = Decor.None;
+    w.zone[i] = ZoneType.None;
   }
   city.funds -= plan.cost;
   return { ok: true, changed: bounds(real), tiles: real };
@@ -178,14 +180,8 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
     w.decor[i] = Decor.None;
     w.road[i] = RoadType.None;
     w.bridge[i] = BridgeAxis.None;
-    // Selecting any tile of a building removes the whole building.
-    const id = w.building[i];
-    const b = w.buildings.get(id);
-    if (b) {
-      const { w: bw, h: bh } = BUILDINGS[b.def].size;
-      w.removeBuilding(id, bw, bh);
-      touched.push({ x: b.x, y: b.y }, { x: b.x + bw - 1, y: b.y + bh - 1 });
-    }
+    // Selecting any tile of a building removes the whole building. The zone stays, so a grown lot regrows.
+    touched.push(...removeBuildingAt(w, i));
   }
   city.funds -= plan.cost;
   return { ok: true, changed: bounds(touched), tiles: valid };
@@ -250,8 +246,66 @@ export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyR
     const i = w.index(t.x, t.y);
     w.tree[i] = 0;
     w.decor[i] = Decor.None;
+    // Placed buildings never sit on a zone (only grown ones do).
+    w.zone[i] = ZoneType.None;
   }
   w.addBuilding({ def: plan.building, x: plan.origin.x, y: plan.origin.y, variant }, size.w, size.h);
   city.funds -= plan.cost;
   return { ok: true, changed: bounds(plan.tiles), tiles: plan.tiles };
+}
+
+/** Remove the building covering tile `i`, if any. Returns its footprint corners for refresh bounds. */
+function removeBuildingAt(w: World, i: number): TilePos[] {
+  const b = w.buildings.get(w.building[i]);
+  if (!b) return [];
+  const { w: bw, h: bh } = BUILDINGS[b.def].size;
+  w.removeBuilding(b.id, bw, bh);
+  return [
+    { x: b.x, y: b.y },
+    { x: b.x + bw - 1, y: b.y + bh - 1 },
+  ];
+}
+
+/**
+ * Price zoning a region as `zone` (ZoneType.None dezones). Valid tiles are the ones that change:
+ * land without rock or road, not already this zone, and either empty or holding a grown building
+ * (which rezoning or dezoning removes). See docs/specs/buildings.md, "Zoning".
+ */
+export function planZone(world: World, region: readonly TilePos[], zone: ZoneTypeId): Plan {
+  const tiles: PlannedTile[] = [];
+  let cost = 0;
+  let count = 0;
+  for (const p of region) {
+    if (!world.inBounds(p.x, p.y)) continue;
+    const i = world.index(p.x, p.y);
+    const b = world.buildings.get(world.building[i]);
+    const valid =
+      world.zone[i] !== zone &&
+      !isWater(world, i) &&
+      world.terrain[i] !== Terrain.Rock &&
+      world.road[i] === RoadType.None &&
+      (b === undefined || b.grown);
+    const c = valid && zone !== ZoneType.None ? BALANCE.zoneCost : 0;
+    tiles.push({ ...p, valid, cost: c });
+    if (valid) {
+      cost += c;
+      count++;
+    }
+  }
+  return { tiles, cost, count };
+}
+
+export function applyZone(city: City, plan: Plan, zone: ZoneTypeId): ApplyResult {
+  const valid = plan.tiles.filter((t) => t.valid);
+  if (valid.length === 0) return { ok: false, reason: 'nothing-to-do' };
+  if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
+  const w = city.world;
+  const touched: TilePos[] = [...valid];
+  for (const t of valid) {
+    const i = w.index(t.x, t.y);
+    w.zone[i] = zone;
+    touched.push(...removeBuildingAt(w, i));
+  }
+  city.funds -= plan.cost;
+  return { ok: true, changed: bounds(touched), tiles: valid };
 }

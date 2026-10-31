@@ -2,6 +2,32 @@
 
 Newest first. One entry per work session.
 
+## 2026-10-31: Zoning & growth (Phase 4b)
+- Agreed the save/backend plan before starting, to build later: Express + SQLite, email/password accounts, saves hold the seed plus what changed (D-034).
+- **Zoning:** `sim/zones.ts`; `planZone`/`applyZone` (rezoning or dezoning removes grown buildings; roads and placed buildings clear the zone). Four tools on `1`–`4`, with zone-coloured previews and a "Residential $150 · 30 tiles" cost label.
+- **Growth** (`sim/growth.ts`, daily, seeded RNG):
+  - R/C/I demand from built capacity: homes need jobs, jobs follow homes.
+  - New level-1 lots on empty zoned tiles with road access.
+  - A 4-day construction stage.
+  - Level-ups in place or as 2×2 merges, gated by occupancy, days and city size.
+  - `chooseBuilding()` picks from the catalog.
+- **Road access** now reaches 3 tiles (`findEntrance`: nearest ring first, then fewest straight steps, front first), so 3-deep zones develop.
+- **Rendering:** zoned-lot layer per chunk (soft, full strength in zone view); procedural foundation and scaffold sites with a tower crane on 2×2 (`constructionArt.ts`); multi-rect `refreshWorld` so a day's changes rebuild each chunk once.
+- **UI:** zone buttons in their colours, R/C/I demand meter, info panel shows construction days left and grown vs placed.
+- **Tuning:** first try grew about 100 buildings in the first minute. Halved lot and upgrade rates and raised the level gates to 150 and 1,000 residents.
+- Verified in headless Chromium: zoned both sides of two roads on seed 42; sites, then houses, then walk-ups and merged warehouses; 584 residents by June Y1 at 3×; rotation fine; no console errors.
+
+## 2026-10-31: View rotation
+- The user asked to see the other side of the map. Built 4-way rotation (D-032, D-033), replacing deferral D-003.
+- `ViewTransform` (world ↔ view math) and `ViewWorld` (rotated copy of the tile layers, re-synced after edits). The existing chunk, road, bridge and terrain renderers work on it unchanged.
+- The building painter is now rotation-aware: recipes in local space, rotated layout, camera-facing walls only, front details only when the front faces you, view-depth ordering for ground props. All 17 buildings were checked on a 4-rotation contact sheet.
+- Overlays, effects, agents, previews (rotated road masks, swapped bridge axes, rotated ghosts) and picking all convert through `viewRef`.
+- Controls: `,` / `.` plus top-bar rotate buttons with a compass. The camera keeps its centre and the view fades in.
+- `AtlasBuilder` now emits pages of up to 4096 px. Boot is atlas ≈ 286 ms, map ≈ 18 ms.
+- Tests: 15 new for transforms and view sync (85 total).
+- Verified in the browser: built a town, rotated through all 4 sides with traffic running, and placed a building in a rotated view (it landed under the cursor).
+- Gotcha: the first scripted test failed because the input started before a cold dev-server load finished. It was not a game bug.
+
 ## 2026-10-31: Simulation, cars and people (Phase 4c)
 - **Dynamics:** calendar (1 day = 2 s), speed controls, road access per building, population that grows toward a job-dependent target, jobs filling from the workforce, and a monthly budget (taxes vs upkeep) with a toast.
 - **Traffic:** cached, bridge-aware BFS routing. Cars, taxis, buses and trucks drive on the right with smooth lane changes through turns and run faster on highways. Pedestrians stroll the pavements with a walk cycle. Density follows population (caps: 320 cars, 180 people).

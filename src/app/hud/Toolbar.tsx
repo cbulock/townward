@@ -10,6 +10,21 @@ interface ToolDef {
   key: string;
   hint: string;
   icon: ReactNode;
+  /** Extra class for the button (zone colours). */
+  tone?: string;
+}
+
+/** A lot diamond with the zone's letter. */
+function zoneIcon(letter: string): ReactNode {
+  return (
+    <g>
+      <path d="M12 3l9 5v8l-9 5-9-5V8z" fill="currentColor" opacity="0.22" />
+      <path d="M12 3l9 5v8l-9 5-9-5V8z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <text x="12" y="16.2" textAnchor="middle" fontSize="10" fontWeight="800" fill="currentColor">
+        {letter}
+      </text>
+    </g>
+  );
 }
 
 const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
@@ -52,6 +67,42 @@ const TOOLS: readonly ToolDef[] = [
     ),
   },
   {
+    id: 'zone-r',
+    label: 'Homes',
+    key: '1',
+    hint: `Drag to zone residential · $${BALANCE.zoneCost}/tile · grows near roads`,
+    icon: zoneIcon('R'),
+    tone: 'tone-r',
+  },
+  {
+    id: 'zone-c',
+    label: 'Shops',
+    key: '2',
+    hint: `Drag to zone commercial · $${BALANCE.zoneCost}/tile · grows near roads`,
+    icon: zoneIcon('C'),
+    tone: 'tone-c',
+  },
+  {
+    id: 'zone-i',
+    label: 'Industry',
+    key: '3',
+    hint: `Drag to zone industrial · $${BALANCE.zoneCost}/tile · grows near roads`,
+    icon: zoneIcon('I'),
+    tone: 'tone-i',
+  },
+  {
+    id: 'dezone',
+    label: 'Dezone',
+    key: '4',
+    hint: 'Drag to remove zoning (and anything grown on it) · free',
+    icon: (
+      <g {...stroke}>
+        <path d="M12 3l9 5v8l-9 5-9-5V8z" />
+        <path d="M9 9.5l6 5M15 9.5l-6 5" />
+      </g>
+    ),
+  },
+  {
     id: 'road',
     label: 'Road',
     key: 'R',
@@ -88,7 +139,7 @@ export function Toolbar() {
         <button
           key={t.id}
           type="button"
-          className={`tool-button ${active === t.id ? 'is-active' : ''}`}
+          className={`tool-button ${t.tone ?? ''} ${active === t.id ? 'is-active' : ''}`}
           aria-pressed={active === t.id}
           disabled={!game}
           onClick={() => game?.setTool(active === t.id && t.id !== 'select' ? 'select' : t.id)}
