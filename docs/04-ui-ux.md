@@ -60,7 +60,10 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 | Cancel tool / drag | Right click | `Esc` |
 | Road / Zone R/C/I / Bulldoze | — | `R` / `1` `2` `3` / `B` |
 | Inspect | — | `Q` |
-| Pause / speed | — | `Space` / `[` `]` |
+| Pause / speed | Top-bar buttons | `Space` / `[` `]` |
+| Inspect building | Click (Select tool) | `Esc` closes |
+| Build | — | `E` |
+| Mute | Speaker button | `M` |
 | Debug overlay | — | `F3` |
 
 ## Feedback Rules

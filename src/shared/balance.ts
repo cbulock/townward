@@ -15,4 +15,23 @@ export const BALANCE = {
   boulderClearCost: 15,
   /** Small decorations (flowers, tall grass) clear for free. */
   minorDecorClearCost: 0,
+
+  // --- Simulation (sim/population.ts) ---
+  /** Sim seconds per in-game day at 1× speed. */
+  secondsPerDay: 2,
+  daysPerMonth: 30,
+  /** Share of the empty space in a home that fills each day (with road access). */
+  moveInRate: 0.12,
+  /** Share of residents who work. */
+  workforceShare: 0.6,
+  /** Homes only fill to this share of capacity while there are no jobs; jobs lift it to 100%. */
+  minHousingFill: 0.45,
+  /** Monthly tax per resident and per worker. */
+  taxPerResident: 3,
+  taxPerWorker: 2,
+  /** Monthly upkeep. */
+  roadUpkeep: 0.4,
+  highwayUpkeep: 1.2,
+  bridgeUpkeep: 2,
+  civicUpkeepShare: 0.01,
 } as const;

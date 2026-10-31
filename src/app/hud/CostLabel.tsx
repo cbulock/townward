@@ -11,7 +11,7 @@ export function CostLabel() {
   const p = useAtomValue(toolPreviewAtom);
   if (!p) return null;
 
-  const verb = p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : 'Road';
+  const verb = p.label ?? (p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : 'Road');
   const empty = p.count === 0;
   // Flip to the other side of the cursor near the right/bottom edges so the label never clips.
   const flipX = p.screen.x > window.innerWidth - LABEL_ROOM_X;
@@ -20,12 +20,16 @@ export function CostLabel() {
   const dy = flipY ? `calc(${p.screen.y - CURSOR_GAP}px - 100%)` : `${p.screen.y + CURSOR_GAP}px`;
   return (
     <div
-      className={`cost-label ${p.affordable ? '' : 'is-unaffordable'}`}
+      className={`cost-label ${p.affordable && !p.blocked ? '' : 'is-unaffordable'}`}
       style={{ transform: `translate(${dx}, ${dy})` }}
     >
       <span className="cost-verb">{verb}</span>
-      {empty ? (
+      {p.blocked ? (
+        <span className="cost-dim">can't build here</span>
+      ) : empty ? (
         <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : 'build'}</span>
+      ) : p.tool === 'build' ? (
+        <span className="cost-value">${p.cost.toLocaleString()}</span>
       ) : (
         <>
           <span className="cost-value">${p.cost.toLocaleString()}</span>

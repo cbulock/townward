@@ -3,6 +3,8 @@ const HINTS: [string, string][] = [
   ['Wheel', 'Zoom'],
   ['Shift', 'Straight'],
   ['Esc', 'Cancel'],
+  ['Space', 'Pause'],
+  ['[ ]', 'Speed'],
   ['G', 'Grid'],
   ['M', 'Mute'],
   ['N', 'New map'],

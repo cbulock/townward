@@ -32,7 +32,15 @@ Status: **Phase 3 implemented** (roads, highways, bridges, clearing, build effec
   - the span is at most **12 tiles** (`BALANCE.maxBridgeSpan`);
   - a road can't cross an existing bridge sideways.
 - **Bridges connect only at their two ends** (`World.bridge` stores the axis). A road on the bank beside a span doesn't branch into it.
-- Art: deck with the same markings as the road, continuous rails with posts, a dark side face for thickness, pillars, and a shadow on the water.
+- Art (`roadArt.ts` `paintBridge`), built up back to front:
+  1. a soft shadow on the water;
+  2. a pair of concrete piers per span tile, with faint ripple rings at the waterline;
+  3. a girder (deck thickness) with a light lip;
+  4. the deck, using the same markings as the road so it meets the shore road flush;
+  5. parapet walls with a lit top;
+  6. a lamp post on the far parapet.
+  
+  The deck stays at ground level; height comes from everything hanging below it. Bridge frames are taller (`BRIDGE_HEADROOM` above for lamps, `BRIDGE_DROP` below for girder, piers and shadow).
 - Clearing a bridge tile removes it, and the water shows again.
 
 ## Build Effects & Sound

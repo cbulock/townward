@@ -2,12 +2,35 @@
 
 Newest first. One entry per work session.
 
+## 2026-10-31: Simulation, cars and people (Phase 4c)
+- **Dynamics:** calendar (1 day = 2 s), speed controls, road access per building, population that grows toward a job-dependent target, jobs filling from the workforce, and a monthly budget (taxes vs upkeep) with a toast.
+- **Traffic:** cached, bridge-aware BFS routing. Cars, taxis, buses and trucks drive on the right with smooth lane changes through turns and run faster on highways. Pedestrians stroll the pavements with a walk cycle. Density follows population (caps: 320 cars, 180 people).
+- **Rendering:** pooled, screen-culled, depth-sorted agent layer with zoom LOD. Procedural vehicle art (4 kinds × 6 colours × 4 headings, head and tail lights) and people (8 variants × 2 frames).
+- **UI:** top bar (date, population, workers/jobs, funds, speed, mute); click-to-inspect info panel with occupancy bar, road status and Demolish; orange "no road" badges; debug overlay hidden by default with boot timings and agent counts.
+- **Optimisation:** measured boot (atlas ≈ 200 ms, map ≈ 20 ms) and found no hotspot worth restructuring. Agents are capped, culled and LOD'd; routes are cached; the daily sim is O(buildings).
+- Verified in the browser: built a street, ran at 3× for a month (population 419, 247/524 jobs, January budget +$1,689), saw cars, buses and pedestrians, inspected buildings, and saw the no-road badge. 70 tests.
+- Fixed: city name wrapping in the top bar.
+
+## 2026-10-31: Phase 4a building catalog and art
+- Plan agreed: 4a catalog and art → 4b zoning and growth → 4c moving cars.
+- **17 buildings**:
+  - Homes: Cottage, Family House, Townhouses, Walk-up, Apartment Block, Condo Tower
+  - Shops & Offices: Corner Shop, Café, Small Office, Supermarket, Hotel, Office Tower
+  - Industry: Workshop, Warehouse, Factory
+  - Civic: Park, Town Hall
+- Procedural painter: lit and shaded walls; gable, hip, flat and sawtooth roofs; punched, band, curtain-wall, shopfront, townhouse and industrial facades; awnings, signs (sheared text), balconies, water tank, AC units, canopy, lit crown, loading docks, smokestack, parking lot with cars. 3 colour variants each.
+- `World.building` and `World.buildings`. `planPlace`/`applyPlace` with footprint checks and auto-clearing. Clear removes whole buildings, and roads can't pass through buildings. 9 new tests (59 total).
+- Build tool (`E`) with a picker (category tabs, live thumbnails painted by the same code, cost and size), a ghost preview, a cost or "can't build here" label, plus pop, dust and sound.
+- Added `?funds=` URL option for testing. Gave parks a hedge and paved edge (they blended into the grass).
+- Verified in the browser: placed all 17 types, no console errors.
+
 ## 2026-10-31: Bridges, build effects and sound (Phase 3 complete)
 - **Bridges:** a new `World.bridge` layer. Paths crossing water become straight, land-to-land bridges (max 12 tiles) at $60 or $160 per tile. They connect only at their ends, and clearing removes them. 8 new tests (50 total).
 - Bridge art: deck markings, rails and posts, a dark side face, pillars, and a shadow on the water. The first version looked too much like road, so it was made more distinct.
 - **Effects:** a rippling additive pop flash and pooled particles (dust, splash, leaves and chips, rock grit) with a 1,500 cap and capped ripple time.
 - **Sound:** procedural Web Audio (build thunk and ticks, bridge ping, clear crunch, error buzz, tool click). `M` and a speaker button mute it; the setting persists.
 - Verified in the browser: bridge preview and pricing, build pop and dust, leaf burst on clear, no console errors. (Sound can't be checked headless.)
+- The user asked for more realistic bridges. Rebuilt them in taller frames with piers and ripples, a girder, parapet walls, lamp posts and a soft shadow. Toned down the first pass's shadow (it read as a slab on the sand) and the ripples (they looked like white squares).
 
 ## 2026-10-31: Phase 3 roads, highways and clearing
 - Seed 42 (the approved River Valley) is now the default map.

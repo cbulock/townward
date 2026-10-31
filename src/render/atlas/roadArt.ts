@@ -174,12 +174,12 @@ export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, 
     ctx,
     () => {
       // Shadow on the water, well below the deck.
-      shift(17, () => body(ctx, mask, edge + 0.02, 'rgba(8, 38, 90, 0.36)'));
+      shift(11, () => body(ctx, mask, edge, 'rgba(8, 38, 90, 0.24)'));
 
       // Piers: a pair of concrete columns under the middle of each span tile.
-      const PIER_DEPTH = 18;
+      const PIER_DEPTH = 16;
       for (const o of [-edge * 0.55, edge * 0.55]) {
-        shift(PIER_DEPTH, () => fill('rgba(205, 240, 255, 0.75)', () => armQuad(ctx, along, -0.1, 0.1, o - 0.1, o + 0.1)));
+        shift(PIER_DEPTH, () => fill('rgba(205, 240, 255, 0.4)', () => armQuad(ctx, along, -0.08, 0.08, o - 0.08, o + 0.08)));
         for (let px = PIER_DEPTH; px >= 4; px--) {
           const t = (px - 4) / (PIER_DEPTH - 4);
           const shade = Math.round(122 - 46 * t);

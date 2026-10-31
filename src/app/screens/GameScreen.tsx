@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Game, type GameOptions } from '../../game/Game';
 import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { connectGameToStore } from '../bridge';
+import { BuildingPicker } from '../hud/BuildingPicker';
 import { ControlsHint } from '../hud/ControlsHint';
 import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
+import { InfoPanel } from '../hud/InfoPanel';
 import { Notices } from '../hud/Notices';
 import { Toolbar } from '../hud/Toolbar';
 import { TopBar } from '../hud/TopBar';
@@ -13,14 +15,19 @@ import { TopBar } from '../hud/TopBar';
 /** The approved River Valley map (docs/specs/terrain.md). Used when the URL has no seed. */
 const DEFAULT_SEED = 42;
 
-/** Until the New Game screen exists, map size and seed live in the URL (`?size=256&seed=42`). */
+/**
+ * Until the New Game screen exists, options live in the URL:
+ * `?size=256&seed=42&funds=100000` (funds is handy for testing expensive buildings).
+ */
 function readOptions(): GameOptions {
   const q = new URLSearchParams(location.search);
   const size = Number(q.get('size'));
   const seed = Number(q.get('seed'));
+  const funds = Number(q.get('funds'));
   return {
     size: (MAP_SIZES as readonly number[]).includes(size) ? size : DEFAULT_MAP_SIZE,
     seed: q.has('seed') && Number.isInteger(seed) ? seed : DEFAULT_SEED,
+    funds: q.has('funds') && Number.isFinite(funds) && funds >= 0 ? funds : undefined,
   };
 }
 
@@ -82,6 +89,8 @@ export function GameScreen() {
       <div className={`fade-in ${ready ? 'is-ready' : ''}`} />
       <TopBar />
       <DebugOverlay />
+      <InfoPanel />
+      <BuildingPicker />
       <Toolbar />
       <Notices />
       <CostLabel />

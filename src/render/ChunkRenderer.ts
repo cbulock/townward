@@ -5,6 +5,8 @@ import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { World } from '../sim/World';
 import type { Rect } from './Camera';
 import { DECOR_VARIANTS } from './atlas/decorArt';
+import { buildingHeadroom } from './atlas/buildingArt';
+import { BUILDINGS } from '../sim/buildings/catalog';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber } from './atlas/palette';
@@ -116,11 +118,11 @@ export class ChunkRenderer {
     const right = tileToWorld(x1, y0);
     const bottom = tileToWorld(x1, y1);
     const left = tileToWorld(x0, y1);
-    // Half a tile of slack for dual cells, plus headroom so tall objects aren't culled early.
+    // Half a tile of slack for dual cells, plus headroom so tall buildings aren't culled early.
     const bounds: Rect = {
       minX: left.x - HALF_W,
       maxX: right.x + HALF_W,
-      minY: top.y - TILE_H * 4,
+      minY: top.y - TILE_H * 8,
       maxY: bottom.y + HALF_H,
     };
 
@@ -213,6 +215,11 @@ export class ChunkRenderer {
   private buildObjects(x: number, y: number, objects: Container) {
     const w = this.world;
     const i = w.index(x, y);
+    const bid = w.building[i];
+    if (bid !== -1) {
+      this.buildBuilding(x, y, bid, objects);
+      return;
+    }
     const hash = cellHash(x + 7919, y + 104729);
     let texture: Texture | null = null;
     const density = w.tree[i];
@@ -225,6 +232,19 @@ export class ChunkRenderer {
     const s = new Sprite(texture);
     s.x = p.x - HALF_W - GROUND_PAD;
     s.y = p.y - GROUND_PAD - TREE_HEADROOM;
+    objects.addChild(s);
+  }
+
+  /** A building is one sprite, added when we reach its front (south) tile so it sorts with trees. */
+  private buildBuilding(x: number, y: number, id: number, objects: Container) {
+    const b = this.world.buildings.get(id);
+    if (!b) return;
+    const { w, h } = BUILDINGS[b.def].size;
+    if (x !== b.x + w - 1 || y !== b.y + h - 1) return;
+    const p = tileToWorld(b.x, b.y);
+    const s = new Sprite(this.tex.buildings[b.def][b.variant]);
+    s.x = p.x - h * HALF_W - GROUND_PAD;
+    s.y = p.y - GROUND_PAD - buildingHeadroom(b.def);
     objects.addChild(s);
   }
 

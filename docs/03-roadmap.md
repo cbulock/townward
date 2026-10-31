@@ -80,20 +80,38 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 ---
 
-## Phase 4 — Zoning & Buildings ⬜  → [specs/buildings.md](specs/buildings.md)
+## Phase 4a — Building Catalog & Art ✅  → [specs/buildings.md](specs/buildings.md)
 
-- [ ] Zone tool: R / C / I paint by drag-rectangle (only on buildable land)
-- [ ] Zone tint overlay plus a toggleable zone view
-- [ ] Building definitions registry (size, zone, level, art generator)
-- [ ] Procedural building art: 1×1, 2×2 and 3×3 for R/C/I at 3 levels
-- [ ] Growth system: zoned tiles within reach of a road develop over time; small lots merge into bigger ones
+- [x] Building catalog (sim): 17 essential types across residential, commercial, industrial and civic, each with size, level, cost and capacity
+- [x] Procedural building painter: iso boxes with lit and shaded faces; gable, hip, flat and sawtooth roofs; windows, balconies, awnings, signs, chimneys, water tanks, loading docks
+- [x] 3 colour variants per building so neighbours don't match
+- [x] World building layer + instances; footprint validation (land, no roads, no other buildings; trees auto-cleared)
+- [x] Build tool (`E`) with a building picker (categories, live thumbnails, cost); ghost footprint preview
+- [x] Clear tool removes whole buildings
+- [x] Pop, dust and sound on placement; tests (59 total)
+
+## Phase 4b — Zoning & Growth ⬜ (next)
+
+- [ ] Zone tool: R / C / I paint by drag-rectangle; zone tint and zone view
+- [ ] Growth: zoned tiles near roads develop over time and level up (house → apartments → towers); lots merge
 - [ ] Construction animation (scaffold → building)
-- [ ] Placeable buildings: Power Plant (3×3), Park (1×1), Town Hall (2×2)
-- [ ] Bulldoze buildings; dezone
-- [ ] Info panel: click a tile or building to see details
-- [ ] Population counter in the top bar
+- [ ] Info panel; population and jobs in the top bar
 
-**DoD:** zone next to roads, press play and watch a small town grow without frame drops.
+## Phase 4c — Simulation, Moving Cars & People ✅  → [specs/simulation.md](specs/simulation.md)
+
+- [x] Calendar + speed controls (pause/1×/2×/3×, Space, [ ])
+- [x] Road access per building, with warning badges
+- [x] Population: homes fill over time, faster when jobs exist; jobs take workers from the workforce
+- [x] Monthly budget: taxes vs road and civic upkeep, with a toast report
+- [x] Road graph routing (BFS, cached, bridge-aware)
+- [x] Cars (car, taxi, bus, truck), right-hand lanes, smooth turns, faster on highways
+- [x] Pedestrians on pavements with a walk cycle
+- [x] Agent renderer: pooled, culled, depth-sorted, zoom LOD
+- [x] Top bar: date, population, workers/jobs, funds, speed; building info panel with Demolish
+- [x] Sim tests (11 new, 70 total)
+- [ ] Car queuing at junctions, rush hours, bus stops
+
+**DoD (4a–4c):** zone next to roads, watch a small town grow, and see cars driving around it, all at 60 FPS.
 
 ---
 

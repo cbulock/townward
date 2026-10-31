@@ -1,4 +1,5 @@
 import { BALANCE } from '../shared/balance';
+import { BUILDINGS, footprintOrigin, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
 import { BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
@@ -108,7 +109,7 @@ export function planRoad(world: World, path: readonly TilePos[], type: Buildable
         if (world.bridge[i] !== BridgeAxis.None && world.bridge[i] !== bridge) blocked = true;
       }
     }
-    if (blocked || world.terrain[i] === Terrain.Rock) {
+    if (blocked || world.terrain[i] === Terrain.Rock || world.building[i] !== -1) {
       blocked = true;
       tiles.push({ ...p, valid: false, cost: 0 });
       continue;
@@ -153,7 +154,8 @@ export function planClear(world: World, region: readonly TilePos[]): Plan {
   for (const p of region) {
     if (!world.inBounds(p.x, p.y)) continue;
     const i = world.index(p.x, p.y);
-    const hasSomething = world.tree[i] > 0 || world.decor[i] !== Decor.None || world.road[i] !== RoadType.None;
+    const hasSomething =
+      world.tree[i] > 0 || world.decor[i] !== Decor.None || world.road[i] !== RoadType.None || world.building[i] !== -1;
     const c = hasSomething ? clearCost(world, i) : 0;
     tiles.push({ ...p, valid: hasSomething, cost: c });
     if (hasSomething) {
@@ -169,15 +171,24 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
   if (valid.length === 0) return { ok: false, reason: 'nothing-to-do' };
   if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
   const w = city.world;
+  const touched: TilePos[] = [...valid];
   for (const t of valid) {
     const i = w.index(t.x, t.y);
     w.tree[i] = 0;
     w.decor[i] = Decor.None;
     w.road[i] = RoadType.None;
     w.bridge[i] = BridgeAxis.None;
+    // Selecting any tile of a building removes the whole building.
+    const id = w.building[i];
+    const b = w.buildings.get(id);
+    if (b) {
+      const { w: bw, h: bh } = BUILDINGS[b.def].size;
+      w.removeBuilding(id, bw, bh);
+      touched.push({ x: b.x, y: b.y }, { x: b.x + bw - 1, y: b.y + bh - 1 });
+    }
   }
   city.funds -= plan.cost;
-  return { ok: true, changed: bounds(valid), tiles: valid };
+  return { ok: true, changed: bounds(touched), tiles: valid };
 }
 
 function bounds(tiles: readonly TilePos[]) {
@@ -192,4 +203,55 @@ function bounds(tiles: readonly TilePos[]) {
     maxY = Math.max(maxY, t.y);
   }
   return { minX, minY, maxX, maxY };
+}
+
+export interface PlacePlan extends Plan {
+  building: BuildingId;
+  /** Footprint's top (north) tile. */
+  origin: TilePos;
+  /** Every footprint tile is valid. */
+  ok: boolean;
+}
+
+/** Price placing `id` with its footprint centred on (cx, cy). Trees and decorations are auto-cleared. */
+export function planPlace(world: World, id: BuildingId, cx: number, cy: number): PlacePlan {
+  const def = BUILDINGS[id];
+  const origin = footprintOrigin(id, cx, cy);
+  const tiles: PlannedTile[] = [];
+  let clearing = 0;
+  let ok = true;
+  for (let y = origin.y; y < origin.y + def.size.h; y++) {
+    for (let x = origin.x; x < origin.x + def.size.w; x++) {
+      if (!world.inBounds(x, y)) {
+        ok = false;
+        continue;
+      }
+      const i = world.index(x, y);
+      const valid =
+        !isWater(world, i) &&
+        world.terrain[i] !== Terrain.Rock &&
+        world.road[i] === RoadType.None &&
+        world.building[i] === -1;
+      const c = valid ? clearCost(world, i) : 0;
+      tiles.push({ x, y, valid, cost: c });
+      clearing += c;
+      if (!valid) ok = false;
+    }
+  }
+  return { tiles, cost: def.cost + clearing, count: ok ? 1 : 0, building: id, origin, ok };
+}
+
+export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyResult {
+  if (!plan.ok) return { ok: false, reason: 'nothing-to-do' };
+  if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
+  const w = city.world;
+  const { size } = BUILDINGS[plan.building];
+  for (const t of plan.tiles) {
+    const i = w.index(t.x, t.y);
+    w.tree[i] = 0;
+    w.decor[i] = Decor.None;
+  }
+  w.addBuilding({ def: plan.building, x: plan.origin.x, y: plan.origin.y, variant }, size.w, size.h);
+  city.funds -= plan.cost;
+  return { ok: true, changed: bounds(plan.tiles), tiles: plan.tiles };
 }

@@ -1,31 +1,99 @@
 import { useAtomValue } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
-import { fundsAtom, gameAtom, mutedAtom } from '../atoms';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { cityAtom, fundsAtom, gameAtom, mutedAtom } from '../atoms';
 
-/** Floating top bar: city name and funds. Funds flash when they change. */
-export function TopBar() {
-  const funds = useAtomValue(fundsAtom);
-  const muted = useAtomValue(mutedAtom);
-  const game = useAtomValue(gameAtom);
-  const prev = useRef(funds);
-  const [flash, setFlash] = useState<'spend' | 'gain' | null>(null);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
+const icon = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+
+/** Number that briefly flashes when it changes (green up, red down). */
+function useFlash(value: number) {
+  const prev = useRef(value);
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
   useEffect(() => {
-    if (funds === prev.current) return;
-    setFlash(funds < prev.current ? 'spend' : 'gain');
-    prev.current = funds;
+    if (value === prev.current) return;
+    setFlash(value > prev.current ? 'up' : 'down');
+    prev.current = value;
     const t = setTimeout(() => setFlash(null), 450);
     return () => clearTimeout(t);
-  }, [funds]);
+  }, [value]);
+  return flash;
+}
+
+function Stat({ title, glyph, children, flash }: { title: string; glyph: ReactNode; children: ReactNode; flash?: 'up' | 'down' | null }) {
+  return (
+    <span className={`stat ${flash ? `flash-${flash}` : ''}`} title={title}>
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        {glyph}
+      </svg>
+      {children}
+    </span>
+  );
+}
+
+const SPEED_LABELS = ['Pause', '1×', '2×', '3×'] as const;
+
+/** Floating top bar: city, date, population, jobs, funds, speed and sound. */
+export function TopBar() {
+  const funds = useAtomValue(fundsAtom);
+  const city = useAtomValue(cityAtom);
+  const muted = useAtomValue(mutedAtom);
+  const game = useAtomValue(gameAtom);
+  const fundsFlash = useFlash(funds);
+  const popFlash = useFlash(city?.population ?? 0);
+
+  const date = city ? `${MONTHS[city.date.month]} ${city.date.dayOfMonth}, Y${city.date.year}` : '—';
 
   return (
     <div className="panel top-bar">
       <span className="city-name">River Valley</span>
       <span className="top-divider" />
-      <span className={`funds ${flash ? `flash-${flash}` : ''}`}>
+      <Stat title="Date" glyph={<g {...icon}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></g>}>
+        <span className="stat-value date">{date}</span>
+      </Stat>
+      <Stat
+        title={city ? `Population ${city.population.toLocaleString()} of ${city.housing.toLocaleString()} homes` : 'Population'}
+        flash={popFlash}
+        glyph={<g {...icon}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx="17" cy="9" r="2.4" /><path d="M16 14.2c2.8.2 5 2.6 5 5.8" /></g>}
+      >
+        <span className="stat-value">{(city?.population ?? 0).toLocaleString()}</span>
+      </Stat>
+      <Stat
+        title={city ? `${city.workers.toLocaleString()} workers in ${city.jobs.toLocaleString()} jobs · ${city.unemployed.toLocaleString()} unemployed` : 'Jobs'}
+        glyph={<g {...icon}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5h6v3M3 13h18" /></g>}
+      >
+        <span className="stat-value">
+          {(city?.workers ?? 0).toLocaleString()}
+          <span className="stat-dim">/{(city?.jobs ?? 0).toLocaleString()}</span>
+        </span>
+      </Stat>
+      <span className={`funds ${fundsFlash ? `flash-${fundsFlash === 'down' ? 'spend' : 'gain'}` : ''}`} title="Funds">
         <span className="funds-sign">$</span>
         {funds.toLocaleString()}
       </span>
+      <span className="top-divider" />
+      <div className="speed-group" role="group" aria-label="Game speed">
+        {SPEED_LABELS.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            className={`speed-button ${city?.speed === i ? 'is-active' : ''}`}
+            aria-pressed={city?.speed === i}
+            title={i === 0 ? 'Pause (Space)' : `${label} speed ([ / ])`}
+            onClick={() => game?.setSpeed(i)}
+          >
+            {i === 0 ? (
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width={10 + i * 4} height="13" aria-hidden="true" preserveAspectRatio="none">
+                {Array.from({ length: i }, (_, k) => (
+                  <path key={k} d={`M${4 + k * (16 / i)} 5l${14 / i} 7-${14 / i} 7z`} fill="currentColor" />
+                ))}
+              </svg>
+            )}
+          </button>
+        ))}
+      </div>
       <span className="top-divider" />
       <button
         type="button"

@@ -34,6 +34,8 @@ export interface InputCallbacks {
   onPrimaryUp: (screen: ScreenPoint, shift: boolean) => void;
   /** Right click without dragging: cancel the current tool action. */
   onCancel: () => void;
+  /** Left click without dragging while no tool takes the drag (e.g. inspect). */
+  onClick: (screen: ScreenPoint) => void;
 }
 
 /**
@@ -131,6 +133,7 @@ export class InputController {
     }
     if (this.drag?.id === e.pointerId) {
       if (this.drag.button === 2 && !this.drag.moved) this.cb.onCancel();
+      if (this.drag.button === 0 && !this.drag.moved) this.cb.onClick(this.local(e));
       this.drag = null;
       this.el.style.cursor = '';
     }

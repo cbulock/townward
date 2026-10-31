@@ -1,77 +1,79 @@
-# Spec — Zoning & Buildings
+# Spec: Buildings, Zoning & Growth
 
-Status: **Draft** (implemented in Phase 4)
+Status: **4a done** (catalog, art, Build tool). 4b zoning/growth and 4c cars follow.
 
-## Two Kinds of Buildings
+Try every building with plenty of money: `http://localhost:5173/?funds=100000`.
 
-1. **Zoned (grown) buildings.** The player paints zones and buildings appear on their own over time.
-2. **Placed (plopped) buildings.** The player places them directly (power plant, park, town hall…).
+## Two Ways Buildings Appear
 
-## Zoning
+1. **Grown (zoned).** The player paints R/C/I zones and matching buildings appear and level up over time (Phase 4b).
+2. **Placed.** The player puts a building down directly with the **Build** tool. In 4a every catalog building can be placed, so we can see and tune them all. Once growth exists, zoned types may become growth-only.
 
-- Zone tool with three sub-tools: **R** (Residential), **C** (Commercial), **I** (Industrial). Hotkeys `1` `2` `3`.
-- Drag a rectangle. Only buildable, empty, road-free tiles get zoned.
-- Cost: $5 per tile (tunable).
-- Zoned-but-empty tiles show a light tint plus a dotted border in the zone colour (see tokens in [04-ui-ux.md](../04-ui-ux.md)).
-- Dezone: bulldoze tool over empty zoned tiles.
+## Catalog (`src/sim/buildings/catalog.ts`)
 
-## Growth Rules (Phase 4, simple version)
+All art is original and generated in code (`src/render/atlas/buildingArt.ts`), with 3 colour variants each.
 
-Runs every N sim ticks:
+### Residential
 
-1. Pick K random zoned, empty tiles (K scales with map size, so growth is spread out and cheap).
-2. A tile can develop if a **road is within 3 tiles** (Manhattan distance).
-3. With probability `p` (tunable), spawn a **level-1, 1×1** building of that zone, starting in a "construction" state for a few seconds.
-4. **Upgrades:** existing buildings randomly level up (1 → 2 → 3) over time.
-5. **Merging:** if a 2×2 or 3×3 block of same-zone level-2+ buildings exists, it can be replaced by a bigger building.
+| Id | Name | Size | Level | Floors | Residents | Look |
+|---|---|---|---|---|---|---|
+| `cottage` | Cottage | 1×1 | 1 | 1 | 3 | small gable-roof house, chimney, picket garden |
+| `family_house` | Family House | 1×1 | 1 | 2 | 5 | two storeys, hip roof, porch |
+| `townhouses` | Townhouses | 1×1 | 2 | 3 | 12 | narrow row of 3, coloured doors, flat roof |
+| `walkup` | Walk-up Apartments | 1×1 | 2 | 4 | 24 | brick, balconies, roof parapet |
+| `apartment_block` | Apartment Block | 2×2 | 3 | 8 | 120 | balconies, rooftop water tank |
+| `condo_tower` | Condo Tower | 2×2 | 3 | 15 | 260 | glass tower, terraces, rooftop crown |
 
-In Phase 7 this is replaced by RCI demand, power and land value. The interface
-(`canDevelop`, `chooseBuilding`) stays the same so the swap is clean.
+### Commercial
 
-## Building Definitions
+| Id | Name | Size | Level | Floors | Jobs | Look |
+|---|---|---|---|---|---|---|
+| `corner_shop` | Corner Shop | 1×1 | 1 | 2 | 6 | striped awning, shop sign |
+| `cafe` | Café | 1×1 | 1 | 1 | 8 | awning, outdoor tables |
+| `small_office` | Small Office | 1×1 | 2 | 5 | 40 | glass window bands |
+| `supermarket` | Supermarket | 2×2 | 2 | 1 | 60 | wide low box, big sign, parking lot |
+| `hotel` | Hotel | 2×2 | 3 | 11 | 90 | tower, rooftop HOTEL sign, entrance canopy |
+| `office_tower` | Office Tower | 2×2 | 3 | 18 | 400 | glass curtain wall, lit crown |
 
-```ts
-interface BuildingDef {
-  id: string;            // 'res_small_house_a'
-  kind: 'zoned' | 'placed';
-  zone?: 'R' | 'C' | 'I';
-  level?: 1 | 2 | 3;
-  size: { w: number; h: number };  // 1x1, 2x2, 3x3
-  cost?: number;          // placed only
-  population?: number;    // residents or jobs
-  art: BuildingArtSpec;   // params for the procedural art generator
-}
-```
+### Industrial
 
-## Procedural Building Art
+| Id | Name | Size | Level | Floors | Jobs | Look |
+|---|---|---|---|---|---|---|
+| `workshop` | Workshop | 1×1 | 1 | 1 | 10 | garage door, sawtooth roof |
+| `warehouse` | Warehouse | 2×2 | 2 | 2 | 40 | big box, loading docks, crates |
+| `factory` | Factory | 2×2 | 3 | 3 | 120 | sawtooth roof, smokestack |
 
-Every building is drawn in code at atlas build time:
-- An isometric box (left face, right face, roof) with per-zone palettes.
-  - R: warm walls, red/brown pitched or flat roofs, small windows.
-  - C: glassy blues, taller, signage stripes.
-  - I: grey/yellow, sawtooth roofs, chimneys (smoke particles at runtime).
-- Height grows with level. Window grids, roof details and colour jitter come from a seed, so neighbours don't look identical.
-- 3–5 variants per (zone × level × size).
+### Civic
 
-## Placed Buildings (first set)
-
-| Building | Size | Cost | Notes |
+| Id | Name | Size | Look |
 |---|---|---|---|
-| Park | 1×1 | $100 | Trees, bench, path |
-| Town Hall | 2×2 | $5,000 | One per city |
-| Power Plant (coal) | 3×3 | $3,000 | Smokestack particles; no power sim yet |
+| `park` | Park | 1×1 | lawn, trees, path, bench, fountain |
+| `town_hall` | Town Hall | 2×2 | columns, pediment, clock dome, plaza |
 
-Placement: a ghost footprint follows the cursor, snaps to the grid and is
-tinted valid or invalid. Needs all footprint tiles buildable and empty. Trees
-are cleared automatically.
+More civic buildings (police, fire, school, hospital, power, water) come with services in Phases 7–8.
+
+## Placement Rules (`planPlace` / `applyPlace` in `sim/commands.ts`)
+
+- The footprint must be fully on the map and on land (no water or rock), with no road and no other building.
+- Trees and decorations in the footprint are cleared automatically at their clearing cost.
+- Cost = building cost + clearing.
+- The cursor sits on the footprint's centre tile (for 2×2, the tile above-left of centre).
+- The **Clear** tool removes the whole building if any of its tiles is selected (free for now).
+
+## Data
+
+- `World.building[i]` holds the building instance id covering tile `i` (−1 if none).
+- `World.buildings: Map<id, { id, def, x, y }>`, where `(x, y)` is the footprint's top (north) tile.
 
 ## Rendering
 
-- Multi-tile buildings are **one sprite** anchored at the footprint's bottom (south) corner.
-- Depth-sort by the footprint's front-most tile `(x + w − 1) + (y + h − 1)`.
-- The `building` layer stores the instance id on every covered tile, which is used for picking and bulldozing.
+- A building is **one sprite**, in a frame tall enough for its floors and roof.
+- It's drawn in the chunk that owns its **front tile** `(x + w − 1, y + h − 1)` and sorted with trees by that tile's diagonal, so buildings and trees overlap correctly.
+- Painter (`buildingArt.ts`): an iso box with a lit south-west face and a shaded south-east face, then:
+  - roof: gable, hip, flat with parapet, sawtooth, or glass;
+  - facade: punched windows, window bands or a curtain wall, with a few lit windows;
+  - extras: chimney, awning, sign, balconies, water tank, AC units, loading dock, smokestack, canopy, crown, parking, garden.
 
-## Info Panel
+## Growth (Phase 4b, planned)
 
-Clicking a building shows its name, zone, level, residents/jobs and (later)
-power, land value and happiness.
+Same as before: zoned tiles within 3 of a road develop at level 1, upgrade over time and merge into 2×2 buildings. Later the RCI demand, power and land value from Phase 7 drive it. `chooseBuilding(zone, level, size)` picks from this catalog.

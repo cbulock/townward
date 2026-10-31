@@ -1,16 +1,21 @@
 import { worldToTile } from '../render/iso';
-import { BRIDGE_ANCHOR_Y } from '../render/atlas/geometry';
+import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildingArt';
+import { BRIDGE_ANCHOR_Y, GROUND_PAD } from '../render/atlas/geometry';
 import { Renderer } from '../render/Renderer';
-import { SIM_TICK_HZ } from '../shared/constants';
+import { BALANCE } from '../shared/balance';
+import { HALF_H, SIM_TICK_HZ } from '../shared/constants';
+import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
-import { applyClear, applyRoad, type ApplyResult, type PlannedTile } from '../sim/commands';
-import { roadMask, type BuildableRoad, type TilePos } from '../sim/roads';
+import { applyClear, applyPlace, applyRoad, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { cityStats, collectBudget, simulateDay, updateRoadAccess } from '../sim/population';
+import { rectTiles, roadMask, type TilePos } from '../sim/roads';
+import { Traffic } from '../sim/traffic';
 import { Decor } from '../sim/terrain/types';
 import { generateRiverValley } from '../sim/terrain/riverValley';
 import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
-import { EventBus, type GameEventMap } from './events';
+import { EventBus, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
 import { planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
@@ -18,6 +23,8 @@ import { planTool, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type Too
 export interface GameOptions {
   size: number;
   seed: number;
+  /** Starting money; defaults to BALANCE.startingFunds. */
+  funds?: number;
 }
 
 /** How often stats are pushed to the UI (they don't need 60 Hz React renders). */
@@ -26,12 +33,16 @@ const STATS_INTERVAL = 0.25;
 const MAX_RIPPLE_TIME = 0.5;
 /** Particle budget shared across all tiles of one action. */
 const PARTICLE_BUDGET = 900;
+/** Sim-time multipliers for pause, 1×, 2×, 3× (the fastest step is 4× for a real jump). */
+export const GAME_SPEEDS = [0, 1, 2, 4] as const;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
 export class Game {
   readonly events = new EventBus<GameEventMap>();
   readonly city: City;
   readonly sound = new SoundBoard();
+  readonly traffic: Traffic;
   private readonly renderer: Renderer;
   private readonly input: InputController;
   private readonly loop: GameLoop;
@@ -39,6 +50,10 @@ export class Game {
   private simTick = 0;
   private hovered: TilePos | null = null;
   private toolId: ToolId = 'select';
+  private buildingChoice: BuildingId = 'cottage';
+  private speedIndex = 1;
+  private dayTimer = 0;
+  private inspected: number | null = null;
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
   private noticeId = 0;
@@ -56,7 +71,10 @@ export class Game {
       onPrimaryMove: (p, shift) => this.onPrimaryMove(p, shift),
       onPrimaryUp: () => this.onPrimaryUp(),
       onCancel: () => this.cancel(),
+      onClick: (p) => this.onClick(p),
     });
+    this.traffic = new Traffic(city.world, city.world.seed);
+    renderer.setAgentSource(() => this.traffic.agents);
     this.loop = new GameLoop(
       SIM_TICK_HZ,
       () => this.tick(),
@@ -67,7 +85,8 @@ export class Game {
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
     const world = generateRiverValley({ seed: opts.seed, size: opts.size });
     const renderer = await Renderer.create(host, world);
-    const game = new Game(new City(world), renderer);
+    const game = new Game(new City(world, opts.funds), renderer);
+    game.loop.speed = GAME_SPEEDS[game.speedIndex];
     game.loop.start();
     return game;
   }
@@ -78,6 +97,22 @@ export class Game {
 
   get tool(): ToolId {
     return this.toolId;
+  }
+
+  get building(): BuildingId {
+    return this.buildingChoice;
+  }
+
+  /** Pick what the Build tool places (and switch to it). */
+  setBuilding(id: BuildingId) {
+    this.buildingChoice = id;
+    this.events.emit('building', id);
+    if (this.toolId !== 'build') this.setTool('build');
+    else this.updatePreview();
+  }
+
+  private plan(drag: ToolDrag | null, hovered: TilePos | null) {
+    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice);
   }
 
   // ---------------------------------------------------------------- tools
@@ -124,24 +159,147 @@ export class Game {
 
   private onPrimaryUp() {
     if (!this.drag) return;
-    const p = planTool(this.world, this.toolId, this.drag, null);
+    const p = this.plan(this.drag, null);
     this.drag = null;
-    if (p) {
-      // What's on each tile before it changes decides the particles (leaves, grit, dust).
-      const debris = this.debrisOf(p.plan.tiles);
-      const result: ApplyResult =
-        p.roadType !== null ? applyRoad(this.city, p.plan, p.roadType) : applyClear(this.city, p.plan);
-      if (result.ok && result.changed) {
-        const c = result.changed;
-        this.renderer.ground.refresh(c.minX, c.minY, c.maxX, c.maxY);
-        this.events.emit('funds', this.city.funds);
-        this.buildFeedback(p, result.tiles ?? [], debris);
-      } else if (result.reason === 'insufficient-funds') {
-        this.sound.play('error');
-        this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
-      }
-    }
+    if (p) this.execute(p);
     this.updatePreview();
+  }
+
+  /** Apply a tool plan: mutate the world, then refresh rendering, sim caches and UI. */
+  private execute(p: ToolPlan) {
+    // What's on each tile before it changes decides the particles (leaves, grit, dust).
+    const debris = this.debrisOf(p.plan.tiles);
+    let result: ApplyResult;
+    if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType);
+    else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
+    else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
+
+    if (p.kind === 'place' && !p.plan.ok) {
+      this.sound.play('error');
+      this.notify('error', "Can't build there: needs clear land, no roads or water");
+    } else if (result.ok && result.changed) {
+      const c = result.changed;
+      this.renderer.ground.refresh(c.minX, c.minY, c.maxX, c.maxY);
+      this.events.emit('funds', this.city.funds);
+      this.buildFeedback(p, result.tiles ?? [], debris);
+      this.afterWorldChange(p.kind !== 'place');
+    } else if (result.reason === 'insufficient-funds') {
+      this.sound.play('error');
+      this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
+    }
+  }
+
+  /** Roads or buildings changed: recheck road access, warning badges, routes and the info panel. */
+  private afterWorldChange(roadsChanged: boolean) {
+    updateRoadAccess(this.world);
+    this.renderer.indicators.sync(this.world);
+    this.traffic.refreshDemand();
+    if (roadsChanged) this.traffic.invalidateRoutes();
+    if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
+    this.emitInspect();
+    this.emitCity();
+  }
+
+  // ---------------------------------------------------------------- simulation
+
+  get speed(): number {
+    return this.speedIndex;
+  }
+
+  /** 0 = paused, 1–3 = 1×, 2×, 3×. */
+  setSpeed(index: number) {
+    this.speedIndex = Math.max(0, Math.min(GAME_SPEEDS.length - 1, index));
+    this.loop.speed = GAME_SPEEDS[this.speedIndex];
+    this.sound.play('tool');
+    this.emitCity();
+  }
+
+  private lastSpeed = 1;
+  togglePause() {
+    if (this.speedIndex === 0) this.setSpeed(this.lastSpeed);
+    else {
+      this.lastSpeed = this.speedIndex;
+      this.setSpeed(0);
+    }
+  }
+
+  private newDay() {
+    const city = this.city;
+    city.day++;
+    simulateDay(this.world);
+    this.traffic.refreshDemand();
+    if (city.day % BALANCE.daysPerMonth === 0) {
+      const r = collectBudget(city);
+      this.events.emit('funds', city.funds);
+      const month = MONTH_NAMES[(city.date.month + 11) % 12];
+      const sign = r.net >= 0 ? '+' : '−';
+      this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
+    }
+    this.emitCity();
+    this.emitInspect();
+  }
+
+  /** Push current city stats to listeners (also used by the UI bridge on connect). */
+  emitCity() {
+    const s = cityStats(this.world);
+    let cars = 0;
+    for (const a of this.traffic.agents) if (a.kind !== 'person') cars++;
+    this.events.emit('city', {
+      ...s,
+      date: this.city.date,
+      speed: this.speedIndex,
+      cars,
+      people: this.traffic.agents.length - cars,
+    });
+  }
+
+  // ---------------------------------------------------------------- inspect
+
+  private onClick(screen: ScreenPoint) {
+    if (this.toolId !== 'select') return;
+    const t = this.tileAt(screen);
+    const id = this.world.building[this.world.index(t.x, t.y)];
+    this.inspect(id === -1 ? null : id);
+  }
+
+  /** Open the info panel for a building (or close it with null). */
+  inspect(id: number | null) {
+    if (id !== null && id !== this.inspected) this.sound.play('tool');
+    this.inspected = id;
+    this.emitInspect();
+    this.updatePreview();
+  }
+
+  private emitInspect() {
+    const b = this.inspected === null ? undefined : this.world.buildings.get(this.inspected);
+    if (!b) {
+      this.events.emit('inspect', null);
+      return;
+    }
+    const d = BUILDINGS[b.def];
+    const info: InspectInfo = {
+      id: b.id,
+      name: d.name,
+      category: d.category,
+      level: d.level,
+      description: d.description,
+      occupants: b.occupants,
+      capacity: d.capacity,
+      occupantLabel: d.category === 'residential' ? 'Residents' : 'Workers',
+      hasRoad: b.entrance !== -1,
+      size: d.size,
+    };
+    this.events.emit('inspect', info);
+  }
+
+  /** Bulldoze a whole building (from the info panel). */
+  demolish(id: number) {
+    const b = this.world.buildings.get(id);
+    if (!b) return;
+    const { w, h } = BUILDINGS[b.def].size;
+    const plan = planClear(this.world, rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }));
+    this.execute({ kind: 'clear', tool: 'clear', plan });
+    this.inspect(null);
   }
 
   private debrisOf(tiles: readonly PlannedTile[]): Map<number, BurstKind> {
@@ -170,9 +328,33 @@ export class Game {
       if (kind) fx.burst(t.x, t.y, kind, perTile, k * stagger);
     });
 
-    if (p.roadType !== null) {
+    if (p.kind === 'place') {
+      const id = p.plan.building;
+      const { w, h } = BUILDINGS[id].size;
+      const b = this.world.buildings.get(this.world.building[this.world.index(p.plan.origin.x, p.plan.origin.y)]);
+      if (b) {
+        const frame = buildingFrameSize(id);
+        fx.pop(
+          [
+            {
+              // Fractional tile coords put the pop at the footprint's centre.
+              x: b.x + (w - 1) / 2,
+              y: b.y + (h - 1) / 2,
+              texture: this.renderer.textures.buildings[id][b.variant],
+              anchorY: (buildingHeadroom(id) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
+            },
+          ],
+          0,
+        );
+      }
+      tiles.forEach((t, k) => fx.burst(t.x, t.y, 'dust', 6, k * 0.03));
+      this.sound.play('build', 0, 0.8);
+      return;
+    }
+
+    if (p.kind === 'road') {
       const tex = this.renderer.textures;
-      const type: BuildableRoad = p.roadType;
+      const type = p.roadType;
       fx.pop(
         tiles.map((t) => ({
           x: t.x,
@@ -215,20 +397,36 @@ export class Game {
   }
 
   private updatePreview() {
-    const p = planTool(this.world, this.toolId, this.drag, this.hovered);
-    if (!p) this.renderer.toolPreview.clear();
+    const p = this.plan(this.drag, this.hovered);
+    const inspected = this.toolId === 'select' && this.inspected !== null ? this.world.buildings.get(this.inspected) : undefined;
+    if (inspected) {
+      // Outline the inspected building's footprint.
+      const { w, h } = BUILDINGS[inspected.def].size;
+      const tex = this.renderer.textures.selection;
+      this.renderer.toolPreview.show(
+        rectTiles({ x: inspected.x, y: inspected.y }, { x: inspected.x + w - 1, y: inspected.y + h - 1 }).map((t) => ({
+          ...t,
+          texture: tex,
+          tint: 0x4fd1c5,
+          alpha: 0.55,
+        })),
+      );
+    } else if (!p) this.renderer.toolPreview.clear();
     else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p));
     this.emitPreviewLabel();
   }
 
   private emitPreviewLabel() {
-    const p = this.drag && planTool(this.world, this.toolId, this.drag, null);
+    // Drags always show a label; the Build tool also labels the hovered spot before you click.
+    const p = this.drag ? this.plan(this.drag, null) : this.toolId === 'build' ? this.plan(null, this.hovered) : null;
     if (!p || !this.lastPointer) {
       this.events.emit('toolPreview', null);
       return;
     }
     this.events.emit('toolPreview', {
       tool: this.toolId,
+      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : null,
+      blocked: p.kind === 'place' && !p.plan.ok,
       screen: this.lastPointer,
       cost: p.plan.cost,
       count: p.plan.count,
@@ -242,12 +440,20 @@ export class Game {
 
   // ---------------------------------------------------------------- loop
 
+  /** Fixed-step simulation: runs SIM_TICK_HZ × speed times per second (GameLoop handles speed). */
   private tick() {
     this.simTick++;
+    this.dayTimer += 1 / SIM_TICK_HZ;
+    if (this.dayTimer >= BALANCE.secondsPerDay) {
+      this.dayTimer -= BALANCE.secondsPerDay;
+      this.newDay();
+    }
   }
 
   private frame(dt: number) {
     this.input.update(dt);
+    // Agents move every frame (smooth), scaled by game speed.
+    this.traffic.update(dt * GAME_SPEEDS[this.speedIndex]);
     this.renderer.render(dt);
 
     this.statsFrames++;
@@ -262,6 +468,10 @@ export class Game {
         visibleChunks: r.ground.visibleChunks,
         totalChunks: r.ground.totalChunks,
         visibleSprites: r.ground.visibleSprites,
+        agents: this.traffic.agents.length,
+        agentsDrawn: r.agents.visible,
+        bootAtlasMs: r.timings.atlas,
+        bootChunksMs: r.timings.chunks,
         zoom: r.camera.zoom,
         mapSize: this.world.width,
         seed: this.world.seed,
@@ -280,6 +490,10 @@ export class Game {
       const t = worldToTile(w.x, w.y);
       if (this.world.inBounds(t.x, t.y)) tile = t;
     }
+    if (screen && this.toolId === 'build') {
+      this.lastPointer = screen;
+      if (!this.drag) this.emitPreviewLabel();
+    }
     if (tile?.x === this.hovered?.x && tile?.y === this.hovered?.y) return;
     this.hovered = tile;
     this.renderer.hover.set(this.toolId === 'select' ? tile : null);
@@ -290,7 +504,13 @@ export class Game {
   private onKey(code: string) {
     if (code === 'KeyG') this.setGrid(!this.renderer.ground.gridOn);
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
-    else if (code === 'Escape') this.cancel();
+    else if (code === 'Space') this.togglePause();
+    else if (code === 'BracketLeft') this.setSpeed(Math.max(1, this.speedIndex - 1));
+    else if (code === 'BracketRight') this.setSpeed(this.speedIndex + 1);
+    else if (code === 'Escape') {
+      if (this.inspected !== null && !this.drag) this.inspect(null);
+      else this.cancel();
+    }
     else {
       const tool = (Object.keys(TOOL_KEYS) as ToolId[]).find((t) => TOOL_KEYS[t] === code);
       if (tool) this.setTool(tool === this.toolId ? 'select' : tool);

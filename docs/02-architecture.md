@@ -54,6 +54,9 @@ src/
     City.ts                funds (budget, population, date later)
     commands.ts            plan*/apply* pairs: every world mutation (undo later)
     roads.ts               road types, auto-tile mask, paths
+    population.ts          road access, daily population/jobs, monthly budget
+    traffic.ts             routing, car and pedestrian agents
+    buildings/catalog.ts   building definitions (BuildingId union from `as const satisfies`)
     layers.ts              typed-array layers
     terrain/               generator, presets
     roads/                 autotile mask logic
@@ -67,6 +70,7 @@ src/
     atlas/                 procedural tile art → texture atlas
     overlays/              hover, tool ghost preview
     fx/                    build pops + pooled particles
+    agents/                car and pedestrian sprites (pooled, culled, LOD)
   shared/                  constants, rng, math utils
 tests/
 docs/

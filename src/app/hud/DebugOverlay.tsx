@@ -40,6 +40,14 @@ export function DebugOverlay() {
         </dd>
         <dt>Sprites</dt>
         <dd>{stats.visibleSprites.toLocaleString()}</dd>
+        <dt>Agents</dt>
+        <dd>
+          {stats.agentsDrawn}/{stats.agents}
+        </dd>
+        <dt>Boot</dt>
+        <dd>
+          atlas {Math.round(stats.bootAtlasMs)} · map {Math.round(stats.bootChunksMs)} ms
+        </dd>
         <dt>Zoom</dt>
         <dd>{stats.zoom.toFixed(2)}×</dd>
         <dt>Map</dt>

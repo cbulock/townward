@@ -7,15 +7,15 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 3 — Roads, highways, bridges & clearing ✅ (verify 60 FPS on real hardware) |
-| **Next phase** | Phase 4 — Zoning & buildings |
+| **Current phase** | Phase 4c — Simulation, cars & people ✅ (population, jobs, budget, traffic) |
+| **Next phase** | Phase 4b — Zoning & growth |
 | **Last updated** | 2026-10-31 |
 
 ## Run It
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173  (?size=64|128|256&seed=N)
+pnpm dev          # http://localhost:5173  (?size=64|128|256&seed=N&funds=N)
 pnpm test         # unit tests
 pnpm typecheck && pnpm lint
 ```
@@ -30,7 +30,8 @@ pnpm typecheck && pnpm lint
 | [04-ui-ux.md](04-ui-ux.md) | Visual language, HUD layout, controls, "feel" rules |
 | [specs/terrain.md](specs/terrain.md) | Terrain types, generator, new-game terrain picker |
 | [specs/roads.md](specs/roads.md) | Road tool, auto-tiling, bulldozing, costs |
-| [specs/buildings.md](specs/buildings.md) | Zoning, building footprints, growth rules, placeable buildings |
+| [specs/buildings.md](specs/buildings.md) | Building catalog, footprints, placement; zoning and growth (planned) |
+| [specs/simulation.md](specs/simulation.md) | Time, population, jobs, budget, traffic and pedestrians |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

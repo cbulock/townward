@@ -1,3 +1,4 @@
+import type { BuildingId } from '../sim/buildings/catalog';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -6,15 +7,50 @@ export interface GameEventMap {
   hover: { x: number; y: number } | null;
   grid: boolean;
   tool: ToolId;
+  building: BuildingId;
   funds: number;
   /** Live cost label for an in-progress drag; null when there's nothing to show. */
   toolPreview: ToolPreviewInfo | null;
   notice: Notice;
   muted: boolean;
+  city: CityInfo;
+  /** Building shown in the info panel, or null when it's closed. */
+  inspect: InspectInfo | null;
+}
+
+export interface CityInfo {
+  population: number;
+  housing: number;
+  jobs: number;
+  workers: number;
+  unemployed: number;
+  date: { year: number; month: number; dayOfMonth: number };
+  /** Index into GAME_SPEEDS (0 = paused). */
+  speed: number;
+  cars: number;
+  people: number;
+}
+
+export interface InspectInfo {
+  id: number;
+  name: string;
+  category: string;
+  level: number;
+  description: string;
+  occupants: number;
+  capacity: number;
+  /** 'Residents' for homes, 'Workers' otherwise. */
+  occupantLabel: string;
+  hasRoad: boolean;
+  size: { w: number; h: number };
 }
 
 export interface ToolPreviewInfo {
   tool: ToolId;
+  /** Name shown instead of the tool verb (e.g. the building being placed). */
+  label: string | null;
+  /** The action can't happen here (e.g. building footprint blocked). */
+  blocked: boolean;
   /** Cursor position in canvas CSS px. */
   screen: { x: number; y: number };
   cost: number;
@@ -36,6 +72,10 @@ export interface DebugStats {
   visibleChunks: number;
   totalChunks: number;
   visibleSprites: number;
+  agents: number;
+  agentsDrawn: number;
+  bootAtlasMs: number;
+  bootChunksMs: number;
   zoom: number;
   mapSize: number;
   seed: number;

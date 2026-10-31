@@ -7,6 +7,19 @@ import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
+import { BUILDING_VARIANTS, buildingFrameSize, paintBuilding } from './buildingArt';
+import {
+  paintPerson,
+  paintVehicle,
+  PERSON_H,
+  PERSON_VARIANTS,
+  PERSON_W,
+  VEHICLE_FRAME_H,
+  VEHICLE_KINDS,
+  VEHICLE_VARIANTS,
+} from './agentArt';
+import type { AgentKind } from '../../sim/traffic';
+import { BUILDING_IDS, type BuildingId } from '../../sim/buildings/catalog';
 import { CHIP_SIZE, LEAF_SIZE, paintChip, paintLeaf, paintPuff, PUFF_SIZE } from './fxArt';
 import type { FxTextures } from '../fx/Effects';
 import {
@@ -50,7 +63,15 @@ export interface TerrainTextures {
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Plain white diamond for tool previews (tinted at runtime). */
   selection: Texture;
+  /** Buildings, indexed by id then variant. Frames vary in size: see buildingFrameSize(). */
+  buildings: Readonly<Record<BuildingId, Texture[]>>;
   fx: FxTextures;
+  /** Vehicles, indexed by kind, then variant, then direction (0 NE, 1 SE, 2 SW, 3 NW). */
+  vehicles: Readonly<Record<Exclude<AgentKind, 'person'>, Texture[][]>>;
+  /** Pedestrians, indexed by variant then walk frame (0/1). */
+  people: Texture[][];
+  /** "No road access" warning badge. */
+  warnRoad: Texture;
   hover: Texture;
   gridLine: Texture;
 }
@@ -99,6 +120,32 @@ function paintSelection(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
   ctx.lineWidth = 1;
   ctx.stroke();
+}
+
+/** Map-pin style badge with a little road glyph: "this building has no road". */
+function paintWarnRoad(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(9, 18.5, 3.5, 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#5a1d14';
+  ctx.beginPath();
+  ctx.arc(9, 8, 8, 0, Math.PI * 2);
+  ctx.moveTo(5, 13);
+  ctx.lineTo(9, 18);
+  ctx.lineTo(13, 13);
+  ctx.fill();
+  ctx.fillStyle = '#ff6a3d';
+  ctx.beginPath();
+  ctx.arc(9, 8, 6.8, 0, Math.PI * 2);
+  ctx.fill();
+  // Road glyph: two edges and a dashed centre line.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(5.5, 4, 1.2, 8);
+  ctx.fillRect(11.3, 4, 1.2, 8);
+  ctx.fillRect(8.5, 4, 1, 2);
+  ctx.fillRect(8.5, 7, 1, 2);
+  ctx.fillRect(8.5, 10, 1, 2);
 }
 
 function paintGridLine(ctx: CanvasRenderingContext2D) {
@@ -157,6 +204,19 @@ export function buildTerrainTextures(): TerrainTextures {
     for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis));
   }
   b.add('selection', W, H, paintSelection);
+  for (const id of BUILDING_IDS) {
+    const f = buildingFrameSize(id);
+    for (let v = 0; v < BUILDING_VARIANTS; v++) b.add(`bld_${id}_${v}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v));
+  }
+  for (const k of VEHICLE_KINDS) {
+    for (let v = 0; v < VEHICLE_VARIANTS; v++) {
+      for (let d = 0; d < 4; d++) b.add(`veh_${k}_${v}_${d}`, W, VEHICLE_FRAME_H, (ctx) => paintVehicle(ctx, k, v, d));
+    }
+  }
+  for (let v = 0; v < PERSON_VARIANTS; v++) {
+    for (let f = 0; f < 2; f++) b.add(`person_${v}_${f}`, PERSON_W, PERSON_H, (ctx) => paintPerson(ctx, v, f));
+  }
+  b.add('warn_road', 18, 20, paintWarnRoad);
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
   b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
@@ -192,6 +252,14 @@ export function buildTerrainTextures(): TerrainTextures {
       ROAD_TYPES.map((t) => [t, [Texture.EMPTY, get(`bridge_${t}_${BridgeAxis.X}`), get(`bridge_${t}_${BridgeAxis.Y}`)]]),
     ) as Record<BuildableRoad, Texture[]>,
     selection: get('selection'),
+    buildings: Object.fromEntries(
+      BUILDING_IDS.map((id) => [id, range(BUILDING_VARIANTS, (v) => get(`bld_${id}_${v}`))]),
+    ) as Record<BuildingId, Texture[]>,
+    vehicles: Object.fromEntries(
+      VEHICLE_KINDS.map((k) => [k, range(VEHICLE_VARIANTS, (v) => range(4, (d) => get(`veh_${k}_${v}_${d}`)))]),
+    ) as Record<Exclude<AgentKind, 'person'>, Texture[][]>,
+    people: range(PERSON_VARIANTS, (v) => range(2, (f) => get(`person_${v}_${f}`))),
+    warnRoad: get('warn_road'),
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
     hover: get('hover'),
     gridLine: get('grid'),

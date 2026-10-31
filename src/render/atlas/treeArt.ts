@@ -55,6 +55,13 @@ export function paintTreeCluster(ctx: CanvasRenderingContext2D, density: 1 | 2 |
   for (const t of trees) pine(ctx, t);
 }
 
+/** A single pine with its shadow, for other art (parks, gardens). */
+export function paintPine(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, shade = 0) {
+  const t: TreeSpec = { x, y, size, shade: shade % PINE_SHADES.length };
+  shadow(ctx, t);
+  pine(ctx, t);
+}
+
 function shadow(ctx: CanvasRenderingContext2D, t: TreeSpec) {
   ctx.fillStyle = 'rgba(20, 70, 20, 0.35)';
   ctx.beginPath();

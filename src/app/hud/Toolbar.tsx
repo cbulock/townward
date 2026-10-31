@@ -37,6 +37,21 @@ const TOOLS: readonly ToolDef[] = [
     ),
   },
   {
+    id: 'build',
+    label: 'Build',
+    key: 'E',
+    hint: 'Place homes, shops, industry and civic buildings',
+    icon: (
+      <g {...stroke}>
+        <path d="M3 11l7-6 7 6" />
+        <path d="M5 10v10h10V10" />
+        <path d="M9 20v-5h3v5" />
+        <path d="M17 20h4V7h-4" />
+        <path d="M18.5 10h1M18.5 13h1M18.5 16h1" />
+      </g>
+    ),
+  },
+  {
     id: 'road',
     label: 'Road',
     key: 'R',

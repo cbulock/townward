@@ -1,4 +1,5 @@
 import { Application, Container } from 'pixi.js';
+import type { Agent } from '../sim/traffic';
 import type { World } from '../sim/World';
 import { Camera } from './Camera';
 import { ChunkRenderer } from './ChunkRenderer';
@@ -7,6 +8,8 @@ import { mapWorldBounds } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
 import { ToolPreview } from './overlays/ToolPreview';
 import { Effects } from './fx/Effects';
+import { AgentRenderer } from './agents/AgentRenderer';
+import { Indicators } from './overlays/Indicators';
 
 /**
  * Owns the Pixi application and the world scene graph:
@@ -16,9 +19,10 @@ import { Effects } from './fx/Effects';
  *      ├─ ground   (dual-grid terrain, masked to the map shape)
  *      ├─ roads
  *      ├─ grid     (optional tile outlines)
+ *      ├─ agents   (cars, pedestrians; under objects so buildings in front cover them)
  *      ├─ objects  (trees, decorations; buildings in later phases)
  *      ├─ fx       (build pops, particles)
- *      └─ overlay  (tool ghosts, hover)
+ *      └─ overlay  (tool ghosts, hover, warning badges)
  */
 export class Renderer {
   readonly app: Application;
@@ -31,6 +35,12 @@ export class Renderer {
   hover!: HoverHighlight;
   textures!: TerrainTextures;
   effects!: Effects;
+  agents!: AgentRenderer;
+  indicators!: Indicators;
+  private world!: World;
+  private agentSource: () => readonly Agent[] = () => [];
+  /** Boot timings (ms) for the debug overlay. */
+  readonly timings = { atlas: 0, chunks: 0 };
 
   /** Draw calls issued during the last rendered frame (WebGL only). */
   drawCalls = 0;
@@ -58,13 +68,25 @@ export class Renderer {
     return r;
   }
 
+  /** Where the agent layer reads cars and people from each frame. */
+  setAgentSource(source: () => readonly Agent[]) {
+    this.agentSource = source;
+  }
+
   private setup(world: World) {
+    this.world = world;
+    let t0 = performance.now();
     const tex = buildTerrainTextures();
+    this.timings.atlas = performance.now() - t0;
     this.textures = tex;
     this.effects = new Effects(tex.fx);
+    this.agents = new AgentRenderer(tex);
+    this.indicators = new Indicators(tex.warnRoad);
+    t0 = performance.now();
     this.ground = new ChunkRenderer(world, tex);
+    this.timings.chunks = performance.now() - t0;
     this.hover = new HoverHighlight(tex.hover);
-    this.overlay.addChild(this.toolPreview.container, this.hover.sprite);
+    this.overlay.addChild(this.toolPreview.container, this.hover.sprite, this.indicators.container);
     this.objects.addChild(this.ground.objectsRoot);
 
     this.worldRoot.addChild(
@@ -73,6 +95,7 @@ export class Renderer {
       this.ground.groundRoot,
       this.ground.roadsRoot,
       this.ground.gridRoot,
+      this.agents.container,
       this.objects,
       this.effects.container,
       this.overlay,
@@ -112,11 +135,14 @@ export class Renderer {
     this.worldRoot.scale.set(cam.zoom);
     this.worldRoot.position.set(cam.screenW / 2 - cam.x * cam.zoom, cam.screenH / 2 - cam.y * cam.zoom);
 
-    this.ground.cull(cam.viewRect());
+    const view = cam.viewRect();
+    this.ground.cull(view);
+    this.agents.update(this.world, this.agentSource(), view, cam.zoom);
     this.ground.update(dt);
     this.hover.update(dt);
     this.toolPreview.update(dt);
     this.effects.update(dt);
+    this.indicators.update(dt);
 
     this.drawCallCounter = 0;
     this.app.render();
