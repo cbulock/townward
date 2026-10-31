@@ -1,6 +1,6 @@
 # Spec: Core City (Phase 7): Time, Density, Services, Utilities, Budget
 
-Status: **In progress.** Goal: the essential city-building loop, kept simple to understand.
+Status: **Implemented.** Goal: the essential city-building loop, kept simple to understand.
 
 ## 1. Time & Speed
 
@@ -34,7 +34,7 @@ Five zone tools, keys `1`–`5`:
 
 ## 3. Utilities: Power & Water (no pipes or lines)
 
-- **Delivery:** a **Power Plant** (2×2, 1,200 power) and a **Water Tower** (1×1, 900 water) supply every building connected to them **through the road network**: the same road "island" as their entrance.
+- **Delivery:** a **Power Plant** (2×2, 4,000 power) and a **Water Tower** (1×1, 2,500 water) supply every building connected to them **through the road network**: the same road "island" as their entrance.
 - **Demand:** each building needs power and water equal to its capacity (residents or jobs). Parks need none.
 - **Allocation:** on each island, demand is filled in building order until capacity runs out. Buildings left over are **unpowered** or **dry**.
 - **Effect:** a building without power or water has no residents or workers. It shows a ⚡ or 💧 badge, and its info panel says what's missing.

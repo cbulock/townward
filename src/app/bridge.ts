@@ -15,6 +15,7 @@ import {
   rotationAtom,
   clockAtom,
   dayNightAtom,
+  budgetAtom,
   worldVersionAtom,
   toolPreviewAtom,
 } from './atoms';
@@ -47,6 +48,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('rotation', (r) => store.set(rotationAtom, r)),
     game.events.on('clock', (h) => store.set(clockAtom, h)),
     game.events.on('dayNight', (m) => store.set(dayNightAtom, m)),
+    game.events.on('budget', (b) => store.set(budgetAtom, b)),
     game.events.on('worldChanged', (v) => store.set(worldVersionAtom, v)),
     game.events.on('city', (c) => store.set(cityAtom, c)),
     game.events.on('inspect', (i) => store.set(inspectAtom, i)),
@@ -61,6 +63,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     }),
   ];
   game.emitCity();
+  game.emitBudget();
   return () => {
     offs.forEach((off) => off());
     timers.forEach(clearTimeout);

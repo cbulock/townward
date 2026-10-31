@@ -1,5 +1,13 @@
 import { useAtomValue } from 'jotai';
+import { SERVICE_KINDS as ALL_SERVICES, type ServiceKind } from '../../sim/buildings/catalog';
 import { gameAtom, inspectAtom } from '../atoms';
+
+const SERVICE_LABEL: Readonly<Record<ServiceKind, string>> = {
+  police: 'Police',
+  fire: 'Fire',
+  health: 'Clinic',
+  education: 'School',
+};
 
 const CATEGORY_LABEL: Readonly<Record<string, string>> = {
   residential: 'Home',
@@ -50,9 +58,48 @@ export function InfoPanel() {
           Under construction · {info.constructionDays} day{info.constructionDays === 1 ? '' : 's'} left
         </div>
       )}
+      {info.provides?.kind === 'service' && (
+        <div className="info-row">
+          <span>{SERVICE_LABEL[info.provides.service]} coverage</span>
+          <strong>{info.provides.radius} tiles around</strong>
+        </div>
+      )}
+      {info.provides?.kind === 'utility' && (
+        <div className="info-row">
+          <span>Supplies</span>
+          <strong>
+            {info.provides.power ? `${info.provides.power.toLocaleString()} power` : ''}
+            {info.provides.water ? `${info.provides.water.toLocaleString()} water` : ''}
+          </strong>
+        </div>
+      )}
+      {info.needsUtilities && info.constructionDays === 0 && (
+        <div className="info-utilities">
+          <span className={`info-pill ${info.powered ? 'ok' : 'warn'}`}>{info.powered ? '⚡ Power' : '⚡ No power'}</span>
+          <span className={`info-pill ${info.watered ? 'ok' : 'warn'}`}>{info.watered ? '💧 Water' : '💧 No water'}</span>
+        </div>
+      )}
+      {info.needsUtilities && (
+        <div className="info-services">
+          <span className="info-services-label">Services nearby</span>
+          <span className="info-services-list">
+            {ALL_SERVICES.map((k) => (
+              <span key={k} className={`info-pill ${info.services.includes(k) ? 'ok' : 'off'}`}>
+                {SERVICE_LABEL[k]}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
       <div className={`info-status ${info.hasRoad ? 'ok' : 'warn'}`}>
         {info.hasRoad ? 'Connected to the road network' : 'No road access: build a road within 3 tiles'}
       </div>
+      {info.upkeep > 0 && (
+        <div className="info-row dim">
+          <span>Upkeep</span>
+          <span>${info.upkeep.toLocaleString()}/month</span>
+        </div>
+      )}
       <div className="info-row dim">
         <span>Origin</span>
         <span>{info.grown ? 'Grew on a zone' : 'Placed'}</span>

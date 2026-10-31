@@ -326,6 +326,7 @@ export class Game {
       this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
     }
     this.emitCity();
+    this.emitBudget();
     this.emitInspect();
   }
 

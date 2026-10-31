@@ -84,7 +84,7 @@ function coverageTiles(world: World, tex: TerrainTextures, id: BuildingId, origi
   for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       if (!world.inBounds(x, y) || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
-      out.push({ x, y, texture: tex.selection, tint: SERVICE_TINT[d.service], alpha: 0.16 });
+      out.push({ x, y, texture: tex.selection, tint: SERVICE_TINT[d.service], alpha: 0.32 });
     }
   }
   return out;

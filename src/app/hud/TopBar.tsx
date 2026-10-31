@@ -1,7 +1,7 @@
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
-import { cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { budgetOpenAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -57,11 +57,21 @@ function Clock() {
   const mode = useAtomValue(dayNightAtom);
   const game = useAtomValue(gameAtom);
   const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  // Close the menu on any click outside it.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && !wrap.current?.contains(e.target)) setOpen(false);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [open]);
   const h = Math.floor(hour);
   const m = Math.floor(((hour - h) * 60) / 10) * 10;
   const day = mode === 'day' || (mode === 'cycle' && hour >= 6.5 && hour < 19);
   return (
-    <span className="clock-wrap">
+    <span className="clock-wrap" ref={wrap}>
       <button
         type="button"
         className={`clock ${open ? 'is-open' : ''}`}
@@ -147,6 +157,7 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
   const muted = useAtomValue(mutedAtom);
   const game = useAtomValue(gameAtom);
   const rotation = useAtomValue(rotationAtom);
+  const setBudgetOpen = useSetAtom(budgetOpenAtom);
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
 
@@ -185,10 +196,15 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
         </span>
       </Stat>
       <DemandMeter demand={city?.demand} />
-      <span className={`funds ${fundsFlash ? `flash-${fundsFlash === 'down' ? 'spend' : 'gain'}` : ''}`} title="Funds">
+      <button
+        type="button"
+        className={`funds ${fundsFlash ? `flash-${fundsFlash === 'down' ? 'spend' : 'gain'}` : ''}`}
+        title="Budget & taxes"
+        onClick={() => setBudgetOpen((o) => !o)}
+      >
         <span className="funds-sign">$</span>
         {funds.toLocaleString()}
-      </span>
+      </button>
       <span className="top-divider" />
       <div className="speed-group" role="group" aria-label="Game speed">
         {SPEED_LABELS.map((label, i) => (

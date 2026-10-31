@@ -298,7 +298,7 @@ export const BUILDINGS = {
     description: 'Powers every building connected to it by road, up to its capacity.',
     group: 'utilities',
     upkeep: 150,
-    supplies: { power: 1200 },
+    supplies: { power: 4000 },
   },
   water_tower: {
     name: 'Water Tower',
@@ -312,7 +312,7 @@ export const BUILDINGS = {
     description: 'Supplies water to every building connected to it by road, up to its capacity.',
     group: 'utilities',
     upkeep: 80,
-    supplies: { water: 900 },
+    supplies: { water: 2500 },
   },
 } as const satisfies Record<string, BuildingDef>;
 

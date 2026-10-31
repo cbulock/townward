@@ -8,6 +8,7 @@ import { ControlsHint } from '../hud/ControlsHint';
 import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
 import { InfoPanel } from '../hud/InfoPanel';
+import { BudgetPanel } from '../hud/BudgetPanel';
 import { Minimap } from '../hud/Minimap';
 import { Notices } from '../hud/Notices';
 import { Toolbar } from '../hud/Toolbar';
@@ -69,6 +70,7 @@ export function GameScreen({ options, onReroll, onNewCity }: GameScreenProps) {
       <TopBar cityName={options.name} onNewCity={onNewCity} />
       <DebugOverlay />
       <InfoPanel />
+      <BudgetPanel />
       <BuildingPicker />
       <Toolbar />
       <Minimap />

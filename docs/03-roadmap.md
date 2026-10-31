@@ -142,15 +142,15 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Zoom-out limited to keep the screen inside the map
 - [x] ~~Hills, Raise/Lower/Level tools~~: built, then removed at the user's request to keep the game simple (D-051). Maps are flat; the renderer can still draw heights.
 
-## Phase 7 — Core City 🚧  → [specs/core.md](specs/core.md)
+## Phase 7 — Core City ✅  → [specs/core.md](specs/core.md)
 
-- [ ] Slower time (6 s days), true 1×/2×/3×, day/night control (cycle / day / night)
-- [ ] Density zones: Apartments and Offices (tools 1–5)
-- [ ] Utilities: power plant and water tower over the road network; ⚡/💧 badges
-- [ ] Services: police, fire, clinic, school with coverage; occupancy and level-ups depend on it; fires
-- [ ] Budget panel with a tax rate; civic upkeep
-- [ ] Civic panel tabs (Services / Utilities / Parks), coverage preview
-- [ ] Tests and docs
+- [x] Slower time (6 s days), true 1×/2×/3×, day/night control (cycle / day / night) in the top bar
+- [x] Density zones: Apartments and Offices (tools 1–5)
+- [x] Utilities: power plant and water tower over the road network; ⚡/💧 badges and first-time hints
+- [x] Services: police, fire, clinic, school with coverage; occupancy and level-ups depend on it; fires
+- [x] Budget panel (click the funds): tax rate, forecast, utility supply; civic upkeep
+- [x] Civic panel tabs (Services / Utilities / Parks & Civic), coverage preview while placing
+- [x] Tests (107) and docs
 
 ## Later Phases (to be specced when we get there)
 

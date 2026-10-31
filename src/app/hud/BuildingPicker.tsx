@@ -57,7 +57,10 @@ export function BuildingPicker() {
   const [tab, setTab] = useState<CivicGroup>('services');
 
   if (tool !== 'build') return null;
-  const ids = PLACEABLE_IDS.filter((id) => (BUILDINGS[id] as BuildingDef).group === tab);
+  const ids = PLACEABLE_IDS.filter((id) => {
+    const d: BuildingDef = BUILDINGS[id];
+    return d.group === tab;
+  });
 
   return (
     <div className="panel building-picker" role="dialog" aria-label="Choose a civic building">

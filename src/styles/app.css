@@ -1079,3 +1079,124 @@ kbd {
   font-size: 11px;
   font-weight: 600;
 }
+
+/* ---------- Info panel: utilities & services ---------- */
+.info-utilities,
+.info-services-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.info-services {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.info-services-label {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.info-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+.info-pill.ok {
+  background: rgba(79, 209, 197, 0.14);
+  color: var(--accent);
+}
+.info-pill.warn {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fecaca;
+}
+.info-pill.off {
+  opacity: 0.55;
+}
+
+/* ---------- Funds button & budget panel ---------- */
+button.funds {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 2px 8px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+button.funds:hover {
+  background: var(--bg-panel-hover);
+}
+.budget-panel {
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 4;
+}
+.budget-heading {
+  margin: 6px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.budget-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.budget-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.budget-line.income strong {
+  color: var(--money);
+}
+.budget-line.total {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border-panel);
+}
+.budget-line.total.gain strong {
+  color: var(--money);
+}
+.budget-line.total.loss strong,
+.budget-line .warn {
+  color: var(--danger);
+}
+.tax {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tax input {
+  accent-color: var(--accent);
+}
+.tax-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.supply {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.meter-fill.is-short {
+  background: var(--danger);
+}
+
+/* The top bar's menus (day/night) must open above the panels below it. */
+.top-bar {
+  z-index: 6;
+}

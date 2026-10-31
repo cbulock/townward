@@ -2,6 +2,19 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Phase 7 — Core city
+- **Time:** days last 6 s, speeds are true 1×/2×/3×, and the clock opens a day/night menu (cycle / always day / always night, with `L` stepping through).
+- **Density (D-054):** zone tools 1–5 for Homes, Apartments, Shops, Offices and Industry, with darker tints for high density. Growth is density-aware.
+- **Utilities (D-052):** power plant (4,000) and water tower (2,500) pooled per road island, ⚡/💧 badges, one-time hints, utility supply in the budget panel.
+- **Services (D-053):**
+  - Police, fire, clinic and school, with coverage circles previewed while placing.
+  - Occupancy is 70% + 7.5% per covering service; level-ups require services.
+  - Fires break out outside fire coverage.
+- **Budget:** tax slider (0–20%) that moves demand, a forecast with a cost breakdown, and per-building upkeep.
+- **UI:** the Civic panel has Services / Utilities / Parks & Civic tabs; the info panel shows power, water, services and upkeep.
+- Fixed while testing: the day/night menu opened under the budget panel, and it now closes on an outside click.
+- Tests: 107. Verified in the browser: a full loop (road → services → utilities → four zone types → 476 residents at 3×), the budget panel, day/night menu and info panel. No errors.
+
 ## 2026-10-31: Simplify: flat maps, no terrain tools, no Dezone
 - User decision (D-051): removed the hills (generator, presets, slider, URL param), the Raise/Lower/Level tools and `sim/terraform.ts`. The borderlands ring is flat.
 - Dezone removed: Clear now also removes zones (and a bulldozed grown building doesn't regrow).
