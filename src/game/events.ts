@@ -1,8 +1,31 @@
+import type { ToolId } from './tools';
+
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
 export interface GameEventMap {
   stats: DebugStats;
   hover: { x: number; y: number } | null;
   grid: boolean;
+  tool: ToolId;
+  funds: number;
+  /** Live cost label for an in-progress drag; null when there's nothing to show. */
+  toolPreview: ToolPreviewInfo | null;
+  notice: Notice;
+}
+
+export interface ToolPreviewInfo {
+  tool: ToolId;
+  /** Cursor position in canvas CSS px. */
+  screen: { x: number; y: number };
+  cost: number;
+  /** Tiles that will change. */
+  count: number;
+  affordable: boolean;
+}
+
+export interface Notice {
+  id: number;
+  kind: 'error' | 'info';
+  message: string;
 }
 
 export interface DebugStats {

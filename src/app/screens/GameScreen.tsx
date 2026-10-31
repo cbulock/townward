@@ -4,7 +4,14 @@ import { Game, type GameOptions } from '../../game/Game';
 import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { connectGameToStore } from '../bridge';
 import { ControlsHint } from '../hud/ControlsHint';
+import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
+import { Notices } from '../hud/Notices';
+import { Toolbar } from '../hud/Toolbar';
+import { TopBar } from '../hud/TopBar';
+
+/** The approved River Valley map (docs/specs/terrain.md). Used when the URL has no seed. */
+const DEFAULT_SEED = 42;
 
 /** Until the New Game screen exists, map size and seed live in the URL (`?size=256&seed=42`). */
 function readOptions(): GameOptions {
@@ -13,7 +20,7 @@ function readOptions(): GameOptions {
   const seed = Number(q.get('seed'));
   return {
     size: (MAP_SIZES as readonly number[]).includes(size) ? size : DEFAULT_MAP_SIZE,
-    seed: q.has('seed') && Number.isInteger(seed) ? seed : randomSeed(),
+    seed: q.has('seed') && Number.isInteger(seed) ? seed : DEFAULT_SEED,
   };
 }
 
@@ -73,7 +80,11 @@ export function GameScreen() {
     <div className="game-screen">
       <div ref={hostRef} className="game-canvas" />
       <div className={`fade-in ${ready ? 'is-ready' : ''}`} />
+      <TopBar />
       <DebugOverlay />
+      <Toolbar />
+      <Notices />
+      <CostLabel />
       <ControlsHint />
     </div>
   );

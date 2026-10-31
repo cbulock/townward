@@ -2,9 +2,10 @@ import { Application, Container } from 'pixi.js';
 import type { World } from '../sim/World';
 import { Camera } from './Camera';
 import { ChunkRenderer } from './ChunkRenderer';
-import { buildTerrainTextures } from './atlas/tiles';
+import { buildTerrainTextures, type TerrainTextures } from './atlas/tiles';
 import { mapWorldBounds } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
+import { ToolPreview } from './overlays/ToolPreview';
 
 /**
  * Owns the Pixi application and the world scene graph:
@@ -12,9 +13,10 @@ import { HoverHighlight } from './overlays/HoverHighlight';
  *   └─ worldRoot (camera transform)
  *      ├─ slab     (soil edge under the map)
  *      ├─ ground   (dual-grid terrain, masked to the map shape)
+ *      ├─ roads
  *      ├─ grid     (optional tile outlines)
- *      ├─ objects  (trees; buildings in later phases)
- *      └─ overlay  (hover, ghosts, zone tint)
+ *      ├─ objects  (trees, decorations; buildings in later phases)
+ *      └─ overlay  (tool ghosts, hover)
  */
 export class Renderer {
   readonly app: Application;
@@ -22,8 +24,10 @@ export class Renderer {
   readonly worldRoot = new Container();
   readonly objects = new Container();
   readonly overlay = new Container();
+  readonly toolPreview = new ToolPreview();
   ground!: ChunkRenderer;
   hover!: HoverHighlight;
+  textures!: TerrainTextures;
 
   /** Draw calls issued during the last rendered frame (WebGL only). */
   drawCalls = 0;
@@ -53,15 +57,17 @@ export class Renderer {
 
   private setup(world: World) {
     const tex = buildTerrainTextures();
+    this.textures = tex;
     this.ground = new ChunkRenderer(world, tex);
     this.hover = new HoverHighlight(tex.hover);
-    this.overlay.addChild(this.hover.sprite);
+    this.overlay.addChild(this.toolPreview.container, this.hover.sprite);
     this.objects.addChild(this.ground.objectsRoot);
 
     this.worldRoot.addChild(
       this.ground.slab,
       this.ground.groundMask,
       this.ground.groundRoot,
+      this.ground.roadsRoot,
       this.ground.gridRoot,
       this.objects,
       this.overlay,
@@ -104,6 +110,7 @@ export class Renderer {
     this.ground.cull(cam.viewRect());
     this.ground.update(dt);
     this.hover.update(dt);
+    this.toolPreview.update(dt);
 
     this.drawCallCounter = 0;
     this.app.render();

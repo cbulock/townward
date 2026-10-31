@@ -19,21 +19,41 @@ const PAN_KEYS: Record<string, [number, number]> = {
   ArrowRight: [1, 0],
 };
 
+export interface ScreenPoint {
+  x: number;
+  y: number;
+}
+
 export interface InputCallbacks {
   /** Pointer moved over the map (screen coords, CSS px relative to canvas), or left it (null). */
-  onPointer: (screen: { x: number; y: number } | null) => void;
+  onPointer: (screen: ScreenPoint | null) => void;
   onKey: (code: string) => void;
+  /** Left button pressed. Return true if the active tool takes the drag; false lets it pan the camera. */
+  onPrimaryDown: (screen: ScreenPoint, shift: boolean) => boolean;
+  onPrimaryMove: (screen: ScreenPoint, shift: boolean) => void;
+  onPrimaryUp: (screen: ScreenPoint, shift: boolean) => void;
+  /** Right click without dragging: cancel the current tool action. */
+  onCancel: () => void;
 }
 
 /**
- * Translates raw DOM input into camera motion and pointer updates.
- * Tools (Phase 3+) will hook into left-button press/drag; for now any button pans.
+ * Translates raw DOM input into camera motion, tool drags and pointer updates.
+ * Right/middle drag always pans; left drag goes to the active tool, or pans if there is none.
  */
 export class InputController {
   edgeScroll = true;
   private readonly held = new Set<string>();
-  private drag: { id: number; lastX: number; lastY: number; startX: number; startY: number; moved: boolean } | null =
-    null;
+  private drag: {
+    id: number;
+    button: number;
+    lastX: number;
+    lastY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null = null;
+  /** Pointer id of an in-progress tool drag. */
+  private toolPointer: number | null = null;
   private pointer: { x: number; y: number } | null = null;
   private trackpadUntil = 0;
   private readonly cleanup: (() => void)[] = [];
@@ -74,12 +94,21 @@ export class InputController {
   private onPointerDown = (e: PointerEvent) => {
     const p = this.local(e);
     this.el.setPointerCapture(e.pointerId);
-    this.drag = { id: e.pointerId, lastX: p.x, lastY: p.y, startX: p.x, startY: p.y, moved: false };
+    if (e.button === 0 && this.cb.onPrimaryDown(p, e.shiftKey)) {
+      this.toolPointer = e.pointerId;
+      return;
+    }
+    this.drag = { id: e.pointerId, button: e.button, lastX: p.x, lastY: p.y, startX: p.x, startY: p.y, moved: false };
   };
 
   private onPointerMove = (e: PointerEvent) => {
     const p = this.local(e);
     this.pointer = p;
+    if (this.toolPointer === e.pointerId) {
+      this.cb.onPointer(p);
+      this.cb.onPrimaryMove(p, e.shiftKey);
+      return;
+    }
     const d = this.drag;
     if (d && d.id === e.pointerId) {
       if (!d.moved && Math.hypot(p.x - d.startX, p.y - d.startY) > DRAG_THRESHOLD) {
@@ -94,14 +123,21 @@ export class InputController {
   };
 
   private onPointerUp = (e: PointerEvent) => {
+    if (this.toolPointer === e.pointerId) {
+      this.toolPointer = null;
+      if (e.type === 'pointercancel') this.cb.onCancel();
+      else this.cb.onPrimaryUp(this.local(e), e.shiftKey);
+      return;
+    }
     if (this.drag?.id === e.pointerId) {
+      if (this.drag.button === 2 && !this.drag.moved) this.cb.onCancel();
       this.drag = null;
       this.el.style.cursor = '';
     }
   };
 
   private onPointerLeave = () => {
-    if (this.drag) return; // captured; keep tracking
+    if (this.drag || this.toolPointer !== null) return; // captured; keep tracking
     this.pointer = null;
     this.cb.onPointer(null);
   };
@@ -167,7 +203,7 @@ export class InputController {
     }
 
     const p = this.pointer;
-    if (this.edgeScroll && p && !this.drag && document.hasFocus()) {
+    if (this.edgeScroll && p && !this.drag && this.toolPointer === null && document.hasFocus()) {
       let ex = 0;
       let ey = 0;
       if (p.x < EDGE_MARGIN) ex = -1;

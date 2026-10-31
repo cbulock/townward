@@ -1,10 +1,12 @@
 import { Texture } from 'pixi.js';
+import { RoadType, type BuildableRoad } from '../../sim/roads';
 import { Decor, DECOR_KINDS, GROUND_VARIANTS, Terrain, type DecorId, type TerrainId } from '../../sim/terrain/types';
 import { OVERLAY_TERRAINS } from '../transitions';
 import { AtlasBuilder, type FramePainter } from './AtlasBuilder';
 import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
+import { paintRoad } from './roadArt';
 import {
   foamOverlay,
   GRASS_SHAPE,
@@ -40,9 +42,15 @@ export interface TerrainTextures {
   trees: Texture[][];
   /** Decorations, indexed [DecorId][variant]. Index 0 (None) is empty. */
   decor: Texture[][];
+  /** Road pieces, indexed by road type then 4-bit connection mask. */
+  roads: Readonly<Record<BuildableRoad, Texture[]>>;
+  /** Plain white diamond for tool previews (tinted at runtime). */
+  selection: Texture;
   hover: Texture;
   gridLine: Texture;
 }
+
+const ROAD_TYPES: readonly BuildableRoad[] = [RoadType.Road, RoadType.Highway];
 
 function shapeFor(t: TerrainId): MaskShape {
   if (t === Terrain.ShallowWater) return SHALLOW_SHAPE;
@@ -76,6 +84,15 @@ function paintHover(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
   ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+function paintSelection(ctx: CanvasRenderingContext2D) {
+  diamondPath(ctx, -0.5);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.lineWidth = 1;
   ctx.stroke();
 }
 
@@ -130,6 +147,10 @@ export function buildTerrainTextures(): TerrainTextures {
   for (const k of decorKinds) {
     for (let v = 0; v < DECOR_VARIANTS; v++) b.add(`decor_${k}_${v}`, W, TREE_FRAME_H, (ctx) => paintDecor(ctx, k, v));
   }
+  for (const t of ROAD_TYPES) {
+    for (let m = 0; m < 16; m++) b.add(`road_${t}_${m}`, W, H, (ctx) => paintRoad(ctx, t, m));
+  }
+  b.add('selection', W, H, paintSelection);
   b.add('hover', W, H, paintHover);
   b.add('grid', W, H, paintGridLine);
 
@@ -154,6 +175,11 @@ export function buildTerrainTextures(): TerrainTextures {
     foam: masks('foam'),
     trees: [[], ...([1, 2, 3] as const).map((d) => range(TREE_VARIANTS, (v) => get(`tree_${d}_${v}`)))],
     decor: [[], ...decorKinds.map((k) => range(DECOR_VARIANTS, (v) => get(`decor_${k}_${v}`)))],
+    roads: Object.fromEntries(ROAD_TYPES.map((t) => [t, range(16, (m) => get(`road_${t}_${m}`))])) as Record<
+      BuildableRoad,
+      Texture[]
+    >,
+    selection: get('selection'),
     hover: get('hover'),
     gridLine: get('grid'),
   };

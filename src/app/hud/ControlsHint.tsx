@@ -1,7 +1,8 @@
 const HINTS: [string, string][] = [
-  ['Drag', 'Pan'],
-  ['WASD', 'Pan'],
+  ['Right-drag', 'Pan'],
   ['Wheel', 'Zoom'],
+  ['Shift', 'Straight'],
+  ['Esc', 'Cancel'],
   ['G', 'Grid'],
   ['N', 'New map'],
   ['F3', 'Debug'],

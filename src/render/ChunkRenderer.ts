@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { CHUNK_SIZE, HALF_H, HALF_W, TILE_H } from '../shared/constants';
+import { roadMask, RoadType, type BuildableRoad } from '../sim/roads';
 import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { World } from '../sim/World';
 import type { Rect } from './Camera';
@@ -32,6 +33,7 @@ interface Chunk {
   y1: number;
   base: Container;
   overlay: Container;
+  roads: Container;
   objects: Container;
   grid: Container | null;
   water: WaterTile[];
@@ -58,6 +60,7 @@ export class ChunkRenderer {
   /** Pass 1: every cell's base terrain. Pass 2: transitions and surf, which cover pass-1 over-draw. */
   private readonly baseRoot = new Container();
   private readonly overlayRoot = new Container();
+  readonly roadsRoot = new Container();
   readonly gridRoot = new Container();
   readonly objectsRoot = new Container();
   /** Soil slab under the map edges; drawn beneath everything else. */
@@ -98,6 +101,7 @@ export class ChunkRenderer {
 
     const base = new Container({ isRenderGroup: true });
     const overlay = new Container({ isRenderGroup: true });
+    const roads = new Container({ isRenderGroup: true });
     const objects = new Container({ isRenderGroup: true });
     const water: WaterTile[] = [];
     base.addChild(this.buildUnderlay(x0, y0, x1, y1));
@@ -107,13 +111,6 @@ export class ChunkRenderer {
     const j1 = y1 === w.height ? y1 + 1 : y1;
     for (let j = y0; j < j1; j++) for (let i = x0; i < i1; i++) this.buildDualCell(i, j, base, overlay, water);
 
-    // Objects back-to-front by diagonal (x + y).
-    for (let d = x0 + y0; d <= x1 - 1 + (y1 - 1); d++) {
-      for (let x = x0; x < x1; x++) {
-        const y = d - x;
-        if (y >= y0 && y < y1) this.buildObjects(x, y, objects);
-      }
-    }
 
     const top = tileToWorld(x0, y0);
     const right = tileToWorld(x1, y0);
@@ -129,8 +126,47 @@ export class ChunkRenderer {
 
     this.baseRoot.addChild(base);
     this.overlayRoot.addChild(overlay);
+    this.roadsRoot.addChild(roads);
     this.objectsRoot.addChild(objects);
-    this.chunks.push({ x0, y0, x1, y1, base, overlay, objects, grid: null, water, bounds, visible: true });
+    const chunk: Chunk = { x0, y0, x1, y1, base, overlay, roads, objects, grid: null, water, bounds, visible: true };
+    this.fillRoadsAndObjects(chunk);
+    this.chunks.push(chunk);
+  }
+
+  /** Roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
+  private fillRoadsAndObjects(c: Chunk) {
+    const w = this.world;
+    for (let y = c.y0; y < c.y1; y++) {
+      for (let x = c.x0; x < c.x1; x++) {
+        const type = w.road[w.index(x, y)];
+        if (type === RoadType.None) continue;
+        const p = tileToWorld(x, y);
+        const s = new Sprite(this.tex.roads[type as BuildableRoad][roadMask(w, x, y)]);
+        s.x = p.x - HALF_W - GROUND_PAD;
+        s.y = p.y - GROUND_PAD;
+        c.roads.addChild(s);
+      }
+    }
+    // Objects back-to-front by diagonal (x + y).
+    for (let d = c.x0 + c.y0; d <= c.x1 - 1 + (c.y1 - 1); d++) {
+      for (let x = c.x0; x < c.x1; x++) {
+        const y = d - x;
+        if (y >= c.y0 && y < c.y1) this.buildObjects(x, y, c.objects);
+      }
+    }
+  }
+
+  /**
+   * Rebuild roads and objects for every chunk touching the tile rectangle, grown by one tile
+   * because a road change alters its neighbours' connection masks.
+   */
+  refresh(minX: number, minY: number, maxX: number, maxY: number) {
+    for (const c of this.chunks) {
+      if (c.x1 <= minX - 1 || c.x0 > maxX + 1 || c.y1 <= minY - 1 || c.y0 > maxY + 1) continue;
+      c.roads.removeChildren().forEach((s) => s.destroy());
+      c.objects.removeChildren().forEach((s) => s.destroy());
+      this.fillRoadsAndObjects(c);
+    }
   }
 
   /** Ground for dual cell (i, j): a diamond centred on the top vertex of tile (i, j). */
@@ -313,12 +349,14 @@ export class ChunkRenderer {
         c.visible = vis;
         c.base.visible = vis;
         c.overlay.visible = vis;
+        c.roads.visible = vis;
         c.objects.visible = vis;
         if (c.grid) c.grid.visible = vis;
       }
       if (vis) {
         chunks++;
-        sprites += c.base.children.length + c.overlay.children.length + c.objects.children.length;
+        sprites +=
+          c.base.children.length + c.overlay.children.length + c.roads.children.length + c.objects.children.length;
       }
     }
     this.visibleChunks = chunks;
