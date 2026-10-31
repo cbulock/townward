@@ -136,17 +136,11 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 ---
 
-## Phase 6 — Elevation, Terraforming & Borderlands ✅  → [specs/elevation.md](specs/elevation.md)
+## Phase 6 — Map Edge (Borderlands) ✅  → [specs/elevation.md](specs/elevation.md)
 
-- [x] Height layer with the smoothness rule; `surfaceHeight`, flat-footprint checks
-- [x] Generator: Hills slider and per-preset hills (River Valley terrain stays byte-identical)
-- [x] Ground as sloped meshes with hill lighting (custom shader), animated water kept
-- [x] Roads, zone lots, grid, previews, hover on slopes; objects, agents, badges and effects lifted
-- [x] Height-aware picking
-- [x] Raise / Lower / Level tools (`5` `6` `7`) with the ripple to neighbours, previews and costs
-- [x] Buildings and 2×2 merges need flat footprints
-- [x] Borderlands: decorative hills and mountains round the map, with fog and a dashed border line (replaces the soil slab)
-- [x] Minimap hill shading; tests (7 new, 109 total). Headless: 60 FPS, 119 draw calls at 1×, 579 fully zoomed out; map + ring boot in 57 ms. Real-hardware FPS check still open.
+- [x] Borderlands: flat decorative land round the map (rivers and sea carried on), fading into fog, with a dashed border line (replaces the soil slab)
+- [x] Zoom-out limited to keep the screen inside the map
+- [x] ~~Hills, Raise/Lower/Level tools~~: built, then removed at the user's request to keep the game simple (D-051). Maps are flat; the renderer can still draw heights.
 
 ## Later Phases (to be specced when we get there)
 

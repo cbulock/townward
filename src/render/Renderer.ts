@@ -230,19 +230,6 @@ export class Renderer {
     this.camera.panTo(w.x, w.y);
   }
 
-  /** Terrain heights changed inside `rect` (world tiles): rebuild the ground there too. */
-  refreshTerrain(rect: TileRect) {
-    this.viewWorld.sync(this.world);
-    const r = this.view.rectToView(rect);
-    this.ground.refreshTerrain([{ minX: r.x, minY: r.y, maxX: r.x + r.w - 1, maxY: r.y + r.h - 1 }]);
-    // Reshaping the map edge changes the seam with the borderlands: rebuild them (rare).
-    const w = this.world;
-    if (rect.x <= 1 || rect.y <= 1 || rect.x + rect.w >= w.width - 1 || rect.y + rect.h >= w.height - 1) {
-      this.ext = generateBorderlands(w, this.ring);
-      this.buildTerrain();
-    }
-  }
-
   /** Show zones at full strength (while a zone tool is active). */
   setZoneView(on: boolean) {
     this.zoneView = on;

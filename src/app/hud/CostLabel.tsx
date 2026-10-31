@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai';
-import { isTerraformTool, isZoneTool } from '../../game/tools';
+import { isZoneTool } from '../../game/tools';
 import { toolPreviewAtom } from '../atoms';
 
 const CURSOR_GAP = 18;
@@ -29,7 +29,7 @@ export function CostLabel() {
       {p.blocked ? (
         <span className="cost-dim">can't build here</span>
       ) : empty ? (
-        <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : isZoneTool(p.tool) ? 'zone' : isTerraformTool(p.tool) ? 'reshape' : 'build'}</span>
+        <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : isZoneTool(p.tool) ? 'zone' : 'build'}</span>
       ) : p.tool === 'build' ? (
         <span className="cost-value">${p.cost.toLocaleString()}</span>
       ) : (

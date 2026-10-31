@@ -13,7 +13,7 @@ interface ToolDef {
   /** Extra class for the button (zone colours). */
   tone?: string;
   /** Buttons are grouped (select/build, zones, roads), with a divider between groups. */
-  group: 'edit' | 'zone' | 'terrain' | 'road';
+  group: 'edit' | 'zone' | 'road';
 }
 
 /** A lot diamond with the zone's letter. */
@@ -45,7 +45,7 @@ const TOOLS: readonly ToolDef[] = [
     group: 'edit',
     label: 'Clear',
     key: 'B',
-    hint: `Drag an area to clear trees, rocks and roads · $${BALANCE.treeClearCost}/tree`,
+    hint: `Drag an area to remove trees, rocks, roads, buildings and zones · $${BALANCE.treeClearCost}/tree`,
     icon: (
       <g {...stroke}>
         <path d="M3 17h11v-5H8l-2 3H3z" />
@@ -97,58 +97,6 @@ const TOOLS: readonly ToolDef[] = [
     hint: `Drag to zone industry · $${BALANCE.zoneCost}/tile · grows within ${BALANCE.roadAccessRange} tiles of a road`,
     icon: zoneIcon('I'),
     tone: 'tone-i',
-  },
-  {
-    id: 'dezone',
-    group: 'zone',
-    label: 'Dezone',
-    key: '4',
-    hint: 'Drag to remove zoning (and anything grown on it) · free',
-    icon: (
-      <g {...stroke}>
-        <path d="M12 3l9 5v8l-9 5-9-5V8z" />
-        <path d="M9 9.5l6 5M15 9.5l-6 5" />
-      </g>
-    ),
-  },
-  {
-    id: 'raise',
-    group: 'terrain',
-    label: 'Raise',
-    key: '5',
-    hint: `Drag to raise the land a level · $${BALANCE.terraformCost}/tile-level · neighbours slope to match`,
-    icon: (
-      <g {...stroke}>
-        <path d="M2 20l6-8 4 5 3-4 7 7z" />
-        <path d="M17 10V3M14 6l3-3 3 3" />
-      </g>
-    ),
-  },
-  {
-    id: 'lower',
-    group: 'terrain',
-    label: 'Lower',
-    key: '6',
-    hint: `Drag to lower the land a level · $${BALANCE.terraformCost}/tile-level`,
-    icon: (
-      <g {...stroke}>
-        <path d="M2 20l6-8 4 5 3-4 7 7z" />
-        <path d="M17 3v7M14 7l3 3 3-3" />
-      </g>
-    ),
-  },
-  {
-    id: 'level',
-    group: 'terrain',
-    label: 'Level',
-    key: '7',
-    hint: 'Drag from a tile to flatten the area to its height (buildings need flat ground)',
-    icon: (
-      <g {...stroke}>
-        <path d="M2 16h20M2 20h20" />
-        <path d="M5 12l4-5 3 3 3-4 4 6" opacity="0.55" />
-      </g>
-    ),
   },
   {
     id: 'road',

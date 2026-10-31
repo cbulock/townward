@@ -18,8 +18,6 @@ export interface PlannedTile extends TilePos {
   cost: number;
   /** Set for road tiles over water. */
   bridge?: BridgeAxisId;
-  /** Terraform: a neighbour that changes to keep the slope rule (not in the dragged area). */
-  ripple?: boolean;
 }
 
 export interface Plan {
@@ -150,7 +148,7 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad): ApplyRes
   return { ok: true, changed: bounds(real), tiles: real };
 }
 
-/** Price clearing a region: trees, decorations and roads. Empty tiles are listed as invalid (no-op). */
+/** Price clearing a region: trees, decorations, roads, buildings and zones. Empty tiles are listed as invalid (no-op). */
 export function planClear(world: World, region: readonly TilePos[]): Plan {
   const tiles: PlannedTile[] = [];
   let cost = 0;
@@ -159,7 +157,11 @@ export function planClear(world: World, region: readonly TilePos[]): Plan {
     if (!world.inBounds(p.x, p.y)) continue;
     const i = world.index(p.x, p.y);
     const hasSomething =
-      world.tree[i] > 0 || world.decor[i] !== Decor.None || world.road[i] !== RoadType.None || world.building[i] !== -1;
+      world.tree[i] > 0 ||
+      world.decor[i] !== Decor.None ||
+      world.road[i] !== RoadType.None ||
+      world.building[i] !== -1 ||
+      world.zone[i] !== ZoneType.None;
     const c = hasSomething ? clearCost(world, i) : 0;
     tiles.push({ ...p, valid: hasSomething, cost: c });
     if (hasSomething) {
@@ -182,7 +184,9 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
     w.decor[i] = Decor.None;
     w.road[i] = RoadType.None;
     w.bridge[i] = BridgeAxis.None;
-    // Selecting any tile of a building removes the whole building. The zone stays, so a grown lot regrows.
+    // Clear is the one "remove" tool: zones go too (there's no separate Dezone, D-051).
+    w.zone[i] = ZoneType.None;
+    // Selecting any tile of a building removes the whole building.
     touched.push(...removeBuildingAt(w, i));
   }
   city.funds -= plan.cost;
@@ -271,7 +275,7 @@ function removeBuildingAt(w: World, i: number): TilePos[] {
 }
 
 /**
- * Price zoning a region as `zone` (ZoneType.None dezones). Valid tiles are the ones that change:
+ * Price zoning a region as `zone`. Valid tiles are the ones that change:
  * land without rock or road, not already this zone, and either empty or holding a grown building
  * (which rezoning or dezoning removes). See docs/specs/buildings.md, "Zoning".
  */

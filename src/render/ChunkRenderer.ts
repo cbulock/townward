@@ -157,28 +157,6 @@ export class ChunkRenderer {
     c.overlay.addChild(batches.overlay.build());
   }
 
-  /**
-   * The terrain changed inside these view-tile rectangles: rebuild the ground of every chunk
-   * they touch (grown by 2, since cells and hill light read their neighbours), then that
-   * chunk's roads and objects, and the map edge.
-   */
-  refreshTerrain(rects: readonly { minX: number; minY: number; maxX: number; maxY: number }[]) {
-    const grown = rects.map((r) => ({ minX: r.minX - 1, minY: r.minY - 1, maxX: r.maxX + 1, maxY: r.maxY + 1 }));
-    for (const c of this.chunks) {
-      if (!grown.some((r) => !(c.x1 <= r.minX - 1 || c.x0 > r.maxX + 1 || c.y1 <= r.minY - 1 || c.y0 > r.maxY + 1))) continue;
-      for (const layer of [c.base, c.overlay]) layer.removeChildren().forEach((s) => s.destroy({ children: true }));
-      this.fillGround(c);
-      if (c.grid) {
-        c.grid.destroy({ children: true });
-        c.grid = this.buildGrid(c);
-        c.grid.visible = c.visible;
-        this.gridRoot.addChild(c.grid);
-      }
-    }
-    this.refresh(grown);
-    this.buildMapShape(this.groundMask.clear()).fill(0xffffff);
-  }
-
   /** Zones, roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
   private fillRoadsAndObjects(c: Chunk) {
     const w = this.world;

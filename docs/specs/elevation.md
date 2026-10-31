@@ -1,6 +1,6 @@
 # Spec: Elevation, Terraforming & Borderlands (Phase 6)
 
-Status: **Implemented** (Phase 6).
+Status: **Hills and terraforming removed (D-051).** Maps are flat and there are no Raise, Lower or Level tools. What's still live: the **Borderlands** section (now flat) and the camera zoom limit. The height model and rendering below remain in the code and see only level 0. They're kept as reference in case elevation returns.
 
 ## Height Model
 
@@ -47,7 +47,7 @@ A screen point maps to a tile by fixed-point iteration: start at h = 0, project 
 |---|---|---|---|
 | Raise | `5` | Drag a rectangle: +1 level | $15 per tile-level changed |
 | Lower | `6` | Drag a rectangle: −1 level (not below 0) | same |
-| Level | `7` | Drag from a tile: flatten the rectangle to the start tile's level | same |
+| Level | `7` | Drag over an area: the whole rectangle becomes one flat height, its rounded average (water, roads and buildings don't count) | same |
 
 - The neighbours are adjusted automatically to keep the smoothness rule; that ripple is priced and previewed too.
 - **Locked tiles:** water, roads and buildings can't change height. An edit that would need to move one is refused for that tile (shown red).

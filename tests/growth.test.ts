@@ -139,7 +139,7 @@ describe('growth', () => {
     expect(grow()).toBe(grow());
   });
 
-  it('bulldozing a grown building keeps the zone; dezoning removes the building', () => {
+  it('Clear removes a grown building and its zone (there is no separate Dezone)', () => {
     const { w, city } = town();
     zone(city, 2, 7, 2, 7, ZoneType.Residential);
     runDays(w, 2);
@@ -147,11 +147,8 @@ describe('growth', () => {
     expect(b).toBeDefined();
     applyClear(city, planClear(w, [{ x: b.x, y: b.y }]));
     expect(w.buildings.size).toBe(0);
-    expect(w.zone[w.index(2, 7)]).toBe(ZoneType.Residential);
-
-    runDays(w, 2);
-    expect(w.buildings.size).toBe(1);
-    zone(city, 2, 7, 2, 7, ZoneType.None);
+    expect(w.zone[w.index(2, 7)]).toBe(ZoneType.None);
+    runDays(w, 4);
     expect(w.buildings.size).toBe(0);
   });
 

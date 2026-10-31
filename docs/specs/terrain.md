@@ -32,7 +32,7 @@ We render it in our isometric view (D-002). **Reference map: `?seed=42`** (appro
 | Flowers (white / yellow) | grouped patches in open grass |
 | Tall grass | scattered |
 
-Elevation arrived in Phase 6: see [elevation.md](elevation.md). Every preset has a **Hills** slider.
+Maps are flat. Hills were tried in Phase 6 and removed (D-051).
 
 ## River Valley Generator (`src/sim/terrain/riverValley.ts`)
 
@@ -81,7 +81,6 @@ All tuning knobs are constants at the top of the file (`RIVER`, `LAKES`). Each f
 - **Trees:** shifts the forest threshold and the number of lone trees.
 - **Rivers:** 0 none; 1 main river (60% chance of a tributary); 2 main + tributary; 3 adds a second river parallel to the main one.
 - **Coast:** sea along 1–3 randomly chosen edges, with a noisy coastline. 4 makes an island.
-- **Hills** (Phase 6): rolling hills. The defaults are River Valley 0.35, Plains 0.15, Coastal 0.3, Island 0.45, Lakes 0.3 and Forested 0.6. Heights only add the elevation layer, so River Valley's terrain, trees and decorations stay byte-identical.
 - Every preset generates 128×128 in under 10 ms (256×256 in about 30 ms) and always leaves more than 35% buildable land.
 
 ## New Game Screen (Phase 2b)

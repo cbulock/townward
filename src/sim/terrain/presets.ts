@@ -16,8 +16,6 @@ export interface TerrainSliders {
   rivers: number;
   /** 0..4: sea along this many map edges; 4 makes an island. */
   coastSides: number;
-  /** 0..1: rolling hills (0 = flat). */
-  hills: number;
 }
 
 export interface TerrainSettings extends TerrainSliders {
@@ -42,7 +40,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   riverValley: {
     name: 'River Valley',
     description: 'Green meadows cut by a winding river, with forests and a few lakes.',
-    sliders: { water: 0.5, trees: 0.5, rivers: 1, coastSides: 0, hills: 0.35 },
+    sliders: { water: 0.5, trees: 0.5, rivers: 1, coastSides: 0 },
     lakes: 1,
     dryness: 0,
     rocks: 0,
@@ -50,7 +48,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   plains: {
     name: 'Plains',
     description: 'Wide open grassland, dry patches, scattered trees and a lazy stream.',
-    sliders: { water: 0.3, trees: 0.2, rivers: 1, coastSides: 0, hills: 0.15 },
+    sliders: { water: 0.3, trees: 0.2, rivers: 1, coastSides: 0 },
     lakes: 0.5,
     dryness: 0.7,
     rocks: 0.35,
@@ -58,7 +56,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   coastal: {
     name: 'Coastal',
     description: 'A long sandy coastline with a river running out to sea.',
-    sliders: { water: 0.5, trees: 0.45, rivers: 1, coastSides: 1, hills: 0.3 },
+    sliders: { water: 0.5, trees: 0.45, rivers: 1, coastSides: 1 },
     lakes: 0.5,
     dryness: 0.15,
     rocks: 0.15,
@@ -66,7 +64,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   island: {
     name: 'Island',
     description: 'One big island ringed by beaches, surrounded by open water.',
-    sliders: { water: 0.5, trees: 0.5, rivers: 0, coastSides: 4, hills: 0.45 },
+    sliders: { water: 0.5, trees: 0.5, rivers: 0, coastSides: 4 },
     lakes: 0.5,
     dryness: 0.1,
     rocks: 0.2,
@@ -74,7 +72,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   lakes: {
     name: 'Lakes',
     description: 'Lake country: many lakes and ponds between the woods.',
-    sliders: { water: 0.7, trees: 0.55, rivers: 0, coastSides: 0, hills: 0.3 },
+    sliders: { water: 0.7, trees: 0.55, rivers: 0, coastSides: 0 },
     lakes: 6,
     dryness: 0,
     rocks: 0.15,
@@ -82,7 +80,7 @@ export const PRESETS: Readonly<Record<PresetId, PresetDef>> = {
   forested: {
     name: 'Forested',
     description: 'Deep forest with rocky ridges and small clearings to build in.',
-    sliders: { water: 0.4, trees: 0.85, rivers: 1, coastSides: 0, hills: 0.6 },
+    sliders: { water: 0.4, trees: 0.85, rivers: 1, coastSides: 0 },
     lakes: 0.7,
     dryness: 0.05,
     rocks: 0.5,

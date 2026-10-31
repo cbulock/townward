@@ -76,14 +76,14 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
 
 ## Zoning (Phase 4b)
 
-- **Tools:** Zone R (`1`), Zone C (`2`), Zone I (`3`) and Dezone (`4`). Drag a rectangle to apply, the same way Clear works. While a zone tool is active the zone layer is shown at full strength ("zone view"). The rest of the time it shows as a soft tint.
+- **Tools:** Zone R (`1`), Zone C (`2`), Zone I (`3`). To remove a zone, use **Clear** (`B`); there's no Dezone tool (D-051). Drag a rectangle to apply, the same way Clear works. While a zone tool is active the zone layer is shown at full strength ("zone view"). The rest of the time it shows as a soft tint.
 - **Data:** `World.zone[i]` holds a `ZoneType` (`sim/zones.ts`): 0 none, 1 R, 2 C, 3 I.
 - **What can be zoned:** land that isn't rock and has no road. A tile can also be zoned if it holds a *grown* building of another zone. Rezoning it removes that building. Placed buildings and roads block zoning.
-- **Cost:** $5 per tile (`BALANCE.zoneCost`). Tiles that already have this zone are free and left unchanged. Dezoning is free and removes the zone together with any grown building on it.
+- **Cost:** $5 per tile (`BALANCE.zoneCost`). Tiles that already have this zone are free and left unchanged.
 - **Interactions with other tools:**
   - Building a road over a zoned tile removes its zone.
   - Placing a building with the Build tool clears the zone under its footprint. Placed buildings never grow or level up.
-  - Clear (bulldoze) removes a grown building but keeps the zone, so the lot grows back later.
+  - Clear (bulldoze) removes everything on the tile, including the zone.
 
 ## Zoning Feedback (UX)
 

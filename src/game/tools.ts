@@ -5,28 +5,21 @@ import type { TerrainTextures } from '../render/atlas/tiles';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
-import { isZoned, ZoneType, type ZoneTypeId } from '../sim/zones';
+import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/population';
 import { BALANCE } from '../shared/balance';
-import { planTerraform, type TerraformOp, type TerraformPlan } from '../sim/terraform';
 import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
 
-export type ZoneToolId = 'zone-r' | 'zone-c' | 'zone-i' | 'dezone';
-export type TerraformToolId = 'raise' | 'lower' | 'level';
-export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId | TerraformToolId;
+export type ZoneToolId = 'zone-r' | 'zone-c' | 'zone-i';
+export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId;
 
-export function isTerraformTool(tool: ToolId): tool is TerraformToolId {
-  return tool === 'raise' || tool === 'lower' || tool === 'level';
-}
-
-/** What each zone tool paints (dezone paints "no zone"). */
-export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZoneTypeId>> = {
+/** What each zone tool paints. Removing a zone is done with Clear (D-051). */
+export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZonedType>> = {
   'zone-r': ZoneType.Residential,
   'zone-c': ZoneType.Commercial,
   'zone-i': ZoneType.Industrial,
-  dezone: ZoneType.None,
 };
 
 export function isZoneTool(tool: ToolId): tool is ZoneToolId {
@@ -43,10 +36,6 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   'zone-r': 'Digit1',
   'zone-c': 'Digit2',
   'zone-i': 'Digit3',
-  dezone: 'Digit4',
-  raise: 'Digit5',
-  lower: 'Digit6',
-  level: 'Digit7',
 };
 
 export interface ToolDrag {
@@ -59,8 +48,7 @@ export interface ToolDrag {
 export type ToolPlan =
   | { kind: 'road'; tool: 'road' | 'highway'; plan: Plan; roadType: BuildableRoad }
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
-  | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZoneTypeId }
-  | { kind: 'terraform'; tool: TerraformToolId; plan: TerraformPlan }
+  | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZonedType }
   | { kind: 'place'; tool: 'build'; plan: PlacePlan };
 
 const TINT_VALID = 0x8ff7ec;
@@ -73,9 +61,9 @@ export function nearRoad(world: World, x: number, y: number): boolean {
   return findEntrance(world, x, y, 1, 1, BALANCE.roadAccessRange) !== -1;
 }
 
-/** How many of a zone plan's tiles no road reaches (0 for dezoning). */
+/** How many of a zone plan's tiles no road reaches. */
 export function strandedZoneTiles(world: World, p: ToolPlan): number {
-  if (p.kind !== 'zone' || !isZoned(p.zone)) return 0;
+  if (p.kind !== 'zone') return 0;
   return p.plan.tiles.filter((t) => t.valid && !nearRoad(world, t.x, t.y)).length;
 }
 
@@ -107,17 +95,9 @@ export function planTool(
       return { kind: 'place', tool, plan: planPlace(world, building, anchor.current.x, anchor.current.y) };
     case 'zone-r':
     case 'zone-c':
-    case 'zone-i':
-    case 'dezone': {
+    case 'zone-i': {
       const zone = ZONE_TOOLS[tool];
       return { kind: 'zone', tool, plan: planZone(world, rectTiles(anchor.start, anchor.current), zone), zone };
-    }
-    case 'raise':
-    case 'lower':
-    case 'level': {
-      // Level flattens to the height of the tile the drag started on.
-      const op: TerraformOp = tool === 'level' ? { kind: 'level', level: world.elevation[world.index(anchor.start.x, anchor.start.y)] } : { kind: tool };
-      return { kind: 'terraform', tool, plan: planTerraform(world, rectTiles(anchor.start, anchor.current), op) };
     }
   }
 }
@@ -127,23 +107,11 @@ export function planTool(
  * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
  */
 export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform): PreviewTile[] {
-  if (p.kind === 'terraform') {
-    const tint = p.tool === 'lower' ? TINT_CLEAR : TINT_VALID;
-    return p.plan.tiles.map((t) => ({
-      x: t.x,
-      y: t.y,
-      texture: tex.selection,
-      tint: t.valid ? tint : TINT_INVALID,
-      // The ripple to neighbours shows fainter than the dragged area.
-      alpha: !t.valid ? 0.55 : t.ripple ? 0.3 : 0.75,
-    }));
-  }
-
   if (p.kind === 'zone') {
-    const tint = isZoned(p.zone) ? ZONE_TINT[p.zone] : TINT_CLEAR;
+    const tint = ZONE_TINT[p.zone];
     return p.plan.tiles.map((t) => {
       // Zone tiles no road reaches won't grow: show them amber so it's clear before you let go.
-      const stranded = t.valid && isZoned(p.zone) && !nearRoad(world, t.x, t.y);
+      const stranded = t.valid && !nearRoad(world, t.x, t.y);
       return {
         x: t.x,
         y: t.y,

@@ -1,6 +1,10 @@
 /** Tunable game-economy numbers. See docs/specs/roads.md. */
 export const BALANCE = {
-  startingFunds: 20_000,
+  /**
+   * DEVELOPMENT VALUE: 700 million so building and testing never runs out of money.
+   * Set back to a real starting budget (e.g. 20_000) before release.
+   */
+  startingFunds: 700_000_000,
   /** Cost per tile, by road type. */
   roadCost: 10,
   highwayCost: 40,
@@ -41,8 +45,6 @@ export const BALANCE = {
   roadAccessRange: 3,
 
   // --- Zoning & growth (sim/growth.ts, docs/specs/buildings.md) ---
-  /** Terraforming: cost per level changed per tile (docs/specs/elevation.md). */
-  terraformCost: 15,
   /** Cost per tile to zone (dezoning is free). */
   zoneCost: 5,
   /** Days a construction site takes; the first half is the foundation, the second the scaffold. */

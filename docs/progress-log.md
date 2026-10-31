@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-10-31: Simplify: flat maps, no terrain tools, no Dezone
+- User decision (D-051): removed the hills (generator, presets, slider, URL param), the Raise/Lower/Level tools and `sim/terraform.ts`. The borderlands ring is flat.
+- Dezone removed: Clear now also removes zones (and a bulldozed grown building doesn't regrow).
+- Kept: the sloped-mesh renderer, which draws a flat world at no extra cost; the zoning-UX hints; the zoom limit; development funds of $700M (D-049).
+- Tests: 105 (terraform and hills tests dropped; new tests for flat presets and Clear removing zones). Checked in the browser: flat Forested map, the trimmed toolbar, Clear over zoned tiles, no errors.
+
 ## 2026-10-31: Phase 6 — Elevation, terraforming & borderlands
 - **Decisions this session:** borderlands with hills for the map edge; Phase 6 next; the Build tool now places civic buildings only (D-042); nothing committed yet.
 - **Heights** (D-043): `World.elevation` with the one-level-per-tile rule, plus `surfaceHeight`, `cornerHeight`, `isFlat` and `smoothElevation` (`sim/terrain/elevation.ts`). The generator has a Hills slider and per-preset hills; River Valley's terrain stays byte-identical.

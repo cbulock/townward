@@ -7,7 +7,7 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phases 0–6 built ✅ (latest: 6 elevation, terraforming & borderlands). Open: the 60 FPS check on real hardware |
+| **Current phase** | Phases 0–6 built ✅ (latest: 6, map edge; hills and terraforming were removed, D-051). Open: the 60 FPS check on real hardware |
 | **Next phase** | Phase 7 — core simulation (power, water, budget & taxes), or Phase 10 save/load (agreed design: D-034) |
 | **Last updated** | 2026-10-31 |
 
