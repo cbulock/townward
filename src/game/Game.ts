@@ -9,6 +9,8 @@ import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { growDay, zoneDemand } from '../sim/growth';
+import { buildDemoCity } from '../sim/demo';
+import { tileToWorld } from '../render/iso';
 import { mulberry32, subSeed } from '../shared/rng';
 import { isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
 import { cityStats, collectBudget, findEntrance, monthlyBudget, simulateDay, updateRoadAccess, type BudgetReport } from '../sim/population';
@@ -33,6 +35,8 @@ export interface GameOptions {
   name: string;
   /** Starting money; defaults to BALANCE.startingFunds. */
   funds?: number;
+  /** Build the planned demo city on the map before the first frame (the /demo route). */
+  demo?: boolean;
 }
 
 /** How often stats are pushed to the UI (they don't need 60 Hz React renders). */
@@ -127,8 +131,17 @@ export class Game {
 
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
     const world = generateTerrain(opts.terrain);
+    const city = new City(world, opts.funds);
+    const demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
     const renderer = await Renderer.create(host, world);
-    const game = new Game(new City(world, opts.funds), renderer);
+    const game = new Game(city, renderer);
+    if (demo) {
+      game.afterWorldChange(true);
+      game.lastBudget = monthlyBudget(world, city.taxRate);
+      // Start over downtown, a little zoomed out.
+      const p = tileToWorld(demo.centre.x, demo.centre.y);
+      renderer.camera.jumpTo(p.x, p.y, 0.8);
+    }
     game.loop.speed = GAME_SPEEDS[game.speedIndex];
     game.loop.start();
     return game;

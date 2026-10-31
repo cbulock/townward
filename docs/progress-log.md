@@ -13,7 +13,8 @@ Newest first. One entry per work session.
 - **Budget:** tax slider (0–20%) that moves demand, a forecast with a cost breakdown, and per-building upkeep.
 - **UI:** the Civic panel has Services / Utilities / Parks & Civic tabs; the info panel shows power, water, services and upkeep.
 - Fixed while testing: the day/night menu opened under the budget panel, and it now closes on an outside click.
-- Tests: 107. Verified in the browser: a full loop (road → services → utilities → four zone types → 476 residents at 3×), the budget panel, day/night menu and info panel. No errors.
+- `/demo` (D-055): a seeded planned city of about 26,000 residents, ready in about 1.9 s (`sim/demo.ts`, spec `docs/specs/demo.md`). Fixed while building it: road islands cut off by the river need their own utilities.
+- Tests: 108. Verified in the browser: a full loop (road → services → utilities → four zone types → 476 residents at 3×), the budget panel, day/night menu and info panel. No errors.
 
 ## 2026-10-31: Simplify: flat maps, no terrain tools, no Dezone
 - User decision (D-051): removed the hills (generator, presets, slider, URL param), the Raise/Lower/Level tools and `sim/terraform.ts`. The borderlands ring is flat.

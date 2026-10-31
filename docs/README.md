@@ -7,15 +7,15 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phases 0–6 built ✅ (latest: 6, map edge; hills and terraforming were removed, D-051). Open: the 60 FPS check on real hardware |
-| **Next phase** | Phase 7 — core simulation (power, water, budget & taxes), or Phase 10 save/load (agreed design: D-034) |
+| **Current phase** | Phases 0–7 built ✅ (latest: 7, core city: density, services, utilities, budget) plus the `/demo` city. Open: the 60 FPS check on real hardware |
+| **Next phase** | Phase 10 save/load (agreed design: D-034), or more services and data overlays (Phase 8) |
 | **Last updated** | 2026-10-31 |
 
 ## Run It
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173 opens the New Game screen
+pnpm dev          # http://localhost:5173 opens the New Game screen; /demo opens a grown city
                   # (?seed=N&size=64|128|256&preset=coastal&funds=N skips it)
 pnpm test         # unit tests
 pnpm typecheck && pnpm lint
@@ -34,6 +34,8 @@ pnpm typecheck && pnpm lint
 | [specs/buildings.md](specs/buildings.md) | Building catalog, footprints, placement; zoning and growth (planned) |
 | [specs/simulation.md](specs/simulation.md) | Time, population, jobs, budget, traffic and pedestrians |
 | [specs/elevation.md](specs/elevation.md) | Heights, sloped rendering, terraforming, borderlands |
+| [specs/core.md](specs/core.md) | Time, density, services, utilities, budget (Phase 7) |
+| [specs/demo.md](specs/demo.md) | The `/demo` showcase city |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

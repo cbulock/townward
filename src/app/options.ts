@@ -64,6 +64,20 @@ export function clearUrlOptions() {
   history.replaceState(null, '', funds ? `${location.pathname}?funds=${funds}` : location.pathname);
 }
 
+/** The /demo route: a planned, fully grown city on River Valley (`/demo?seed=N` for another). */
+export function isDemoRoute(): boolean {
+  return location.pathname.replace(/\/+$/, '') === '/demo';
+}
+
+export function demoOptions(seed = Number(new URLSearchParams(location.search).get('seed')) || DEFAULT_SEED): GameOptions {
+  return { terrain: presetSettings('riverValley', seed, DEFAULT_MAP_SIZE), name: 'Demo City', demo: true };
+}
+
+/** Keep the demo's seed in the URL (so a reload shows the same city). */
+export function writeDemoUrl(seed: number) {
+  history.replaceState(null, '', `/demo?seed=${seed}`);
+}
+
 export function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000);
 }
