@@ -23,12 +23,15 @@ saves remain playable.
 
 - **Power Substation** is available under Civic → Utilities.
 - Substations show a blue reach preview while placing or inspecting them.
-- A working plant only contributes to a network when it shares a road island with a working
-  substation. A plant on an unconnected island is isolated and supplies nothing.
-- A building can receive power when it shares that island and lies within a connected
-  substation's reach. This makes plant placement and road connections meaningful without
-  adding a manually painted wire layer.
+- A working plant contributes to the shared grid from wherever it is built, as long as it
+  has road access. Plants do not need to share a road island with a substation.
+- A building can receive power when it has road access and lies within a working
+  substation's reach. Substations distribute the pooled generation across the city, so a
+  nearby plant can power a far-away covered building.
 - Existing cities without substations continue using the previous road-island rules.
+- Selecting an unpowered building shows the reason and live figures: missing road access,
+  outside substation coverage, insufficient generation, or power already allocated to
+  earlier buildings.
 
 ## Player Experience
 

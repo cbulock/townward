@@ -24,6 +24,10 @@ Newest first. One entry per work session.
 - Customer demand now allows road-accessible businesses to attract residents from across the
   city. Commercial happiness separates customer availability from traffic quality, so heavy
   congestion produces a traffic complaint with average travel-time diagnostics.
+- Power warnings now expose actionable diagnostics in the inspection panel, including
+  substation coverage and live demand, supply and shortfall values.
+- Power generation is now pooled citywide once substations exist: plants can be on different
+  road islands, while each consumer still needs road access and substation coverage.
 
 ## 2026-11-01: Parks and shopping landmarks
 - Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.

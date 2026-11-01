@@ -107,6 +107,7 @@ export interface InspectInfo {
   /** Services covering it (zoned buildings). */
   services: readonly ServiceKind[];
   provides: Provides | null;
+  powerIssue: { reason: string; stats: readonly { label: string; value: string }[] } | null;
   /** Power plants only: condition and repair status. */
   condition: number | null;
   repairDays: number;

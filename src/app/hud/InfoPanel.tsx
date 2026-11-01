@@ -92,6 +92,17 @@ export function InfoPanel() {
           </strong>
         </div>
       )}
+      {info.powerIssue && (
+        <div className="info-status warn">
+          <strong>Power issue: {info.powerIssue.reason}</strong>
+          {info.powerIssue.stats.map((stat) => (
+            <div className="info-row" key={stat.label}>
+              <span>{stat.label}</span>
+              <span>{stat.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {info.condition !== null && (
         <div className="info-power-status">
           <div className="info-row">

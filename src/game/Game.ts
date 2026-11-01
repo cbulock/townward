@@ -22,7 +22,7 @@ import { demandFor } from '../sim/systems/growth';
 import { PAVEMENTS, ROAD_SPECS } from '../sim/roadTypes';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
-import { needsUtilities } from '../sim/systems/utilities';
+import { isWorking, needsUtilities } from '../sim/systems/utilities';
 import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
 import { happinessColor, type OverlayTile } from '../render/Renderer';
 import { rectTiles, RoadType, roadMask, type BuildableRoad, type TilePos } from '../sim/roads';
@@ -799,6 +799,7 @@ export class Game {
               repairCost: d.energy?.repairCost,
             }
           : null,
+      powerIssue: this.powerIssue(b),
       condition: d.energy && d.energy.source !== 'battery' ? b.condition : null,
       repairDays: b.repairDays,
       repairCost: d.energy?.repairCost ?? 0,
@@ -808,6 +809,36 @@ export class Game {
       abandoned: b.abandoned,
     };
     this.events.emit('inspect', info);
+  }
+
+  private powerIssue(b: BuildingInstance): InspectInfo['powerIssue'] {
+    const d: BuildingDef = buildingDef(b.def);
+    if (d.category === 'civic' || b.powered) return null;
+    if (b.entrance === -1) return { reason: 'No road access', stats: [{ label: 'Required', value: 'A connected road within 3 tiles' }] };
+    const report = this.sim.utilities.report.power;
+    const substations = [...this.world.buildings.values()].filter((s) => buildingDef(s.def).substation && isWorking(s));
+    if (substations.length > 0) {
+      const connected = substations.some((s) => {
+        const sd = buildingDef(s.def).substation;
+        const cx = b.x + d.size.w / 2;
+        const cy = b.y + d.size.h / 2;
+        return sd !== undefined && Math.hypot(s.x + 0.5 - cx, s.y + 0.5 - cy) <= sd.radius;
+      });
+      if (!connected) {
+        return {
+          reason: 'Outside substation coverage',
+          stats: [{ label: 'Coverage', value: 'Move closer to a connected GRID substation' }],
+        };
+      }
+    }
+    return {
+      reason: report.supply < report.demand ? 'Insufficient generation' : 'Power already allocated to earlier buildings',
+      stats: [
+        { label: 'Demand', value: report.demand.toLocaleString() },
+        { label: 'Available', value: report.supply.toLocaleString() },
+        { label: 'Short', value: report.short.toLocaleString() },
+      ],
+    };
   }
 
   /** Bulldoze a whole building (from the info panel). */

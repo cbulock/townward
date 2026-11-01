@@ -47,16 +47,19 @@ function powerNetwork(buildings: readonly BuildingInstance[], islands: Int32Arra
   if (substations.length === 0) return () => true;
   const islandOf = (b: BuildingInstance) => (b.entrance === -1 ? -1 : islands[b.entrance]);
   return (b: BuildingInstance): boolean => {
+    const def: BuildingDef = BUILDINGS[b.def];
+    // Plants feed the shared grid from wherever they are built. Consumers still
+    // need road access and a substation within their coverage radius.
+    if (def.energy) return isWorking(b);
     const island = islandOf(b);
     if (island === -1) return false;
-    const def: BuildingDef = BUILDINGS[b.def];
     const size = def.size;
     const cx = b.x + size.w / 2;
     const cy = b.y + size.h / 2;
     return substations.some((s) => {
       const substationDef: BuildingDef = BUILDINGS[s.def];
       const radius = substationDef.substation?.radius ?? 0;
-      return islandOf(s) === island && Math.hypot(s.x + 0.5 - cx, s.y + 0.5 - cy) <= radius;
+      return Math.hypot(s.x + 0.5 - cx, s.y + 0.5 - cy) <= radius;
     });
   };
 }
@@ -130,8 +133,10 @@ export function updateUtilities(world: World, at: GridHour | null = null): Utili
   const islandOf = (b: BuildingInstance) => (b.entrance === -1 ? -1 : islands[b.entrance]);
   const needs = (b: BuildingInstance) => needsUtilities(BUILDINGS[b.def]);
   const powerConnected = powerNetwork(buildings, islands);
+  const sharedGrid = buildings.some((b) => isSubstation(b) && isWorking(b));
+  const powerIslandOf = sharedGrid ? () => 0 : islandOf;
 
-  const power = balancePower(buildings, islandOf, needs, isWorking, at, powerConnected);
+  const power = balancePower(buildings, powerIslandOf, needs, isWorking, at, powerConnected);
 
   // Water: supply pooled per road island, handed out in building order.
   const pool = new Map<number, number>();
