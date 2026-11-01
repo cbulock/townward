@@ -29,7 +29,7 @@ function BuildingThumb({ id }: { id: BuildingId }) {
 const GROUPS: readonly { id: CivicGroup; label: string; hint: string }[] = [
   { id: 'services', label: 'Services', hint: 'Cover the area around them. Covered buildings fill up, and all four let towers grow.' },
   { id: 'utilities', label: 'Utilities', hint: 'Power and water every building on the same roads, up to their capacity.' },
-  { id: 'parks', label: 'Parks & Civic', hint: 'Parks and the town hall.' },
+  { id: 'parks', label: 'Parks & Places', hint: 'Beautiful parks, markets, shopping and the town hall.' },
 ];
 
 const ZONE_LINKS: readonly { tool: ZoneToolId; label: string; key: string; tone: string }[] = [

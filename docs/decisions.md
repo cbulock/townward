@@ -8,6 +8,8 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 
 ## Accepted
 
+- **D-071 — Civic leisure landmarks stay in the parks group.** 2026-11-01. Parks and shopping complexes use the existing civic placement path and Parks & Places picker. This keeps placement, upkeep, happiness and save compatibility stable while giving the city visually distinct leisure destinations; shopping zoning remains separate for demand balance.
+
 - **D-002 — Isometric 2:1 view.** 2026-10-31. Looks much richer than top-down and fits the "very cool UI" goal.
 - **D-003 — Map rotation deferred until after Phase 5.** 2026-10-31. Rotation means every building needs 4 views, which doubles the art and sorting work. *Superseded by D-032: built early at the user's request, while the renderer is still small.*
 - **D-010 — TypeScript + Vite + PixiJS v8 + React HUD.** 2026-10-31. Pixi gives batched WebGL sprite rendering for smooth large maps, and React suits a rich, animated HUD. They are kept in separate layers.

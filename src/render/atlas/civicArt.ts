@@ -353,6 +353,162 @@ function paintPark(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
   paintHedges(iso, lot);
 }
 
+// ---------------------------------------------------------------- landmark parks and shopping
+
+function paintCentralPark(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
+  const w = o.vw;
+  const h = o.vh;
+  iso.floor(0.03, w - 0.03, 0.03, h - 0.03, 0, '#d6cdb9');
+  iso.floor(0.09, w - 0.09, 0.09, h - 0.09, 0, '#6fc84c');
+  iso.floor(0.42, w - 0.42, 0.12, 0.3, 0.08, '#e8d8b7');
+  iso.floor(0.12, 0.3, 0.42, h - 0.42, 0.08, '#e8d8b7');
+  iso.disc(w * 0.63, h * 0.57, 0.62, 0.1, '#d7c69f');
+  iso.disc(w * 0.63, h * 0.57, 0.56, 0.14, '#4b9ed2');
+  iso.disc(w * 0.58, h * 0.5, 0.18, 0.19, '#6bb8e3');
+  const items: Item[] = [];
+  const trees: readonly (readonly [number, number, number, number])[] = [
+    [0.35, 0.38, 0.85, 0],
+    [2.35, 0.34, 0.9, 1],
+    [0.36, 2.45, 0.82, 2],
+    [2.46, 2.42, 0.9, 3],
+    [1.35, 2.68, 0.72, variant % 4],
+  ];
+  for (const [u, v, size, tone] of trees) items.push(roundTree(iso, o, u, v, size, tone));
+  items.push({
+    depth: w + h,
+    draw: () => {
+      const p = at(o, 1.45, 1.2);
+      iso.round(p.u, p.v, 0, 7, () => 0.14, '#a7a49b', '#e7e2d5');
+      iso.disc(p.u, p.v, 0.09, 7.1, '#5aa8e0');
+      pole(iso, p.u, p.v, 7, 14, 0.8, '#d8d1bd');
+    },
+  });
+  flowerDots(iso, o, rng, { u0: 1.55, u1: 2.4, v0: 0.35, v1: 0.75 }, 24, FLOWERS);
+  drawItems(items);
+  paintHedges(iso, { u0: 0, u1: w, v0: 0, v1: h });
+}
+
+function paintBotanicalGarden(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
+  const w = o.vw;
+  const h = o.vh;
+  iso.floor(0.03, w - 0.03, 0.03, h - 0.03, 0, '#c7bca9');
+  iso.floor(0.09, w - 0.09, 0.09, h - 0.09, 0, '#78c85b');
+  iso.floor(w * 0.47, w * 0.53, 0.12, h - 0.12, 0.1, '#eadbbd');
+  iso.floor(0.12, w - 0.12, h * 0.47, h * 0.53, 0.1, '#eadbbd');
+  const items: Item[] = [];
+  const glasshouses: readonly Box[] = [
+    { u0: 0.32, u1: 1.18, v0: 0.38, v1: 1.12 },
+    { u0: 1.82, u1: 2.68, v0: 1.82, v1: 2.62 },
+  ];
+  for (const b0 of glasshouses) {
+    const b = o.rect(b0);
+    items.push({
+      depth: b.u0 + b.v0,
+      draw: () => {
+        iso.box(b.u0, b.u1, b.v0, b.v1, 0, 14, '#b7d8c9', '#75a99b', '#d8f0df');
+        for (const face of ['sw', 'se'] as const) {
+          const f = faceRef(face, b);
+          for (let a = f.a0 + 0.12; a < f.a1 - 0.05; a += 0.18) wallOn(iso, f, a, a + 0.025, 1, 13, '#edf8eb');
+        }
+      },
+    });
+  }
+  for (const [u, v, size, tone] of [
+    [0.35, 2.45, 0.7, 0],
+    [2.55, 0.4, 0.7, 2],
+    [2.5, 2.75, 0.65, 1],
+  ] as const)
+    items.push(roundTree(iso, o, u, v, size, tone));
+  flowerDots(iso, o, rng, { u0: 0.18, u1: 0.82, v0: 1.42, v1: 2.1 }, 36, FLOWERS);
+  const fountain = at(o, 1.5, 1.5);
+  items.push({
+    depth: fountain.depth,
+    draw: () => {
+      iso.disc(fountain.u, fountain.v, 0.24, 0.12, '#e5d7ba');
+      iso.disc(fountain.u, fountain.v, 0.17, 0.2, '#56a7d6');
+      iso.round(fountain.u, fountain.v, 0.2, 6, () => 0.05, '#e8e1d3', '#f7f2e7');
+    },
+  });
+  void variant;
+  drawItems(items);
+  paintHedges(iso, { u0: 0, u1: w, v0: 0, v1: h });
+}
+
+function paintShoppingComplex(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
+  const w = o.vw;
+  const h = o.vh;
+  iso.floor(0.03, w - 0.03, 0.03, h - 0.03, 0, '#bdb8ae');
+  iso.floor(0.12, w - 0.12, 0.12, h - 0.12, 0, '#e5d9c4');
+  iso.floor(0.18, w - 0.18, h * 0.53, h - 0.18, 0.1, '#d6c3a2');
+  const items: Item[] = [];
+  const halls: readonly [Box, string, string][] = [
+    [{ u0: 0.18, u1: 1.42, v0: 0.18, v1: 1.05 }, '#e7b56e', 'MARKET'],
+    [{ u0: 1.58, u1: 2.82, v0: 0.18, v1: 1.05 }, '#79b6c8', 'GALLERIA'],
+  ];
+  for (const [local, color, label] of halls) {
+    const b = o.rect(local);
+    items.push({
+      depth: b.u0 + b.v0,
+      draw: () => {
+        iso.box(b.u0, b.u1, b.v0, b.v1, 0, 22, color, shade(color, -0.3), shade(color, 0.2));
+        for (const face of ['sw', 'se'] as const) {
+          const f = faceRef(face, b);
+          const count = Math.max(3, Math.floor((f.a1 - f.a0) * 4));
+          for (let k = 0; k < count; k++) {
+            const a = f.a0 + (k + 0.2) * ((f.a1 - f.a0) / count);
+            glazing(iso, f, a, a + 0.08, 7, 15);
+          }
+        }
+        const front = o.faceOf('front');
+        if (front) {
+          const f = faceRef(front, b);
+          iso.text(front, f.at, (f.a0 + f.a1) / 2, 18, label, 5, '#fff8df');
+        }
+      },
+    });
+  }
+  for (const [u, v] of [[0.38, 1.52], [1.08, 1.72], [2.45, 1.5]] as const) {
+    items.push(roundTree(iso, o, u, v, 0.42, (variant + Math.round(u * 3)) % 4));
+  }
+  for (const [u, v] of [[0.65, 1.28], [1.8, 1.3], [2.35, 1.28]] as const) {
+    const p = at(o, u, v);
+    items.push({
+      depth: p.depth,
+      draw: () => iso.box(p.u - 0.12, p.u + 0.12, p.v - 0.08, p.v + 0.08, 0, 2.5, '#6f4a32', '#533523', '#d97b43'),
+    });
+  }
+  drawItems(items);
+  void rng;
+}
+
+function paintRiversideMarket(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
+  const w = o.vw;
+  const h = o.vh;
+  iso.floor(0.03, w - 0.03, 0.03, h - 0.03, 0, '#d1c6b3');
+  iso.floor(0.12, w - 0.12, 0.12, h - 0.12, 0, '#e7d8bc');
+  iso.disc(w * 0.5, h * 0.53, 0.36, 0.1, '#63add0');
+  const items: Item[] = [];
+  const stalls: readonly [Box, string][] = [
+    [{ u0: 0.18, u1: 0.82, v0: 0.18, v1: 0.8 }, '#e78852'],
+    [{ u0: 1.18, u1: 1.82, v0: 0.18, v1: 0.8 }, '#69a9c5'],
+    [{ u0: 0.18, u1: 0.82, v0: 1.2, v1: 1.82 }, '#d6b34f'],
+    [{ u0: 1.18, u1: 1.82, v0: 1.2, v1: 1.82 }, '#8ab86b'],
+  ];
+  for (const [local, color] of stalls) {
+    const b = o.rect(local);
+    items.push({
+      depth: b.u0 + b.v0,
+      draw: () => {
+        iso.box(b.u0, b.u1, b.v0, b.v1, 0, 10, color, shade(color, -0.3), shade(color, 0.16));
+        iso.floor(b.u0 - 0.02, b.u1 + 0.02, b.v1 - 0.04, b.v1 + 0.03, 11, '#f4e3bd');
+      },
+    });
+  }
+  items.push(roundTree(iso, o, 0.98, 0.99, 0.48, variant % 4));
+  flowerDots(iso, o, rng, { u0: 0.82, u1: 1.18, v0: 0.82, v1: 1.18 }, 14, FLOWERS);
+  drawItems(items);
+}
+
 // ---------------------------------------------------------------- town hall
 
 function paintTownHall(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
@@ -748,6 +904,10 @@ function paintWaterTower(iso: IsoFrame, o: Orient, rng: Rng, variant: number) {
 
 export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   park: { variants: 6, headroom: () => 34, paint: paintPark },
+  central_park: { variants: 4, headroom: () => 42, paint: paintCentralPark },
+  botanical_garden: { variants: 4, headroom: () => 42, paint: paintBotanicalGarden },
+  shopping_complex: { variants: 4, headroom: () => 58, paint: paintShoppingComplex },
+  riverside_market: { variants: 4, headroom: () => 34, paint: paintRiversideMarket },
   town_hall: { variants: 3, headroom: () => 72, paint: paintTownHall },
   power_plant: { variants: 3, headroom: () => 92, paint: paintPowerPlant, smoke: powerPlantSmoke },
   water_tower: { variants: 3, headroom: (v) => (v === 0 ? 62 : v === 1 ? 56 : 30), paint: paintWaterTower },

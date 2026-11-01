@@ -106,7 +106,16 @@ function variants(base: BuildingArt, ...overrides: readonly Partial<BuildingArt>
 const one = (floors: number, inset: number, facade?: Facade, wall?: string): Mass => ({ floors, inset, facade, wall });
 
 /** Buildings with their own painter in civicArt.ts. */
-export type CustomArtId = 'park' | 'town_hall' | 'power_plant' | 'water_tower' | EnergyArtId;
+export type CustomArtId =
+  | 'park'
+  | 'central_park'
+  | 'botanical_garden'
+  | 'shopping_complex'
+  | 'riverside_market'
+  | 'town_hall'
+  | 'power_plant'
+  | 'water_tower'
+  | EnergyArtId;
 export type RecipeId = Exclude<BuildingId, CustomArtId>;
 
 export const ART: Readonly<Record<RecipeId, readonly BuildingArt[]>> = {

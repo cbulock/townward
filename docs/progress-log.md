@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Parks and shopping landmarks
+- Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.
+- Each landmark has deterministic procedural isometric art with distinct paths, water, planting, glasshouses, market stalls, storefronts and plaza details. Existing park, town hall, service and utility behavior is unchanged.
+- Shopping landmarks remain civic buildings so they do not alter commercial zoning demand; their capacity still contributes jobs through the existing population model.
+- Verified: 154 tests and lint pass. Typecheck was attempted but the environment permission prompt blocked that command.
+
 
 ## 2026-11-01: Transport T2, wide roads, ramps, pedestrian streets, paving
 - **Wide roads:** Boulevard (6 lanes) and Expressway (8 lanes) are two parallel one-way carriageways laid by one straight drag (`World.lane` holds each tile's direction). `roadMask` follows the rules in one place: carriageways join end to end, open into each other at crossings and at their ends (turnarounds), and never sideways otherwise; expressways join only expressways, highways and **ramps**. `stepAllowed` keeps the commute model and visible cars from going against the flow; the trip home is routed fresh on one-way roads.
