@@ -207,8 +207,14 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] **A. Energy v2** → [specs/energy.md](specs/energy.md): coal, gas, wind (daily wind), solar (sun curve) and battery banks; demand follows the clock with an evening peak; hourly per-island balance; brownout notice; Energy Mix in the budget panel; deterministic tick clock (D-068); 4 energy tests
 - [ ] **B. Water, sewage and drainage**: shore water pumps, treatment, sewage outlets and plants, river flow carries pollution downstream, storm drains and street flooding (master plan §12.2, §12.2b)
 - [ ] **C. Health and education**: hospital (beds, ambulances), clinic, elementary and high school, university, library, research centre
-- [ ] **D. Proper traffic**: road segment graph + Dijkstra (fixes the 92 ms day), avenues, junction control, isochrone reach for services
-- [ ] **E. Public transport**: stops, player bus lines, mode choice; then trams, metro, rail
+- [ ] **D + E. Transport** → [specs/transport.md](specs/transport.md) (D-069), steps T1–T7:
+  - [x] T1 Road-type table (`sim/roadTypes.ts`) with every system reading it; **Avenue** (4 lanes, planted median, brick footpaths, median trees and lamps); upgrade in place paying the difference; road art split into `render/atlas/roads/` (one file per type)
+  - [ ] T2 2-tile dual carriageways: Boulevard (6 lanes), Expressway (8 lanes), ramps; pedestrian street; pavement styles
+  - [ ] T3 Flyovers, interchange prefabs, truss / cable-stayed / suspension bridges, tunnels
+  - [ ] T4 Road segment graph + Dijkstra (fixes the 92 ms day), junction control, adaptive lights, isochrones
+  - [ ] T5 Buses: stops, line tool, depots, line panel, mode choice, transit view
+  - [ ] T6 Trams, metro, rail, ferries, transfers
+  - [ ] T7 Parks and leisure: central park, water park, botanical garden, Wonderland, stadium
 - [ ] **F. Research tree**: points from universities and research centres; energy, mobility and city branches
 
 ## Art Track (runs alongside the phases; D-066)

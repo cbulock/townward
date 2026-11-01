@@ -2,6 +2,7 @@ import { BUILDING_IDS, BUILDINGS, buildingDef, type BuildingId } from './buildin
 import { City } from './City';
 import { Simulation } from './core/Simulation';
 import { BridgeAxis, RoadType } from './roads';
+import { PAVEMENTS, roadSpec } from './roadTypes';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
 import { Decor } from './terrain/types';
@@ -49,6 +50,9 @@ export interface SavedLayers {
   readonly zone: string;
   /** 1 where the tile has neither tree nor decor (cleared by roads, zoning or buildings). */
   readonly cleared: string;
+  /** One-way carriageway directions and footpath styles (docs/specs/transport.md); absent in older saves. */
+  readonly lane?: string;
+  readonly pave?: string;
 }
 
 /**
@@ -120,7 +124,14 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
     name,
     terrain: { ...terrain },
     city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate },
-    layers: { road: encodeLayer(w.road), bridge: encodeLayer(w.bridge), zone: encodeLayer(w.zone), cleared: encodeLayer(cleared) },
+    layers: {
+      road: encodeLayer(w.road),
+      bridge: encodeLayer(w.bridge),
+      zone: encodeLayer(w.zone),
+      cleared: encodeLayer(cleared),
+      lane: encodeLayer(w.lane),
+      pave: encodeLayer(w.pave),
+    },
     buildings,
     ...(sim && { sim: saveSimState(sim) }),
   };
@@ -160,10 +171,15 @@ export function deserialize(data: SaveData): City {
   const bridge = decodeLayer(data.layers.bridge, n);
   const zone = decodeLayer(data.layers.zone, n);
   const cleared = decodeLayer(data.layers.cleared, n);
+  const lane = data.layers.lane ? decodeLayer(data.layers.lane, n) : null;
+  const pave = data.layers.pave ? decodeLayer(data.layers.pave, n) : null;
   for (let i = 0; i < n; i++) {
     world.road[i] = ROAD_VALUES.has(road[i]) ? road[i] : RoadType.None;
     world.bridge[i] = world.road[i] !== RoadType.None && BRIDGE_VALUES.has(bridge[i]) ? bridge[i] : BridgeAxis.None;
     world.zone[i] = ZONE_VALUES.has(zone[i]) ? zone[i] : ZoneType.None;
+    // Directions only on wide roads; styles only where there's a road.
+    world.lane[i] = lane && world.road[i] !== RoadType.None && lane[i] <= 4 && roadSpec(world.road[i])?.width === 2 ? lane[i] : 0;
+    world.pave[i] = pave && world.road[i] !== RoadType.None && pave[i] <= PAVEMENTS.length ? pave[i] : 0;
     if (cleared[i] === 1) {
       world.tree[i] = 0;
       world.decor[i] = Decor.None;
@@ -306,7 +322,14 @@ export function parseSave(json: unknown): SaveData {
     name: str(json, 'name').slice(0, 64),
     terrain,
     city: { funds: num(c, 'funds'), day: num(c, 'day', 0), clock: num(c, 'clock', 0), taxRate: num(c, 'taxRate', 0, 100) },
-    layers: { road: str(l, 'road'), bridge: str(l, 'bridge'), zone: str(l, 'zone'), cleared: str(l, 'cleared') },
+    layers: {
+      road: str(l, 'road'),
+      bridge: str(l, 'bridge'),
+      zone: str(l, 'zone'),
+      cleared: str(l, 'cleared'),
+      ...(typeof l.lane === 'string' && { lane: l.lane }),
+      ...(typeof l.pave === 'string' && { pave: l.pave }),
+    },
     buildings,
     ...parseSimState(json.sim),
   };

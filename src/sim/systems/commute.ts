@@ -1,7 +1,7 @@
 import { BALANCE } from '../../shared/balance';
 import { BUILDINGS } from '../buildings/catalog';
 import type { SimSystem, WorldChange } from '../core/System';
-import { roadMask, RoadType } from '../roads';
+import { roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
 import { hasUtilities } from './utilities';
@@ -278,9 +278,12 @@ export class CommuteSystem implements SimSystem {
       const x = i % w.width;
       const y = (i - x) / w.width;
       const m = roadMask(w, x, y);
-      for (const [bit, dx, dy] of DIRS) {
+      for (let k = 0; k < DIRS.length; k++) {
+        const [bit, dx, dy] = DIRS[k];
         if (!(m & bit)) continue;
         const j = w.index(x + dx, y + dy);
+        // Never against a one-way carriageway (DIRS here is in mask-bit order, like sim/roads.ts).
+        if (!stepAllowed(w, i, j, k)) continue;
         const d = this.dist[i] + this.tileMinutes(j);
         if (this.seen[j] === this.stamp && d >= this.dist[j]) continue;
         this.seen[j] = this.stamp;

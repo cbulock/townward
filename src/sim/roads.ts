@@ -8,6 +8,14 @@ export const RoadType = {
   Highway: 2,
   /** Four lanes, a tree-lined median and footpaths (docs/specs/transport.md). */
   Avenue: 3,
+  /** Six lanes on two tiles: each tile is one direction's three lanes (a dual carriageway). */
+  Boulevard: 4,
+  /** Eight lanes on two tiles, limited access: joins only expressways, highways and ramps. */
+  Expressway: 5,
+  /** A slip road: the only way between an expressway and local roads. */
+  Ramp: 6,
+  /** Paved, car-free: walkers, shops and cafés. */
+  Pedestrian: 7,
 } as const;
 export type RoadTypeId = (typeof RoadType)[keyof typeof RoadType];
 export type BuildableRoad = Exclude<RoadTypeId, typeof RoadType.None>;
@@ -33,25 +41,96 @@ export interface TilePos {
 }
 
 /**
- * Connection mask for auto-tiling: which of the 4 neighbours carry a road that connects here.
- *   bit 0 NE (x, y−1)   bit 1 SE (x+1, y)   bit 2 SW (x, y+1)   bit 3 NW (x−1, y)
- * Roads and highways connect to each other. Bridges only connect along their axis,
- * so a road beside a bridge doesn't sprout a branch into it (and vice versa).
+ * The four directions, in mask-bit order: 0 NE (x, y−1), 1 SE (x+1, y), 2 SW (x, y+1), 3 NW (x−1, y).
+ * Right of heading d is (d + 1) % 4, left is (d + 3) % 4, opposite is (d + 2) % 4.
+ */
+export const DIRS: readonly (readonly [number, number])[] = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+];
+
+/** Travel direction of a one-way carriageway tile (World.lane − 1), or −1 for two-way roads. */
+export function laneDir(world: World, i: number): number {
+  return world.lane[i] - 1;
+}
+
+const sameAxis = (a: number, b: number) => a % 2 === b % 2;
+
+/** Limited-access roads join only each other and ramps (docs/specs/transport.md). */
+function accessOk(a: number, b: number): boolean {
+  const limited = (t: number) => t === RoadType.Expressway;
+  const opens = (t: number) => t === RoadType.Expressway || t === RoadType.Highway || t === RoadType.Ramp;
+  return (!limited(a) || opens(b)) && (!limited(b) || opens(a));
+}
+
+/**
+ * A one-way tile is a crossing when a road meets it from the side: then the two carriageways
+ * open into each other, so cross traffic can pass through the median.
+ */
+function isCrossing(world: World, x: number, y: number): boolean {
+  const i = world.index(x, y);
+  const d = laneDir(world, i);
+  for (const side of [(d + 1) % 4, (d + 3) % 4]) {
+    const nx = x + DIRS[side][0];
+    const ny = y + DIRS[side][1];
+    if (!world.inBounds(nx, ny)) continue;
+    const j = world.index(nx, ny);
+    if (world.road[j] === RoadType.None) continue;
+    const dj = laneDir(world, j);
+    if (dj < 0 || !sameAxis(dj, d)) return true;
+  }
+  return false;
+}
+
+/** Do the roads on (x, y) and its neighbour in direction `d` join? */
+function links(world: World, x: number, y: number, d: number): boolean {
+  const nx = x + DIRS[d][0];
+  const ny = y + DIRS[d][1];
+  if (!world.inBounds(nx, ny)) return false;
+  const i = world.index(x, y);
+  const j = world.index(nx, ny);
+  if (world.road[j] === RoadType.None || !accessOk(world.road[i], world.road[j])) return false;
+  // Bridges only connect along their axis.
+  const along = d % 2 === 0 ? BridgeAxis.Y : BridgeAxis.X;
+  if (world.bridge[j] !== BridgeAxis.None && world.bridge[j] !== along) return false;
+  if (world.bridge[i] !== BridgeAxis.None && world.bridge[i] !== along) return false;
+  // One-way carriageways: end to end unless head-on; sideways only into the partner at a
+  // crossing, into a crossing road, or into a carriageway that crosses at right angles.
+  const di = laneDir(world, i);
+  const dj = laneDir(world, j);
+  if (di >= 0 && dj >= 0) {
+    if (sameAxis(di, d) && sameAxis(dj, d)) return di === dj;
+    if (!sameAxis(di, d) && !sameAxis(dj, d)) return di !== dj && (isCrossing(world, x, y) || isCrossing(world, nx, ny));
+    return true;
+  }
+  return true;
+}
+
+/**
+ * Connection mask for auto-tiling and routing: which of the 4 neighbours carry a road that
+ * connects here. bit 0 NE (x, y−1), bit 1 SE (x+1, y), bit 2 SW (x, y+1), bit 3 NW (x−1, y).
+ * Bridges connect only along their axis; one-way carriageways and limited-access roads follow
+ * the rules in `links` (docs/specs/transport.md).
  */
 export function roadMask(world: World, x: number, y: number): number {
-  const has = (nx: number, ny: number, axis: number) => {
-    if (!world.inBounds(nx, ny)) return false;
-    const i = world.index(nx, ny);
-    if (world.road[i] === RoadType.None) return false;
-    const b = world.bridge[i];
-    return b === BridgeAxis.None || b === axis;
-  };
-  const mask =
-    (has(x, y - 1, BridgeAxis.Y) ? 1 : 0) |
-    (has(x + 1, y, BridgeAxis.X) ? 2 : 0) |
-    (has(x, y + 1, BridgeAxis.Y) ? 4 : 0) |
-    (has(x - 1, y, BridgeAxis.X) ? 8 : 0);
-  return mask & bridgeAxisMask(world.bridge[world.index(x, y)]);
+  if (world.road[world.index(x, y)] === RoadType.None) return 0;
+  let mask = 0;
+  for (let d = 0; d < 4; d++) if (links(world, x, y, d)) mask |= 1 << d;
+  return mask;
+}
+
+/**
+ * May traffic move from tile `from` to its neighbour in direction `d`? Never against a one-way
+ * carriageway's flow, entering or leaving it (sideways moves at crossings are fine).
+ */
+export function stepAllowed(world: World, from: number, to: number, d: number): boolean {
+  const a = laneDir(world, from);
+  const b = laneDir(world, to);
+  if (a >= 0 && sameAxis(a, d) && a !== d) return false;
+  if (b >= 0 && sameAxis(b, d) && b !== d) return false;
+  return true;
 }
 
 /**

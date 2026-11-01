@@ -10,6 +10,14 @@ export const BALANCE = {
   highwayCost: 40,
   avenueCost: 35,
   avenueBridgeCost: 110,
+  /** Wide roads are priced per tile; one drag lays two tiles per step. */
+  boulevardCost: 45,
+  boulevardBridgeCost: 130,
+  expresswayCost: 80,
+  expresswayBridgeCost: 200,
+  rampCost: 30,
+  rampBridgeCost: 120,
+  pedestrianCost: 20,
   /** Bridges replace the per-tile road cost while over water. */
   bridgeCost: 60,
   highwayBridgeCost: 160,
@@ -42,6 +50,10 @@ export const BALANCE = {
   roadUpkeep: 0.4,
   highwayUpkeep: 1.2,
   avenueUpkeep: 0.9,
+  boulevardUpkeep: 1,
+  expresswayUpkeep: 1.6,
+  rampUpkeep: 0.8,
+  pedestrianUpkeep: 0.3,
   bridgeUpkeep: 2,
   /** A land road within this many tiles of a footprint gives road access. */
   roadAccessRange: 3,

@@ -2,7 +2,7 @@ import { mulberry32 } from '../../shared/rng';
 import { BUILDINGS } from '../buildings/catalog';
 import { isActive } from './access';
 import { speedFactor, type CommuteTrip } from './commute';
-import { roadMask, RoadType } from '../roads';
+import { roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
 import { roadSpec } from '../roadTypes';
@@ -165,6 +165,11 @@ const DIRS: readonly (readonly [number, number])[] = [
   [-1, 0],
 ];
 
+/** Cars may drive here (not pedestrian streets). */
+function drivable(world: World, tile: number): boolean {
+  return roadSpec(world.road[tile])?.cars ?? false;
+}
+
 /** Shortest route between two road tiles (BFS over connected road pieces). */
 export function findRoute(world: World, from: number, to: number, scratch?: Int32Array): Int32Array | null {
   if (world.road[from] === RoadType.None || world.road[to] === RoadType.None) return null;
@@ -187,6 +192,8 @@ export function findRoute(world: World, from: number, to: number, scratch?: Int3
       if (!(mask & (1 << d))) continue;
       const j = world.index(x + DIRS[d][0], y + DIRS[d][1]);
       if (prev[j] !== -1) continue;
+      // Cars keep to roads they may drive, and never against a one-way carriageway.
+      if (!stepAllowed(world, i, j, d) || (j !== to && !drivable(world, j))) continue;
       prev[j] = i;
       queue[tail++] = j;
     }
@@ -219,9 +226,9 @@ function laneOffset(world: World, a: Agent, tile: number): number {
   return isLong(a) || a.variant % 3 === 0 ? lanes[lanes.length - 1] : lanes[0];
 }
 
-/** Roads with footpaths (pedestrians stroll there; never highways or bridges). */
+/** Roads with footpaths both sides (pedestrians stroll there; never highways, bridges or one-way carriageways). */
 function walkable(world: World, tile: number): boolean {
-  return world.bridge[tile] === 0 && (roadSpec(world.road[tile])?.footpath ?? null) !== null;
+  return world.bridge[tile] === 0 && world.lane[tile] === 0 && (roadSpec(world.road[tile])?.footpath ?? null) !== null;
 }
 
 /**
@@ -440,10 +447,15 @@ export class Traffic {
       else hi = mid;
     }
     const trip = trips[lo];
+    // Walkers' trips (through pedestrian streets) aren't drawn as cars.
+    for (let k = 1; k < trip.path.length - 1; k++) if (!drivable(this.world, trip.path[k])) return null;
     if (this.rng() < outboundShare(hour)) return trip.path;
     let back = this.reversed.get(trip);
     if (!back) {
-      back = trip.path.slice().reverse();
+      // The way home: a plain reverse, unless one-way roads mean it must take the other carriageway.
+      const oneWay = trip.path.some((t) => this.world.lane[t] !== 0);
+      back = oneWay ? (this.route(trip.path[trip.path.length - 1], trip.path[0]) ?? undefined) : trip.path.slice().reverse();
+      if (!back) return null;
       this.reversed.set(trip, back);
     }
     return back;

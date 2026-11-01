@@ -17,6 +17,10 @@ export class World {
   readonly road: Uint8Array;
   /** Bridge axis for road tiles over water (see sim/roads.ts BridgeAxis). */
   readonly bridge: Uint8Array;
+  /** One-way carriageways (boulevards, expressways): travel direction + 1, or 0 (sim/roads.ts laneDir). */
+  readonly lane: Uint8Array;
+  /** Pavement style of a road's footpaths: 0 = the road type's default, else style + 1 (cosmetic). */
+  readonly pave: Uint8Array;
   readonly zone: Uint8Array;
   /** Building instance id covering each tile, −1 if none. */
   readonly building: Int32Array;
@@ -35,6 +39,8 @@ export class World {
     this.decor = new Uint8Array(n);
     this.road = new Uint8Array(n);
     this.bridge = new Uint8Array(n);
+    this.lane = new Uint8Array(n);
+    this.pave = new Uint8Array(n);
     this.zone = new Uint8Array(n);
     this.building = new Int32Array(n).fill(-1);
   }

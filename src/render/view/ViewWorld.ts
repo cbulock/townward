@@ -1,4 +1,5 @@
 import { BUILDINGS, type BuildingInstance } from '../../sim/buildings/catalog';
+import { DIRS } from '../../sim/roads';
 import { World } from '../../sim/World';
 import type { ViewTransform } from './ViewTransform';
 
@@ -21,6 +22,13 @@ export class ViewWorld extends World {
 
   sync(world: World) {
     const v = this.view;
+    // One-way directions turn with the view: map each world direction through the transform.
+    const c = { x: Math.floor(world.width / 2), y: Math.floor(world.height / 2) };
+    const o = v.tileToView(c.x, c.y);
+    const turnDir = DIRS.map(([dx, dy]) => {
+      const t = v.tileToView(c.x + dx, c.y + dy);
+      return DIRS.findIndex(([ex, ey]) => ex === t.x - o.x && ey === t.y - o.y);
+    });
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
         const wi = y * world.width + x;
@@ -34,6 +42,8 @@ export class ViewWorld extends World {
         this.decor[vi] = world.decor[wi];
         this.road[vi] = world.road[wi];
         this.bridge[vi] = v.bridgeAxis(world.bridge[wi]);
+        this.lane[vi] = world.lane[wi] === 0 ? 0 : turnDir[world.lane[wi] - 1] + 1;
+        this.pave[vi] = world.pave[wi];
         this.zone[vi] = world.zone[wi];
         this.building[vi] = world.building[wi];
       }

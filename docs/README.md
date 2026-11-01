@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Feature track (D-067): **A. Energy v2 ✅**. Earlier: Phases 0–10 ✅, step 11.1 ✅ (harness, timings, exact saves) |
-| **Next phase** | **B. Water, sewage and drainage** (master plan §12.2, §12.2b; spec to write first) |
+| **Current phase** | Transport (specs/transport.md): **T1 ✅** road-type table + Avenue. Earlier: energy ✅, Demand v2 ✅, Phases 0–10 ✅, step 11.1 ✅ |
+| **Next phase** | **T2**: 6-lane Boulevard and 8-lane Expressway (2-tile dual carriageways), ramps, pedestrian street, pavement styles |
 | **Last updated** | 2026-11-01 |
 
 ## Run It
@@ -47,6 +47,7 @@ pnpm typecheck && pnpm lint
 | [05-master-plan.md](05-master-plan.md) | The plan for Phases 11–22: people, land value, transport, economy, government, disasters |
 | [specs/engine.md](specs/engine.md) | Phase 11: harness, timings, determinism, time-slicing, fields, road graph, Worker |
 | [specs/energy.md](specs/energy.md) | Power plants, day/night demand, batteries, the tick clock |
+| [specs/transport.md](specs/transport.md) | Road hierarchy, wide roads, flyovers, bridges, public transport, parks |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

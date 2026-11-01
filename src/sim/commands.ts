@@ -2,7 +2,7 @@ import { BALANCE } from '../shared/balance';
 import { BUILDINGS, footprintOrigin, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
-import { BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
+import { DIRS, BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
 import { ZoneType, type ZoneTypeId } from './zones';
@@ -19,6 +19,8 @@ export interface PlannedTile extends TilePos {
   cost: number;
   /** Set for road tiles over water. */
   bridge?: BridgeAxisId;
+  /** One-way carriageways: travel direction (sim/roads.ts DIRS index). */
+  lane?: number;
 }
 
 export interface Plan {
@@ -87,13 +89,53 @@ function bridgeRunValid(world: World, path: readonly TilePos[], k: number): bool
  * Price a road along `path`. Each tile is judged on its own (docs/specs/roads.md): rock,
  * buildings and the map edge block only their own tiles, and the rest of the drag still builds.
  * Water is crossed by straight bridges that start and end on roadable land; a crossing that
- * can't be bridged is blocked as a whole. Tiles that already carry this road type (or a
- * highway, when placing a road) are free and kept.
+ * can't be bridged is blocked as a whole. The same or a bigger road is kept for free; a
+ * smaller one is upgraded in place, paying the difference.
+ *
+ * Wide roads (boulevards, expressways) lay two rows from one straight drag: the dragged row
+ * carries traffic in the drag's direction, the row on its left the other way (we drive on the
+ * right). A step is built only where both rows can be, so no half carriageways are left.
  */
 export function planRoad(world: World, path: readonly TilePos[], type: BuildableRoad): Plan {
+  const spec = ROAD_SPECS[type];
+  if (spec.width === 1) return planRow(world, path, type, -1);
+  const a = path[0];
+  const b = path[path.length - 1];
+  const d = path.length < 2 ? 1 : b.x > a.x ? 1 : b.x < a.x ? 3 : b.y > a.y ? 2 : 0;
+  const [lx, ly] = DIRS[(d + 3) % 4];
+  const near = planRow(world, path, type, d);
+  const far = planRow(
+    world,
+    path.map((p) => ({ x: p.x + lx, y: p.y + ly })),
+    type,
+    (d + 2) % 4,
+  );
+  // Pair the rows step by step (out-of-bounds steps are missing from a row).
+  const farAt = new Map(far.tiles.map((t) => [`${t.x - lx},${t.y - ly}`, t]));
   const tiles: PlannedTile[] = [];
   let cost = 0;
   let count = 0;
+  for (const t of near.tiles) {
+    const f = farAt.get(`${t.x},${t.y}`);
+    const both = t.valid && f !== undefined && f.valid;
+    for (const p of f ? [t, f] : [t]) {
+      tiles.push(both ? p : { ...p, valid: false, cost: 0 });
+      if (both) {
+        cost += p.cost;
+        if (p.cost > 0) count++;
+      }
+    }
+  }
+  return { tiles, cost, count };
+}
+
+/** One row of road tiles (see planRoad). `lane` is the travel direction for one-way rows, −1 otherwise. */
+function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, lane: number): Plan {
+  const tiles: PlannedTile[] = [];
+  let cost = 0;
+  let count = 0;
+  const spec = ROAD_SPECS[type];
+  const oneWay = lane >= 0 ? { lane } : {};
   /** Whether the water crossing we're in can be bridged; decided on entering it. */
   let crossingOk = false;
   for (let k = 0; k < path.length; k++) {
@@ -114,9 +156,6 @@ export function planRoad(world: World, path: readonly TilePos[], type: Buildable
       continue;
     }
 
-    // The same or a bigger road is kept (never downgrade); a smaller one is upgraded in place,
-    // paying the difference (docs/specs/transport.md).
-    const spec = ROAD_SPECS[type];
     const existing = roadSpec(world.road[i]);
     if (existing && existing.rank >= spec.rank) {
       tiles.push({ ...p, valid: true, cost: 0, ...(water && { bridge }) });
@@ -124,14 +163,15 @@ export function planRoad(world: World, path: readonly TilePos[], type: Buildable
     }
     const full = water ? spec.bridgeCost : spec.cost + clearCost(world, i);
     const c = existing ? Math.max(1, full - (water ? existing.bridgeCost : existing.cost)) : full;
-    tiles.push({ ...p, valid: true, cost: c, ...(water && { bridge }) });
+    tiles.push({ ...p, valid: true, cost: c, ...(water && { bridge }), ...oneWay });
     cost += c;
     count++;
   }
   return { tiles, cost, count };
 }
 
-export function applyRoad(city: City, plan: Plan, type: BuildableRoad): ApplyResult {
+/** Build a planned road. `pave` is the footpath style picked in the road tool (World.pave; 0 = default). */
+export function applyRoad(city: City, plan: Plan, type: BuildableRoad, pave = 0): ApplyResult {
   const w = city.world;
   // Tiles that already carry the road are listed with cost 0; every real change costs at least the road price.
   const real = plan.tiles.filter((t) => t.valid && t.cost > 0);
@@ -141,6 +181,8 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad): ApplyRes
     const i = w.index(t.x, t.y);
     w.road[i] = type;
     w.bridge[i] = t.bridge ?? BridgeAxis.None;
+    w.lane[i] = t.lane === undefined ? 0 : t.lane + 1;
+    w.pave[i] = pave;
     w.tree[i] = 0;
     w.decor[i] = Decor.None;
     w.zone[i] = ZoneType.None;
@@ -185,6 +227,8 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
     w.decor[i] = Decor.None;
     w.road[i] = RoadType.None;
     w.bridge[i] = BridgeAxis.None;
+    w.lane[i] = 0;
+    w.pave[i] = 0;
     // Clear is the one "remove" tool: zones go too (there's no separate Dezone, D-051).
     w.zone[i] = ZoneType.None;
     // Selecting any tile of a building removes the whole building.
