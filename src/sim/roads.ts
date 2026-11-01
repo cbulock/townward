@@ -66,12 +66,18 @@ function accessOk(a: number, b: number): boolean {
 }
 
 /**
- * A one-way tile is a crossing when a road meets it from the side: then the two carriageways
- * open into each other, so cross traffic can pass through the median.
+ * The two carriageways of a wide road open into each other at a crossing (a road meets them
+ * from the side, so cross traffic passes through the median) and at the road's ends (a
+ * turnaround, so traffic can U-turn instead of being trapped).
  */
-function isCrossing(world: World, x: number, y: number): boolean {
+function opensMedian(world: World, x: number, y: number): boolean {
   const i = world.index(x, y);
   const d = laneDir(world, i);
+  for (const end of [d, (d + 2) % 4]) {
+    const nx = x + DIRS[end][0];
+    const ny = y + DIRS[end][1];
+    if (!world.inBounds(nx, ny) || world.road[world.index(nx, ny)] === RoadType.None) return true;
+  }
   for (const side of [(d + 1) % 4, (d + 3) % 4]) {
     const nx = x + DIRS[side][0];
     const ny = y + DIRS[side][1];
@@ -102,7 +108,7 @@ function links(world: World, x: number, y: number, d: number): boolean {
   const dj = laneDir(world, j);
   if (di >= 0 && dj >= 0) {
     if (sameAxis(di, d) && sameAxis(dj, d)) return di === dj;
-    if (!sameAxis(di, d) && !sameAxis(dj, d)) return di !== dj && (isCrossing(world, x, y) || isCrossing(world, nx, ny));
+    if (!sameAxis(di, d) && !sameAxis(dj, d)) return di !== dj && (opensMedian(world, x, y) || opensMedian(world, nx, ny));
     return true;
   }
   return true;
