@@ -1,4 +1,4 @@
-# Deploying
+# Deploying Openpolis
 
 The game is one Node process: the save server (`server/`) serves the API under `/api` and the
 built client for every other path. It needs Postgres. Decisions: D-062 (Postgres), D-073 (limits).
@@ -9,7 +9,7 @@ What runs in Docker: `postgres` and `app` (the game and API), both reachable onl
 itself (`127.0.0.1:8787` for the app). HTTPS comes from your own reverse proxy on the host.
 1 GB RAM is enough.
 
-1. **Point your domain** (e.g. `play.example.com`) at the server's IP with an `A` record.
+1. **Point your domain** (`openpolis.space`) at the server's IP with an `A` record.
 2. **Install Docker:**
    ```bash
    curl -fsSL https://get.docker.com | sh
@@ -21,7 +21,7 @@ itself (`127.0.0.1:8787` for the app). HTTPS comes from your own reverse proxy o
    ```
 4. **Get the code** and configure it:
    ```bash
-   git clone <your-repo-url> citybuilder && cd citybuilder
+   git clone <your-repo-url> openpolis && cd openpolis
    cp .env.example .env
    nano .env   # POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
    ```
@@ -45,11 +45,11 @@ Keep `POSTGRES_PASSWORD` the same once the database exists (Postgres only reads 
 ## With Docker, behind your own proxy
 
 ```bash
-docker build -t citybuilder .
+docker build -t openpolis .
 docker run -d -p 8787:8787 \
   -e DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/citybuilder \
   -e TRUST_PROXY=1 \
-  citybuilder
+  openpolis
 ```
 
 Migrations run at startup. The image has a health check on `/api/health`.
@@ -57,12 +57,12 @@ Migrations run at startup. The image has a health check on `/api/health`.
 ## Without Docker
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm build
-NODE_ENV=production DATABASE_URL=… TRUST_PROXY=1 pnpm start
+bun install --frozen-lockfile
+bun run build
+NODE_ENV=production DATABASE_URL=… TRUST_PROXY=1 bun run start
 ```
 
-Node 26 (it runs the server's TypeScript directly).
+Bun 1.4 (it runs the server's TypeScript directly).
 
 ## Settings
 

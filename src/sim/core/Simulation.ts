@@ -44,7 +44,7 @@ export class Simulation {
   private readonly onChange: readonly SimSystem[];
   /** Random streams whose state is saved, so a loaded city continues exactly (sim/save.ts). */
   readonly streams: { readonly growth: RandomStream; readonly fire: RandomStream };
-  /** Time per system and hook (F3 overlay, `pnpm sim:run`). */
+  /** Time per system and hook (F3 overlay, `bun run sim:run`). */
   readonly timings = new SystemTimings();
   readonly city: City;
 

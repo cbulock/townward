@@ -1,6 +1,6 @@
 /**
  * Per-system time spent in the simulation (docs/specs/engine.md, "Timings"). The F3 overlay
- * and the headless harness (`pnpm sim:run`) read it. Two clock reads per call: cheap enough
+ * and the headless harness (`bun run sim:run`) read it. Two clock reads per call: cheap enough
  * to stay on all the time.
  */
 
@@ -53,7 +53,7 @@ export class SystemTimings {
 }
 
 /**
- * Per-call budgets in ms (docs/05-master-plan.md §13), for `pnpm bench`. A hook over 1.5× its
+ * Per-call budgets in ms (docs/05-master-plan.md §13), for `bun run bench`. A hook over 1.5× its
  * budget fails the strict bench. Day work is budgeted as if it ran in one tick until
  * time-slicing (step 11.3) spreads it out.
  */

@@ -5,8 +5,8 @@ import { createPgDb } from './db/db.ts';
 import { migrate } from './db/migrations.ts';
 
 /**
- * Save server entry point. `pnpm dev` runs it next to Vite (which proxies /api here);
- * `pnpm start` also serves the built client. Postgres: `docker compose up -d`.
+ * Save server entry point, run by bun. `bun run dev` runs it next to Vite (which proxies /api
+ * here); `bun run start` also serves the built client. Postgres: `docker compose up -d`.
  */
 
 const config = loadConfig();

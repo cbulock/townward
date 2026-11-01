@@ -129,7 +129,7 @@ export function AuthDialog() {
         </button>
         <header className="auth-head">
           <Mark />
-          <h2 id="auth-title">{isSignup ? 'Create your account' : 'Welcome back, mayor'}</h2>
+          <h2 id="auth-title">{isSignup ? 'Join Openpolis' : 'Welcome back, mayor'}</h2>
           <p className="auth-lead">{isSignup ? 'Keep your cities safe and play them from any browser.' : 'Log in to open the cities in your account.'}</p>
         </header>
 

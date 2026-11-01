@@ -1,0 +1,14 @@
+{
+  "name": "Openpolis",
+  "short_name": "Openpolis",
+  "description": "A free city builder you play in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1820",
+  "theme_color": "#0e1820",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

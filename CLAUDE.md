@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Browser city-builder (original game in the city-sim genre). TypeScript + Vite + PixiJS v8 + React HUD + Jotai. Package manager: **pnpm** (never npm/yarn).
+**Openpolis** (openpolis.space): browser city-builder (original game in the city-sim genre). TypeScript + Vite + PixiJS v8 + React HUD + Jotai. Package manager and server runtime: **bun** (never npm/yarn/pnpm).
 
-Commands: `pnpm dev` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build`
+Commands: `bun run dev` · `bun run test` · `bun run typecheck` · `bun run lint` · `bun run build`
 
 **Start every session by reading `docs/README.md`.** It holds the current phase, the index and the working agreement.
 
@@ -25,4 +25,4 @@ TypeScript runs in `strict` mode, and types are part of the design, not an after
   - Use `readonly` for data that must not change.
 - **Explicit types at boundaries.** Exported functions, class public APIs, event payloads (`game/events.ts`) and anything crossing sim ↔ render ↔ UI get named interfaces. Inference is fine for locals.
 - **Type-only imports** use `import type` (enforced by `verbatimModuleSyntax`).
-- `pnpm typecheck` and `pnpm lint` must pass with zero errors before a task counts as done.
+- `bun run typecheck` and `bun run lint` must pass with zero errors before a task counts as done.

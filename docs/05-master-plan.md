@@ -148,7 +148,7 @@ traffic, crime, pollution, approval, and so on): 10 years at month resolution pl
 ### 4.7 Determinism and the headless harness
 
 - Every system keeps its own seeded random stream (as growth and fire do now).
-- **`pnpm sim:run --seed 42 --preset demo --years 10`** runs the sim without rendering and writes a CSV of the history. It's our balancing tool (§14) and catches regressions in CI.
+- **`bun run sim:run --seed 42 --preset demo --years 10`** runs the sim without rendering and writes a CSV of the history. It's our balancing tool (§14) and catches regressions in CI.
 
 ---
 

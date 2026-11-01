@@ -89,7 +89,7 @@ Typical size: ~3 KB of layers plus ~45 bytes per building (a 2,000-building city
 ## Server (`server/`)
 
 Express 5 + Postgres (D-062), run with Node's built-in TypeScript support (no build step).
-`docker compose up -d` starts Postgres; `pnpm dev` starts the server alongside Vite, which
+`docker compose up -d` starts Postgres; `bun run dev` starts the server alongside Vite, which
 proxies `/api` to it. Env: `PORT` (8787), `DATABASE_URL`, `NODE_ENV`.
 
 ```
@@ -127,7 +127,7 @@ server/
   `day`, `size`, `preset`, `seed` columns for the list), versioned by `schema_version`.
   One row per city; a save overwrites it (last write wins). The quota is checked in the
   same INSERT statement.
-- In production (`pnpm start`) the server also serves `dist/`, so one process runs the whole game.
+- In production (`bun run start`) the server also serves `dist/`, so one process runs the whole game.
 
 ## Client
 

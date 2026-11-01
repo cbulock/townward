@@ -28,12 +28,12 @@ calls, total, average and max ms. That's two clock reads per call, so it's alway
 - **F3 overlay:** the five slowest hooks, average and max ms, in amber over budget and red over 1.5× budget.
 - **Budgets** (`SYSTEM_BUDGETS_MS`) follow master plan §13. Day work is budgeted as if it ran in one tick until 11.3 spreads it out.
 
-### Harness (`pnpm sim:run`, `scripts/sim-run.ts`)
+### Harness (`bun run sim:run`, `scripts/sim-run.ts`)
 
 ```
-pnpm sim:run --scenario demo|blank --preset riverValley --seed 42 --size 128 --years 2 --out history.csv
-pnpm bench          # demo, 1 year, with the budget report
-pnpm sim:run ... --strict   # exits 1 if any hook averages over 1.5× its budget
+bun run sim:run --scenario demo|blank --preset riverValley --seed 42 --size 128 --years 2 --out history.csv
+bun run bench          # demo, 1 year, with the budget report
+bun run sim:run ... --strict   # exits 1 if any hook averages over 1.5× its budget
 ```
 
 It runs the real sim on Node with no rendering and no build step: `scripts/resolve-ts.mjs`

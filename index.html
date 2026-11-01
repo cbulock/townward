@@ -3,15 +3,100 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>City Builder</title>
+    <title>Openpolis: Free City Builder Game, Play in Your Browser</title>
+    <meta
+      name="description"
+      content="Openpolis is a free city-building game you play in your browser, no download. Lay roads, zone neighbourhoods and grow a town block by block into a living city, day into night."
+    />
+    <meta name="theme-color" content="#0e1820" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="canonical" href="https://openpolis.space/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Openpolis" />
+    <meta property="og:title" content="Openpolis: Free City Builder Game in Your Browser" />
+    <meta property="og:description" content="Lay a road and a city moves in. Build a town block by block into a living city, free in your browser." />
+    <meta property="og:url" content="https://openpolis.space/" />
+    <meta property="og:image" content="https://openpolis.space/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="An isometric Openpolis city: glass towers, shops, a park and homes along two streets." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Openpolis: Free City Builder Game in Your Browser" />
+    <meta name="twitter:description" content="Lay a road and a city moves in. Free, in your browser, nothing to install." />
+    <meta name="twitter:image" content="https://openpolis.space/og.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://openpolis.space/#website",
+            "name": "Openpolis",
+            "url": "https://openpolis.space/",
+            "inLanguage": "en"
+          },
+          {
+            "@type": "VideoGame",
+            "@id": "https://openpolis.space/#game",
+            "name": "Openpolis",
+            "url": "https://openpolis.space/",
+            "description": "A free city-building simulation game that runs in the browser. Lay roads, zone homes, shops and industry, run power and water, and grow a town block by block into a city.",
+            "image": "https://openpolis.space/og.png",
+            "genre": ["City-building game", "Simulation", "Strategy"],
+            "gamePlatform": ["Web browser", "PC", "Mac"],
+            "applicationCategory": "Game",
+            "operatingSystem": "Any (web browser)",
+            "playMode": "SinglePlayer",
+            "isAccessibleForFree": true,
+            "inLanguage": "en",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock" }
+          }
+        ]
+      }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Shown until the app starts (and to crawlers and link previews that don't run scripts). */
+      body { margin: 0; background: #0e1820; }
+      .boot { max-width: 760px; margin: 0 auto; padding: 56px 24px; color: #ece4d3; font: 16px/1.6 'IBM Plex Sans', system-ui, sans-serif; }
+      .boot h1 { margin: 0 0 16px; font: 800 44px/1.05 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.03em; }
+      .boot h2 { margin: 32px 0 8px; font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; }
+      .boot p, .boot li { color: #a9b0a8; }
+      .boot a { color: #f0b23e; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="boot">
+        <h1>Openpolis: a free city builder you play in your browser</h1>
+        <p>
+          Lay a road and a city moves in. Openpolis is a city-building simulation game for the web: zone homes, shops and industry, run power and water, open
+          schools and clinics, and grow a town block by block into a busy city, with traffic at rush hour and lights after dark. No download, no install.
+        </p>
+        <h2>How a city grows</h2>
+        <ul>
+          <li><strong>Zone:</strong> lay roads and paint residential, commercial and industrial zones. Lots fill up when people want to live and work there.</li>
+          <li><strong>Serve:</strong> power plants, water, schools, clinics, police and fire stations. Citizens tell you what their street is missing.</li>
+          <li><strong>Grow:</strong> land value rises and cottages give way to apartments and towers.</li>
+        </ul>
+        <h2>Free, and your cities are saved</h2>
+        <p>Play as a guest and your cities save on this device, or create a free account to keep them in the cloud and play from any browser.</p>
+        <p><a href="/">Play Openpolis</a> · <a href="/demo">Walk around a finished city</a></p>
+        <noscript><p>Openpolis needs JavaScript to run. Please turn it on to play.</p></noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

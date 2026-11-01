@@ -2,6 +2,10 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: The game is called Openpolis (D-001)
+- Name chosen and domain registered: **Openpolis**, openpolis.space. Browser title, landing wordmark and footer, sign-up heading, package name, Docker image and docs use it. Added a favicon, page description, canonical URL and Open Graph tags.
+- Internal identifiers keep the old `citybuilder` names (browser storage keys, IndexedDB, Postgres) so existing cities and accounts keep working.
+
 ## 2026-11-01: Backend hardening and the account flow (D-073)
 - Rate limits count failures only (per email and per address), clear on success, and send `Retry-After`; `TRUST_PROXY` so a deployed server sees real client addresses.
 - Security headers, `/api/health`, asset caching (`/assets` immutable, `index.html` no-cache), hourly session pruning, `Dockerfile` + `docker compose --profile app`, [deploy.md](deploy.md).

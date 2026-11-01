@@ -5,7 +5,7 @@
 | Concern | Choice | Why |
 |---|---|---|
 | Language | **TypeScript** (strict) | Large codebase, so we want types everywhere |
-| Package manager | **pnpm** | Fast, strict dependency resolution |
+| Package manager and server runtime | **bun** | One fast tool to install, run scripts and run the server's TypeScript directly (D-074) |
 | Build/dev | **Vite** | Fast HMR, simple config |
 | World rendering | **PixiJS v8** (WebGL2, WebGPU when available) | Batched sprite rendering handles 10k+ tiles at 60 FPS |
 | UI / HUD | **React 18** + **Jotai** (atomic state) | Rich, animated panels; fine-grained atoms mean only the widget that changed re-renders |

@@ -2,8 +2,8 @@
  * Headless simulation harness (docs/specs/engine.md, "Harness"): runs a city without rendering,
  * writes its monthly history as CSV and prints how long each system took.
  *
- *   pnpm sim:run --scenario demo --years 2 --out history.csv
- *   pnpm bench                       (demo, 1 year, budget check)
+ *   bun run sim:run --scenario demo --years 2 --out history.csv
+ *   bun run bench                    (demo, 1 year, budget check)
  *
  * Options: --scenario demo|blank  --preset <id>  --seed <n>  --size 64|128|256  --years <n>
  *          --out <file.csv>  --budget (report budgets)  --strict (exit 1 when over 1.5× budget)

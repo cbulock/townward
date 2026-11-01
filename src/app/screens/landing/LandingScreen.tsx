@@ -35,7 +35,7 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
   return (
     <div className="landing">
       <header className="landing-nav">
-        <span className="landing-wordmark">City Builder</span>
+        <span className="landing-wordmark">Openpolis</span>
         {online && (
           <nav className="landing-nav-actions" aria-label="Account">
             <button type="button" className="landing-text-button" onClick={() => openDialog('login')}>
@@ -51,7 +51,7 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
       <main>
         <section className="landing-hero">
           <div className="landing-copy">
-            <p className="landing-eyebrow">A city-building game for the browser</p>
+            <p className="landing-eyebrow">A city builder for everyone, in the browser</p>
             <h1>
               Lay a road.
               <br />A city moves in.
@@ -140,7 +140,7 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
       </main>
 
       <footer className="landing-footer">
-        <span className="landing-wordmark is-small">City Builder</span>
+        <span className="landing-wordmark is-small">Openpolis</span>
         <span>Free to play. Runs in any modern browser, nothing to install.</span>
       </footer>
     </div>

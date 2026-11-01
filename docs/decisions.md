@@ -4,7 +4,7 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 
 ## Open (need your call)
 
-- **D-001 — Product name.** Status: *Open; user chose to decide later (2026-11-01).* We need an original name; the repo folder can stay `simcity-web`.
+- **D-001 — Product name: Openpolis.** Decided 2026-11-01; the user registered openpolis.space. A city builder open to everyone in the browser; "-polis" is the genre's classic naming shape without borrowing anyone's trademark (no "Sim", "SimCity", "Skylines"). Player-visible text uses the name; internal identifiers (browser storage keys `citybuilder.*`, the `citybuilder` IndexedDB and Postgres database) keep their old names so existing saves still load. The repo folder stays `simcity-web`.
 
 ## Accepted
 
@@ -150,4 +150,5 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
   - `TRUST_PROXY` (default `loopback`; `1` behind one load balancer) sets Express `trust proxy`, so `req.ip` is the player.
   - Counters stay in memory: right for one server process. Running several instances would move them to Postgres or Redis.
   - Also for deploying: security headers (HSTS in production), `/api/health`, immutable caching for hashed assets with `index.html` revalidated, hourly pruning of expired sessions, and a Docker image ([deploy.md](deploy.md)).
+- **D-074 — Bun replaces pnpm and Node.** 2026-11-01. User direction. Bun installs packages (`bun.lock`), runs the scripts (`bun run dev` runs Vite and the server in parallel), and runs the server and the headless sim as TypeScript directly; the Node resolver hook for scripts is gone, since bun resolves extensionless imports. The Docker image is `oven/bun` for both build and run. Vite and Vitest are unchanged. The erasable-syntax lint rule stays (it keeps the code runnable by any type-stripping runtime, and by the future Worker).
 

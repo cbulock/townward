@@ -35,8 +35,8 @@ export default tseslint.config(
     },
   },
   {
-    // Sim, shared code and scripts run straight on Node's TypeScript support (pnpm sim:run, the
-    // server, later the Worker), which only strips types: no parameter properties or enums.
+    // Sim, shared code, scripts and the server run as plain TypeScript (bun, and later the Worker)
+    // with types simply stripped: keep to erasable syntax, so no parameter properties or enums.
     files: ['src/sim/**/*.ts', 'src/shared/**/*.ts', 'scripts/**/*.ts', 'server/**/*.ts'],
     rules: {
       '@typescript-eslint/parameter-properties': 'error',

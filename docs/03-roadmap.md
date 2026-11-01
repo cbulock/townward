@@ -28,7 +28,7 @@ Goal: an empty isometric world you can fly around smoothly.
 
 **DoD:** 256×256 flat map pans/zooms at 60 FPS and the hover highlight is pixel-accurate.
 
-> Test it with `pnpm dev`, then open `http://localhost:5173/?size=256`. Hover picking is covered by unit tests and was checked in a headless browser. FPS must be checked on a real GPU, because headless Chrome renders in software.
+> Test it with `bun run dev`, then open `http://localhost:5173/?size=256`. Hover picking is covered by unit tests and was checked in a headless browser. FPS must be checked on a real GPU, because headless Chrome renders in software.
 
 ---
 

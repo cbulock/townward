@@ -6,8 +6,8 @@ A browser-based, 2D isometric **city-building simulation** in the classic genre.
 Players shape terrain, lay roads, zone land and watch a city grow. It should feel
 buttery-smooth and look modern.
 
-> **Working title:** _TBD_ (the folder is `simcity-web`, but the product needs its
-> own name. See [decisions.md](decisions.md) D-001.)
+> **Name:** **Openpolis**, at [openpolis.space](https://openpolis.space) (D-001). The repo
+> folder stays `simcity-web`.
 
 ## Originality Boundary
 

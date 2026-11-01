@@ -14,15 +14,15 @@ work session, read **Current Status** below, then the relevant spec.
 ## Run It
 
 ```bash
-pnpm install
+bun install
 docker compose up -d   # Postgres for the save server (accounts and cloud saves)
-pnpm dev          # http://localhost:5173 opens the New Game screen; /demo opens a grown city
+bun run dev          # http://localhost:5173 opens the New Game screen; /demo opens a grown city
                   # (?seed=N&size=64|128|256&preset=coastal&funds=N skips it)
-                  # pnpm dev runs Vite and the save server (:8787); without Postgres the game still runs, saving on the device
-pnpm sim:run --scenario demo --years 1   # headless sim: history CSV + per-system timings
-pnpm bench        # the same on /demo with the budget report
-pnpm test         # unit tests (server tests use in-process PGlite: no Docker needed)
-pnpm typecheck && pnpm lint
+                  # bun run dev runs Vite and the save server (:8787); without Postgres the game still runs, saving on the device
+bun run sim:run --scenario demo --years 1   # headless sim: history CSV + per-system timings
+bun run bench        # the same on /demo with the budget report
+bun run test         # unit tests (server tests use in-process PGlite: no Docker needed)
+bun run typecheck && bun run lint
 ```
 
 ## Index
