@@ -65,6 +65,8 @@ export class World {
       moodDays: 0,
       abandoned: false,
       stored: 0,
+      condition: 1,
+      repairDays: 0,
     };
     this.buildings.set(instance.id, instance);
     for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) this.building[this.index(x, y)] = instance.id;

@@ -2,6 +2,13 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Advanced power coverage and plant maintenance
+- Power plants now expose type-specific coverage radii in the Build preview and picker.
+- Generation is condition-aware: sustained high consumption wears plants down, derates output, and can trigger a repair period.
+- Plant condition and repair state appear in the inspection panel, can be repaired for a type-specific cost, and persist in saves.
+- The Energy Mix panel reports plants awaiting repair. Existing road-island delivery and battery behavior remain intact.
+- Selecting an existing clinic, school, fire station or police station now shows its colour-coded coverage radius; placement previews continue to show the same reach.
+
 ## 2026-11-01: Parks and shopping landmarks
 - Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.
 - Each landmark has deterministic procedural isometric art with distinct paths, water, planting, glasshouses, market stalls, storefronts and plaza details. Existing park, town hall, service and utility behavior is unchanged.

@@ -99,18 +99,19 @@ const SERVICE_TINT: Readonly<Record<ServiceKind, number>> = {
   education: 0xffc94d,
 };
 
-/** Placing a service: tint the circle it will cover (docs/specs/core.md). */
-function coverageTiles(world: World, tex: TerrainTextures, id: BuildingId, origin: TilePos): PreviewTile[] {
+/** Coverage tint for a service or power building, used by placement and inspection previews. */
+export function coveragePreviewTiles(world: World, tex: TerrainTextures, id: BuildingId, origin: TilePos): PreviewTile[] {
   const d: BuildingDef = BUILDINGS[id];
-  if (!d.service || !d.radius) return [];
+  const radius = d.service ? d.radius : d.energy?.coverage;
+  if ((!d.service && !d.energy) || !radius) return [];
   const cx = origin.x + d.size.w / 2;
   const cy = origin.y + d.size.h / 2;
-  const r = d.radius;
+  const r = radius;
   const out: PreviewTile[] = [];
   for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       if (!world.inBounds(x, y) || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
-      out.push({ x, y, texture: tex.selection, tint: SERVICE_TINT[d.service], alpha: 0.32 });
+      out.push({ x, y, texture: tex.selection, tint: d.service ? SERVICE_TINT[d.service] : 0xf2c94c, alpha: 0.32 });
     }
   }
   return out;
@@ -241,7 +242,7 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
       tint: ok ? 0xffffff : TINT_INVALID,
       alpha: ok ? 0.8 : 0.55,
     };
-    return [...coverageTiles(world, tex, building, origin), ...footprint, ghost];
+    return [...coveragePreviewTiles(world, tex, building, origin), ...footprint, ghost];
   }
 
   const planned = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));

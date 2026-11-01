@@ -1,5 +1,17 @@
 # Energy v2 (step A of the utilities and services track)
 
+## Plant coverage, wear and repairs
+
+Power plants show a type-specific coverage preview while placing them. The preview is a
+planning aid: buildings still need to share a connected road island with the plant, and
+coverage differs by technology (gas reaches furthest; wind reaches the least).
+
+Generating plants have a condition value. When hourly demand pushes the grid beyond a plant's
+safe operating threshold, condition wears down and output is derated. A failed plant enters a
+short repair period and is shown in the power panel and inspection panel. The player can pay
+the plant's repair cost from its inspection panel to restore full output immediately. Condition
+and repair state are saved, so a reload does not silently heal a damaged plant. v2 (step A of the utilities and services track)
+
 Master plan §12.1, brought forward by the user (2026-11-01): the city's power should feel like
 a real grid, with plants that differ, demand that follows the day, and storage that matters.
 Delivery stays over road islands (D-052), with no lines or pipes.

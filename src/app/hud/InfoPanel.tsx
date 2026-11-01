@@ -87,6 +87,24 @@ export function InfoPanel() {
           </strong>
         </div>
       )}
+      {info.condition !== null && (
+        <div className="info-power-status">
+          <div className="info-row">
+            <span>Plant condition</span>
+            <strong className={info.condition < 0.4 || info.repairDays > 0 ? 'warn' : ''}>
+              {info.repairDays > 0 ? `Failed · repair in ${info.repairDays}d` : `${Math.round(info.condition * 100)}%`}
+            </strong>
+          </div>
+          <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(info.condition * 100)}>
+            <div className={`meter-fill ${info.condition < 0.4 ? 'is-short' : ''}`} style={{ width: `${Math.round(info.condition * 100)}%` }} />
+          </div>
+          {info.repairDays > 0 || info.condition < 1 ? (
+            <button type="button" className="secondary-button" onClick={() => game?.repairBuilding(info.id)} disabled={info.repairCost <= 0}>
+              Repair · ${info.repairCost.toLocaleString()}
+            </button>
+          ) : null}
+        </div>
+      )}
       {info.abandoned && <div className="info-status warn">Abandoned: fix what its people need and they'll come back</div>}
       {info.needs && (
         <div className="info-needs">

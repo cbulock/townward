@@ -29,6 +29,7 @@ export function EnergyMix({ power, hour }: { power: PowerReport; hour: number })
         <span className={short ? 'warn' : ''}>
           {power.demand.toLocaleString()} needed · {total.toLocaleString()} made
           {short ? ` · ${power.short} without` : ''}
+          {power.repair > 0 ? ` · ${power.repair} plant${power.repair === 1 ? '' : 's'} need repair` : ''}
         </span>
       </div>
       <div className="energy-meter" role="img" aria-label={`Power at ${time}: ${total} made, ${power.demand} needed`}>

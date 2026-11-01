@@ -1,7 +1,7 @@
 import { BUILDINGS, buildingDef, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
 import { roadMask, RoadType } from '../roads';
 import { World } from '../World';
-import { balancePower, type GridHour, type PowerReport } from './energy';
+import { balancePower, buildingOutput, type GridHour, type PowerReport } from './energy';
 import type { SimSystem } from '../core/System';
 
 /**
@@ -34,7 +34,32 @@ export function hasUtilities(b: BuildingInstance): boolean {
 
 /** Finished and connected: a service or utility building is working. */
 export function isWorking(b: BuildingInstance): boolean {
-  return b.construction === 0 && b.entrance !== -1;
+  return b.construction === 0 && b.entrance !== -1 && b.repairDays === 0 && b.condition > 0;
+}
+
+/** Apply one day's maintenance wear and progress existing repairs. */
+function maintainPlants(world: World, report: UtilityReport) {
+  for (const b of world.buildings.values()) {
+    const energy = buildingDef(b.def).energy;
+    if (!energy || energy.source === 'battery' || b.construction > 0 || b.entrance === -1) continue;
+    if (b.repairDays > 0) {
+      b.repairDays--;
+      if (b.repairDays === 0) b.condition = 1;
+      continue;
+    }
+    const output = buildingOutput(b, null);
+    const demand = report.power.demand;
+    const load = output === 0 ? 0 : demand / Math.max(1, output);
+    if (load > (energy.overload ?? 0.9)) {
+      b.condition = Math.max(0, b.condition - 0.04 * Math.min(2, load));
+      if (b.condition <= 0) {
+        b.condition = 0;
+        b.repairDays = 3;
+      }
+    } else {
+      b.condition = Math.min(1, b.condition + 0.01);
+    }
+  }
 }
 
 /** Road islands: tiles reachable from each other along connected road pieces share a label (−1 = no road). */
@@ -123,6 +148,11 @@ export class UtilitiesSystem implements SimSystem {
   }
 
   onWorldChanged() {
+    this.report = updateUtilities(this.world, this.now());
+  }
+
+  onDay() {
+    maintainPlants(this.world, this.report);
     this.report = updateUtilities(this.world, this.now());
   }
 

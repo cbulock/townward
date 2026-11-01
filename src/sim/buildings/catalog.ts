@@ -16,6 +16,12 @@ export interface EnergyDef {
   /** Batteries: how much they hold, and how much they can take in or give out per clock hour. */
   readonly storage?: number;
   readonly rate?: number;
+  /** Preview reach from the plant, in tiles. The grid still requires a shared road island. */
+  readonly coverage?: number;
+  /** Output fraction at which sustained demand begins wearing this plant down. */
+  readonly overload?: number;
+  /** Cost to restore a failed plant to full condition. */
+  readonly repairCost?: number;
 }
 
 /** Civic panel tabs. */
@@ -364,7 +370,7 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 150,
     supplies: { power: 4000 },
-    energy: { source: 'coal' },
+    energy: { source: 'coal', coverage: 14, overload: 0.9, repairCost: 900 },
   },
   gas_plant: {
     name: 'Gas Power Plant',
@@ -379,7 +385,7 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 260,
     supplies: { power: 5000 },
-    energy: { source: 'gas' },
+    energy: { source: 'gas', coverage: 18, overload: 0.95, repairCost: 1200 },
   },
   wind_turbine: {
     name: 'Wind Turbine',
@@ -394,7 +400,7 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 15,
     supplies: { power: 450 },
-    energy: { source: 'wind' },
+    energy: { source: 'wind', coverage: 10, overload: 0.8, repairCost: 180 },
   },
   solar_farm: {
     name: 'Solar Farm',
@@ -409,7 +415,7 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 30,
     supplies: { power: 1000 },
-    energy: { source: 'solar' },
+    energy: { source: 'solar', coverage: 12, overload: 0.85, repairCost: 450 },
   },
   battery_bank: {
     name: 'Battery Bank',
@@ -501,6 +507,10 @@ export interface BuildingInstance {
   abandoned: boolean;
   /** Battery banks: power held right now (sim/systems/energy.ts); 0 for everything else. */
   stored: number;
+  /** 0..1 health of a generating plant; non-generators remain at 1. */
+  condition: number;
+  /** In-game days remaining before a failed generator can run again. */
+  repairDays: number;
 }
 
 /** What a caller supplies when placing or growing; the runtime fields start empty. */

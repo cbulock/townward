@@ -81,7 +81,7 @@ export interface BudgetInfo {
 /** What a civic building provides (shown in the info panel). */
 export type Provides =
   | { kind: 'service'; service: ServiceKind; radius: number }
-  | { kind: 'utility'; power?: number; water?: number };
+  | { kind: 'utility'; power?: number; water?: number; coverage?: number; condition?: number; repairCost?: number };
 
 export interface InspectInfo {
   id: number;
@@ -105,6 +105,10 @@ export interface InspectInfo {
   /** Services covering it (zoned buildings). */
   services: readonly ServiceKind[];
   provides: Provides | null;
+  /** Power plants only: condition and repair status. */
+  condition: number | null;
+  repairDays: number;
+  repairCost: number;
   /** Monthly running cost. */
   upkeep: number;
   /** Homes: average commute of its workers (minutes), null if unknown. */

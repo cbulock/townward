@@ -12,7 +12,7 @@ import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyMove, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
-import { isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
+import { buildingDef, isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
 import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
@@ -37,7 +37,7 @@ import type { Point, ViewTransform } from '../render/view/ViewTransform';
 import { EventBus, type DayNightMode, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { isRoadTool, isZoneTool, planTool, type RoadToolId, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
+import { coveragePreviewTiles, isRoadTool, isZoneTool, planTool, type RoadToolId, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
   /** Preset, seed, size and sliders (see sim/terrain/presets.ts). */
@@ -778,7 +778,20 @@ export class Game {
       powered: b.powered,
       watered: b.watered,
       services: d.category === 'civic' ? [] : SERVICE_KINDS.filter((k) => b.services & serviceBit(k)),
-      provides: d.service ? { kind: 'service', service: d.service, radius: d.radius ?? 0 } : d.supplies ? { kind: 'utility', ...d.supplies } : null,
+      provides: d.service
+        ? { kind: 'service', service: d.service, radius: d.radius ?? 0 }
+        : d.supplies || d.energy
+          ? {
+              kind: 'utility',
+              ...d.supplies,
+              coverage: d.energy?.coverage,
+              condition: d.energy && d.energy.source !== 'battery' ? b.condition : undefined,
+              repairCost: d.energy?.repairCost,
+            }
+          : null,
+      condition: d.energy && d.energy.source !== 'battery' ? b.condition : null,
+      repairDays: b.repairDays,
+      repairCost: d.energy?.repairCost ?? 0,
       upkeep: d.upkeep ?? 0,
       commuteMinutes: d.category === 'residential' ? (this.sim.commute.commuteMinutes.get(b.id) ?? null) : null,
       needs: this.needsInfo(b.id),
@@ -795,6 +808,29 @@ export class Game {
     const plan = planClear(this.world, rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }));
     this.execute({ kind: 'clear', tool: 'clear', plan });
     this.inspect(null);
+  }
+
+  /** Restore a damaged power plant immediately, paying its type-specific repair cost. */
+  repairBuilding(id: number) {
+    const b = this.world.buildings.get(id);
+    if (!b) return;
+    const energy = buildingDef(b.def).energy;
+    const cost = energy?.repairCost;
+    if (!energy || energy.source === 'battery' || !cost || b.condition >= 1) return;
+    if (this.city.funds < cost) {
+      this.notify('error', `Repairing the ${BUILDINGS[b.def].name} costs $${cost.toLocaleString()}`);
+      return;
+    }
+    this.city.funds -= cost;
+    b.condition = 1;
+    b.repairDays = 0;
+    this.edits++;
+    this.sim.worldChanged({ roads: false });
+    this.bumpWorld();
+    this.emitInspect();
+    this.emitBudget();
+    this.emitCity();
+    this.notify('info', `${BUILDINGS[b.def].name} repaired and back at full output`);
   }
 
   private debrisOf(tiles: readonly PlannedTile[]): Map<number, BurstKind> {
@@ -913,16 +949,19 @@ export class Game {
     const p = this.plan(this.drag, this.hovered);
     const inspected = this.toolId === 'select' && this.inspected !== null ? this.world.buildings.get(this.inspected) : undefined;
     if (inspected) {
-      // Outline the inspected building's footprint.
+      // Show both the footprint and the service/power reach of the inspected facility.
       const { w, h } = BUILDINGS[inspected.def].size;
       const tex = this.renderer.textures.selection;
       this.renderer.toolPreview.show(
-        rectTiles({ x: inspected.x, y: inspected.y }, { x: inspected.x + w - 1, y: inspected.y + h - 1 }).map((t) => ({
-          ...t,
-          texture: tex,
-          tint: 0x4fd1c5,
-          alpha: 0.55,
-        })),
+        [
+          ...coveragePreviewTiles(this.world, this.renderer.textures, inspected.def, { x: inspected.x, y: inspected.y }),
+          ...rectTiles({ x: inspected.x, y: inspected.y }, { x: inspected.x + w - 1, y: inspected.y + h - 1 }).map((t) => ({
+            ...t,
+            texture: tex,
+            tint: 0x4fd1c5,
+            alpha: 0.55,
+          })),
+        ],
       );
     } else if (!p) this.renderer.toolPreview.clear();
     else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p, this.renderer.view, this.pavementChoice));

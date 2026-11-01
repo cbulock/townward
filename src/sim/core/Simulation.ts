@@ -83,6 +83,7 @@ export class Simulation {
     this.city.day++;
     t.run('growth.day', () => this.growth.onDay(out));
     t.run('fire.day', () => this.fire.onDay(out));
+    t.run('utilities.day', () => this.utilities.onDay?.());
     this.worldChanged({ roads: false });
     t.run('commute.day', () => this.commute.onDay());
     t.run('needs.day', () => this.needs.onDay(out));

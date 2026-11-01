@@ -29,6 +29,8 @@ export interface PowerReport {
   /** All batteries together. */
   stored: number;
   storage: number;
+  /** Number of plants currently waiting for repair. */
+  repair: number;
 }
 
 /** Demand through the day (fraction of each building's capacity): low at night, evening peak 1. */
@@ -90,6 +92,13 @@ export function plantOutput(def: BuildingDef, at: GridHour | null): number {
   return source === 'battery' ? 0 : peak;
 }
 
+/** Output from a particular plant, including its current maintenance condition. */
+export function buildingOutput(b: BuildingInstance, at: GridHour | null): number {
+  const d: BuildingDef = buildingDef(b.def);
+  if (!d.energy || d.energy.source === 'battery' || b.repairDays > 0) return 0;
+  return Math.round(plantOutput(d, at) * Math.max(0, Math.min(1, b.condition)));
+}
+
 /** A building's power need this hour (the peak, without an hour). */
 export function powerNeed(def: BuildingDef, at: GridHour | null): number {
   return at ? def.capacity * demandFactor(at.hour) : def.capacity;
@@ -111,13 +120,14 @@ export function balancePower(
   isWorking: (b: BuildingInstance) => boolean,
   at: GridHour | null,
 ): PowerReport {
-  const report: PowerReport = { supply: 0, demand: 0, short: 0, sources: emptySources(), stored: 0, storage: 0 };
+  const report: PowerReport = { supply: 0, demand: 0, short: 0, sources: emptySources(), stored: 0, storage: 0, repair: 0 };
   const production = new Map<number, number>();
   const demand = new Map<number, number>();
   const batteries = new Map<number, BuildingInstance[]>();
 
   for (const b of buildings) {
     const d: BuildingDef = BUILDINGS[b.def];
+    if (d.energy && d.energy.source !== 'battery' && b.repairDays > 0) report.repair++;
     if (d.energy && isWorking(b)) {
       const island = islandOf(b);
       if (d.energy.source === 'battery') {
@@ -126,7 +136,7 @@ export function balancePower(
         batteries.set(island, list);
         report.storage += d.energy.storage ?? 0;
       } else {
-        const out = plantOutput(d, at);
+        const out = buildingOutput(b, at);
         production.set(island, (production.get(island) ?? 0) + out);
         report.sources[d.energy.source] += out;
       }

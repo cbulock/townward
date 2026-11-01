@@ -31,8 +31,11 @@ type SavedBuildingCore = readonly [
   moodDays: number,
 ];
 
-/** The core fields, plus `stored` (battery charge) when there is any. */
-export type SavedBuilding = SavedBuildingCore | readonly [...SavedBuildingCore, stored: number];
+/** The core fields, plus optional battery charge and power-plant maintenance state. */
+export type SavedBuilding =
+  | SavedBuildingCore
+  | readonly [...SavedBuildingCore, stored: number]
+  | readonly [...SavedBuildingCore, stored: number, condition: number, repairDays: number];
 
 const FLAG = { grown: 1, abandoned: 2 } as const;
 
@@ -116,7 +119,13 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       Math.round(b.happiness * 100),
       b.moodDays,
     ];
-    buildings.push(b.stored > 0 ? [...core, b.stored] : core);
+    buildings.push(
+      b.condition < 1 || b.repairDays > 0
+        ? [...core, b.stored, b.condition, b.repairDays]
+        : b.stored > 0
+          ? [...core, b.stored]
+          : core,
+    );
   }
   return {
     v: SAVE_VERSION,
@@ -237,7 +246,7 @@ const BRIDGE_VALUES: ReadonlySet<number> = new Set(Object.values(BridgeAxis));
 const ZONE_VALUES: ReadonlySet<number> = new Set(Object.values(ZoneType));
 
 function addSavedBuilding(world: World, s: SavedBuilding) {
-  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored = 0] = s;
+  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored = 0, condition = 1, repairDays = 0] = s;
   const { w, h } = BUILDINGS[def].size;
   if (!world.inBounds(x, y) || !world.inBounds(x + w - 1, y + h - 1)) return;
   for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) if (world.building[world.index(tx, ty)] !== -1) return;
@@ -247,6 +256,8 @@ function addSavedBuilding(world: World, s: SavedBuilding) {
   b.moodDays = moodDays;
   b.abandoned = (flags & FLAG.abandoned) !== 0;
   b.stored = Math.max(0, Math.min(stored, buildingDef(def).energy?.storage ?? 0));
+  b.condition = Math.min(1, Math.max(0, condition));
+  b.repairDays = Math.max(0, repairDays);
 }
 
 // ---------------------------------------------------------------- parse (untrusted JSON → SaveData)

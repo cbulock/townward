@@ -43,6 +43,7 @@ const ZONE_LINKS: readonly { tool: ZoneToolId; label: string; key: string; tone:
 /** The key number on a card: coverage radius, utility capacity, or footprint. */
 function cardStat(d: BuildingDef): string {
   if (d.radius) return `${d.radius}-tile reach`;
+  if (d.energy?.coverage) return `${d.energy.coverage}-tile reach`;
   if (d.supplies?.power) return `${d.supplies.power} ⚡`;
   if (d.supplies?.water) return `${d.supplies.water} 💧`;
   return `${d.size.w}×${d.size.h}`;
