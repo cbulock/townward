@@ -8,6 +8,8 @@ export const BALANCE = {
   /** Cost per tile, by road type. */
   roadCost: 10,
   highwayCost: 40,
+  avenueCost: 35,
+  avenueBridgeCost: 110,
   /** Bridges replace the per-tile road cost while over water. */
   bridgeCost: 60,
   highwayBridgeCost: 160,
@@ -39,6 +41,7 @@ export const BALANCE = {
   /** Monthly upkeep. */
   roadUpkeep: 0.4,
   highwayUpkeep: 1.2,
+  avenueUpkeep: 0.9,
   bridgeUpkeep: 2,
   /** A land road within this many tiles of a footprint gives road access. */
   roadAccessRange: 3,

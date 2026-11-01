@@ -1,12 +1,12 @@
 import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, type BuildingDef, type BuildingId, type BuildingInstance } from '../buildings/catalog';
 import type { DayOutcome, SimSystem } from '../core/System';
-import { RoadType } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
 import type { CommuteSystem } from './commute';
 import { serviceBit } from './coverage';
 import { cityStats } from './population';
+import { roadSpec } from '../roadTypes';
 
 /**
  * Needs system (docs/specs/needs.md): every finished, connected zoned building scores its
@@ -267,7 +267,7 @@ export class NeedsSystem implements SimSystem {
     let n = 0;
     for (let y = b.y - r; y < b.y + bh + r; y++) {
       for (let x = b.x - r; x < b.x + bw + r; x++) {
-        if (w.inBounds(x, y) && w.road[w.index(x, y)] === RoadType.Highway) n++;
+        if (w.inBounds(x, y) && roadSpec(w.road[w.index(x, y)])?.noisy) n++;
       }
     }
     return Math.min(0.4, n * 0.05);

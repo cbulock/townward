@@ -30,5 +30,5 @@ describe('demo city', () => {
     expect([...b.world.buildings.values()].map((x) => `${x.def}@${x.x},${x.y}`)).toEqual(
       [...a.world.buildings.values()].map((x) => `${x.def}@${x.x},${x.y}`),
     );
-  });
+  }, 20_000); // builds the demo twice; ~1.5 s each, slower when the suite runs in parallel
 });

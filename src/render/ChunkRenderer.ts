@@ -332,6 +332,10 @@ export class ChunkRenderer {
       if (k === 4) return f.gantry[axis];
       return k % 2 === 1 ? f.highwayLamp[axis] : null;
     }
+    if (w.road[i] === RoadType.Avenue) {
+      // Avenues: median trees and lamps on straights; nothing in junctions (the crossings stay clear).
+      return straight ? f.avenue[axis][hash % f.avenue[axis].length] : null;
+    }
     if (straight) {
       const style = hash % 5;
       return style < f.street[axis].length ? f.street[axis][style] : null;

@@ -94,11 +94,20 @@ describe('planRoad / applyRoad', () => {
     expect(w.road[w.index(1, 0)]).toBe(RoadType.Highway);
   });
 
-  it('highways upgrade roads', () => {
+  it('bigger roads upgrade smaller ones in place, paying the difference; never the reverse', () => {
     const w = grassWorld();
-    w.road[w.index(0, 0)] = RoadType.Road;
-    const plan = planRoad(w, [{ x: 0, y: 0 }], RoadType.Highway);
-    expect(plan.cost).toBe(BALANCE.highwayCost);
+    const city = new City(w, 10_000);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 0 }, { x: 3, y: 0 }, true), RoadType.Road), RoadType.Road);
+    const avenue = planRoad(w, roadPath({ x: 0, y: 0 }, { x: 3, y: 0 }, true), RoadType.Avenue);
+    expect(avenue.cost).toBe(4 * (BALANCE.avenueCost - BALANCE.roadCost));
+    applyRoad(city, avenue, RoadType.Avenue);
+    expect(w.road[w.index(2, 0)]).toBe(RoadType.Avenue);
+    const highway = planRoad(w, [{ x: 0, y: 0 }], RoadType.Highway);
+    expect(highway.cost).toBe(BALANCE.highwayCost - BALANCE.avenueCost);
+    // A street dragged over the avenue keeps the avenue, for free.
+    const street = planRoad(w, roadPath({ x: 0, y: 0 }, { x: 3, y: 0 }, true), RoadType.Road);
+    expect(street.cost).toBe(0);
+    expect(street.tiles.every((t) => t.valid)).toBe(true);
   });
 
   it('applies: sets road, clears tree/decor, deducts funds', () => {

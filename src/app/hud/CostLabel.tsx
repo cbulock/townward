@@ -12,7 +12,7 @@ export function CostLabel() {
   const p = useAtomValue(toolPreviewAtom);
   if (!p) return null;
 
-  const verb = p.label ?? (p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : 'Road');
+  const verb = p.label ?? (p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : p.tool === 'avenue' ? 'Avenue' : 'Road');
   const empty = p.count === 0;
   // Flip to the other side of the cursor near the right/bottom edges so the label never clips.
   const flipX = p.screen.x > window.innerWidth - LABEL_ROOM_X;

@@ -13,7 +13,11 @@ import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from 
 import type { World } from '../sim/World';
 
 export type ZoneToolId = 'zone-r' | 'zone-rh' | 'zone-c' | 'zone-ch' | 'zone-i';
-export type ToolId = 'select' | 'clear' | 'road' | 'highway' | 'build' | ZoneToolId;
+/** Tools that lay roads, and the road type each lays (sim/roadTypes.ts). */
+export const ROAD_TOOLS = { road: RoadType.Road, avenue: RoadType.Avenue, highway: RoadType.Highway } as const satisfies Record<string, BuildableRoad>;
+export type RoadToolId = keyof typeof ROAD_TOOLS;
+
+export type ToolId = 'select' | 'clear' | RoadToolId | 'build' | ZoneToolId;
 
 /** What each zone tool paints. Removing a zone is done with Clear (D-051). */
 export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZonedType>> = {
@@ -33,6 +37,7 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   select: 'KeyQ',
   clear: 'KeyB',
   road: 'KeyR',
+  avenue: 'KeyV',
   highway: 'KeyH',
   build: 'KeyE',
   'zone-r': 'Digit1',
@@ -50,7 +55,7 @@ export interface ToolDrag {
 }
 
 export type ToolPlan =
-  | { kind: 'road'; tool: 'road' | 'highway'; plan: Plan; roadType: BuildableRoad }
+  | { kind: 'road'; tool: RoadToolId; plan: Plan; roadType: BuildableRoad }
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
   | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZonedType }
   | { kind: 'place'; tool: 'build'; plan: PlacePlan };
@@ -113,8 +118,9 @@ export function planTool(
 
   switch (tool) {
     case 'road':
+    case 'avenue':
     case 'highway': {
-      const roadType = tool === 'road' ? RoadType.Road : RoadType.Highway;
+      const roadType = ROAD_TOOLS[tool];
       const path = roadPath(anchor.start, anchor.current, anchor.straight);
       return { kind: 'road', tool, plan: planRoad(world, path, roadType), roadType };
     }

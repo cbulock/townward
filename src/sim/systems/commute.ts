@@ -5,6 +5,7 @@ import { roadMask, RoadType } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
 import { hasUtilities } from './utilities';
+import { roadSpec } from '../roadTypes';
 
 /**
  * Commute system (docs/specs/traffic.md): where people travel and how busy each road is.
@@ -16,11 +17,10 @@ import { hasUtilities } from './utilities';
 
 export const COMMUTE = {
   /** Commuters per day a road tile carries before it counts as congested. */
+  /** Fallbacks; each road type's own numbers are in sim/roadTypes.ts. */
   roadCapacity: 500,
-  highwayCapacity: 1500,
   /** Free-flow minutes to cross one tile. */
   roadMinutes: 1,
-  highwayMinutes: 0.45,
   /** Distance decay of job attraction (minutes). */
   decayMinutes: 25,
   /** Share of each day's new volume blended into the running volume (stops routes flapping). */
@@ -168,12 +168,12 @@ export class CommuteSystem implements SimSystem {
 
   /** Free-flow minutes to cross a tile, slowed by its current congestion. */
   private tileMinutes(i: number): number {
-    const base = this.world.road[i] === RoadType.Highway ? COMMUTE.highwayMinutes : COMMUTE.roadMinutes;
+    const base = roadSpec(this.world.road[i])?.minutes ?? COMMUTE.roadMinutes;
     return base / speedFactor(this.congestion[i]);
   }
 
   private capacity(i: number): number {
-    return this.world.road[i] === RoadType.Highway ? COMMUTE.highwayCapacity : COMMUTE.roadCapacity;
+    return roadSpec(this.world.road[i])?.capacity ?? COMMUTE.roadCapacity;
   }
 
   /** Recompute today's commute: volumes, congestion, commute times and trips. */

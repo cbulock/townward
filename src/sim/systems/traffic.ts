@@ -5,6 +5,7 @@ import { speedFactor, type CommuteTrip } from './commute';
 import { roadMask, RoadType } from '../roads';
 import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
+import { roadSpec } from '../roadTypes';
 
 /**
  * Cars and pedestrians moving over the road network. Pure data and logic;
@@ -55,14 +56,10 @@ export const TRAFFIC = {
   carTripsPerResident: 1 / 140,
   peoplePerResident: 1 / 45,
   carSpeed: 1.7,
-  highwaySpeedFactor: 1.9,
   personSpeed: 0.45,
   /** Cars drive on the right, this far from the road's centre line (tile units). Matches render/atlas/roadArt STREET. */
   laneOffset: 0.13,
-  /** Highways have two lanes each way: cars mostly inside, trucks and buses outside. */
-  highwayInnerLane: 0.12,
-  highwayOuterLane: 0.32,
-  /** Pedestrians walk down the middle of the right-hand footpath. */
+  /** Pedestrians walk down the middle of the right-hand footpath (each road type has its own, sim/roadTypes.ts). */
   sidewalkOffset: 0.37,
   /** Share of a segment over which a car eases from the previous lane offset into the new one. */
   laneBlend: 0.35,
@@ -215,10 +212,16 @@ function rightOf(dir: number): [number, number] {
   return [-dy, dx];
 }
 
-/** Lane offset of a vehicle on a tile: highways have an inner and an outer lane. */
+/** Lane offset of a vehicle on a tile: on multi-lane roads buses, trucks and some cars keep to the outer lane. */
 function laneOffset(world: World, a: Agent, tile: number): number {
-  if (world.road[tile] !== RoadType.Highway) return TRAFFIC.laneOffset;
-  return isLong(a) || a.variant % 3 === 0 ? TRAFFIC.highwayOuterLane : TRAFFIC.highwayInnerLane;
+  const lanes = roadSpec(world.road[tile])?.lanes;
+  if (!lanes || lanes.length === 1) return lanes?.[0] ?? TRAFFIC.laneOffset;
+  return isLong(a) || a.variant % 3 === 0 ? lanes[lanes.length - 1] : lanes[0];
+}
+
+/** Roads with footpaths (pedestrians stroll there; never highways or bridges). */
+function walkable(world: World, tile: number): boolean {
+  return world.bridge[tile] === 0 && (roadSpec(world.road[tile])?.footpath ?? null) !== null;
 }
 
 /**
@@ -232,7 +235,7 @@ export function walkPoint(world: World, path: Int32Array, k: number): [number, n
   const i = path[k];
   const din = k > 0 ? stepDir(path[k - 1], i) : -1;
   const dout = k < path.length - 1 ? stepDir(i, path[k + 1]) : -1;
-  const o = TRAFFIC.sidewalkOffset;
+  const o = roadSpec(world.road[i])?.footpath ?? TRAFFIC.sidewalkOffset;
   let ox = 0;
   let oy = 0;
   const add = (d: number) => {
@@ -498,7 +501,7 @@ export class Traffic {
     if (pool.length === 0) return;
     const w = this.world;
     const start = this.pick(pool);
-    if (w.road[start] !== RoadType.Road || w.bridge[start] !== 0) return;
+    if (!walkable(w, start)) return;
     const steps = 3 + Math.floor(this.rng() * 6);
     const path = [start];
     let cur = start;
@@ -511,7 +514,7 @@ export class Traffic {
       for (let d = 0; d < 4; d++) {
         if (!(mask & (1 << d))) continue;
         const j = w.index(x + DIRS[d][0], y + DIRS[d][1]);
-        if (j !== prev && w.bridge[j] === 0 && w.road[j] === RoadType.Road) options.push(j);
+        if (j !== prev && walkable(w, j)) options.push(j);
       }
       if (options.length === 0) break;
       prev = cur;
@@ -638,7 +641,7 @@ export class Traffic {
 
         // Congested roads slow everyone down (but never to a stop).
         const slow = this.commute ? speedFactor(this.commute.congestion[p[a.seg]]) : 1;
-        const step = dt * a.speed * slow * (w.road[p[a.seg]] === RoadType.Highway ? TRAFFIC.highwaySpeedFactor : 1);
+        const step = dt * a.speed * slow * (roadSpec(w.road[p[a.seg]])?.carSpeed ?? 1);
         const t = Math.max(a.t, Math.min(a.t + step, limit));
         a.wait = a.dwell <= 0 && t - a.t < step * 0.5 ? a.wait + dt : 0;
         a.t = t;

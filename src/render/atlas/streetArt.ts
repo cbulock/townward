@@ -1,6 +1,7 @@
 import { HALF_W } from '../../shared/constants';
 import { GROUND_FRAME_H, GROUND_FRAME_W, GROUND_PAD } from './geometry';
 import { IsoFrame, paintRoundTree, shade, type Box } from './isoPaint';
+import { paintAvenueFurniture } from './roads/avenueFurniture';
 
 /**
  * Street furniture (docs/specs/city-art.md): one sprite per road tile, drawn in the objects
@@ -24,17 +25,18 @@ export type FurniturePiece =
   | { kind: 'cornerLamp'; mask: number }
   | { kind: 'highwayLamp'; axis: RoadAxis }
   | { kind: 'gantry'; axis: RoadAxis }
-  | { kind: 'overbridge'; axis: RoadAxis };
+  | { kind: 'overbridge'; axis: RoadAxis }
+  | { kind: 'avenue'; axis: RoadAxis; style: number };
 
-const POLE = '#545b64';
-const LAMP = '#fff1b8';
+export const POLE = '#545b64';
+export const LAMP = '#fff1b8';
 
 /** (along, lateral) on a road → view (u, v). Lateral is measured from the centre line. */
-function onRoad(axis: RoadAxis, s: number, o: number): [number, number] {
+export function onRoad(axis: RoadAxis, s: number, o: number): [number, number] {
   return axis === 'u' ? [s, 0.5 + o] : [0.5 + o, s];
 }
 
-function pole(iso: IsoFrame, u: number, v: number, z0: number, z1: number, w = 1) {
+export function pole(iso: IsoFrame, u: number, v: number, z0: number, z1: number, w = 1) {
   const [x, y] = iso.p(u, v, z0);
   iso.ctx.fillStyle = POLE;
   iso.ctx.fillRect(x - w / 2, y - (z1 - z0), w, z1 - z0);
@@ -122,6 +124,9 @@ export function paintFurniture(ctx: CanvasRenderingContext2D, piece: FurniturePi
       return;
     case 'overbridge':
       paintOverbridge(iso, piece.axis);
+      return;
+    case 'avenue':
+      paintAvenueFurniture(iso, piece.axis, piece.style);
       return;
   }
 }

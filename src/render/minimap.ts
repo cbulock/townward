@@ -21,6 +21,8 @@ export interface MinimapLayout {
 const FOREST: readonly [number, number, number] = [38, 120, 46];
 const ROAD: readonly [number, number, number] = [58, 61, 68];
 const HIGHWAY: readonly [number, number, number] = [36, 38, 43];
+/** Avenues read a touch green on the minimap: their planted medians. */
+const AVENUE: readonly [number, number, number] = [62, 84, 60];
 const SITE: readonly [number, number, number] = [240, 138, 36];
 const CATEGORY: Readonly<Record<BuildingCategory, readonly [number, number, number]>> = {
   residential: [222, 244, 228],
@@ -74,7 +76,7 @@ function paintTiles(world: World, view: ViewTransform): ImageData {
       const b = world.buildings.get(world.building[i]);
       const z = world.zone[i];
       if (b) c = b.construction > 0 ? SITE : CATEGORY[BUILDINGS[b.def].category];
-      else if (world.road[i] !== RoadType.None) c = world.road[i] === RoadType.Highway ? HIGHWAY : ROAD;
+      else if (world.road[i] !== RoadType.None) c = world.road[i] === RoadType.Highway ? HIGHWAY : world.road[i] === RoadType.Avenue ? AVENUE : ROAD;
       else {
         if (world.tree[i] > 0) c = mix(c, FOREST, 0.35 + world.tree[i] * 0.15);
         if (isZoned(z)) c = mix(c, numberToRgb(ZONE_TINT[z]), 0.5);

@@ -2,6 +2,7 @@ import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, upkeepOf, type BuildingDef } from '../buildings/catalog';
 import type { City } from '../City';
 import { BridgeAxis, RoadType } from '../roads';
+import { roadSpec } from '../roadTypes';
 import type { World } from '../World';
 import { cityStats } from './population';
 import type { DayOutcome, SimSystem } from '../core/System';
@@ -26,7 +27,7 @@ export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRat
   for (let i = 0; i < world.road.length; i++) {
     const r = world.road[i];
     if (r === RoadType.None) continue;
-    roads += world.bridge[i] !== BridgeAxis.None ? BALANCE.bridgeUpkeep : r === RoadType.Highway ? BALANCE.highwayUpkeep : BALANCE.roadUpkeep;
+    roads += world.bridge[i] !== BridgeAxis.None ? BALANCE.bridgeUpkeep : (roadSpec(r)?.upkeep ?? BALANCE.roadUpkeep);
   }
   let services = 0;
   let utilities = 0;

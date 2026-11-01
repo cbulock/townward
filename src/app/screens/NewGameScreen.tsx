@@ -15,7 +15,8 @@ import type { World } from '../../sim/World';
 import type { CityRef } from '../../save/SaveStore';
 import { AccountButton } from '../account/AccountButton';
 import { DEFAULT_SEED, randomSeed } from '../options';
-import { CityList, uniqueCityName, useCities } from './CityList';
+import { CityList, useCities } from './CityList';
+import { uniqueCityName } from './cityNames';
 
 /** Settings changes repaint the preview after this pause (ms). Generation itself takes < 50 ms. */
 const PREVIEW_DEBOUNCE = 120;

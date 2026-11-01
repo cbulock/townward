@@ -1,5 +1,5 @@
 import { Texture, type TextureSource } from 'pixi.js';
-import { BridgeAxis, RoadType, type BuildableRoad } from '../../sim/roads';
+import { BridgeAxis, type BuildableRoad } from '../../sim/roads';
 import { Decor, DECOR_KINDS, GROUND_VARIANTS, Terrain, type DecorId, type TerrainId } from '../../sim/terrain/types';
 import { OVERLAY_TERRAINS } from '../transitions';
 import { AtlasBuilder, type FramePainter } from './AtlasBuilder';
@@ -7,6 +7,8 @@ import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
+import { BUILDABLE_ROADS } from '../../sim/roadTypes';
+import { AVENUE_STYLES } from './roads/avenueFurniture';
 import { BUILDING_ROTATIONS, buildingFrameSize, buildingVariantCount, paintBuilding } from './buildingArt';
 import {
   paintPerson,
@@ -122,6 +124,8 @@ export interface StreetFurniture {
   highwayLamp: Readonly<Record<RoadAxis, Texture>>;
   gantry: Readonly<Record<RoadAxis, Texture>>;
   overbridge: Readonly<Record<RoadAxis, Texture>>;
+  /** Straight avenues, indexed by axis then style (roads/avenueFurniture.ts). */
+  avenue: Readonly<Record<RoadAxis, readonly Texture[]>>;
 }
 
 const armCount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
@@ -135,6 +139,7 @@ function furniturePieces(): [string, FurniturePiece][] {
     out.push([`furn_hwlamp_${axis}`, { kind: 'highwayLamp', axis }]);
     out.push([`furn_gantry_${axis}`, { kind: 'gantry', axis }]);
     out.push([`furn_overbridge_${axis}`, { kind: 'overbridge', axis }]);
+    for (let style = 0; style < AVENUE_STYLES; style++) out.push([`furn_avenue_${axis}_${style}`, { kind: 'avenue', axis, style }]);
   }
   for (let m = 0; m < 16; m++) {
     if (isBend(m)) out.push([`furn_corner_${m}`, { kind: 'cornerLamp', mask: m }]);
@@ -142,7 +147,8 @@ function furniturePieces(): [string, FurniturePiece][] {
   return out;
 }
 
-const ROAD_TYPES: readonly BuildableRoad[] = [RoadType.Road, RoadType.Highway];
+/** Every road type gets its pieces in the atlas (sim/roadTypes.ts). */
+const ROAD_TYPES: readonly BuildableRoad[] = BUILDABLE_ROADS;
 
 function shapeFor(t: TerrainId): MaskShape {
   if (t === Terrain.ShallowWater) return SHALLOW_SHAPE;
@@ -406,6 +412,7 @@ export function buildTerrainTextures(): TerrainTextures {
       highwayLamp: { u: get('furn_hwlamp_u'), v: get('furn_hwlamp_v') },
       gantry: { u: get('furn_gantry_u'), v: get('furn_gantry_v') },
       overbridge: { u: get('furn_overbridge_u'), v: get('furn_overbridge_v') },
+      avenue: { u: range(AVENUE_STYLES, (k) => get(`furn_avenue_u_${k}`)), v: range(AVENUE_STYLES, (k) => get(`furn_avenue_v_${k}`)) },
     },
     selection: get('selection'),
     zoneLot: get('zone_lot'),

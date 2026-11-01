@@ -130,6 +130,20 @@ const TOOLS: readonly ToolDef[] = [
     ),
   },
   {
+    id: 'avenue',
+    group: 'road',
+    label: 'Avenue',
+    key: 'V',
+    hint: `Drag to build · $${BALANCE.avenueCost}/tile · 4 lanes, planted median · drag over a road to upgrade it`,
+    icon: (
+      <g {...stroke}>
+        <path d="M6 3L3 21M18 3l3 18" />
+        <path d="M12 3v18" strokeWidth="2.6" opacity="0.55" />
+        <path d="M9 5v2.5M8.6 11v2.5M8.2 17v2.5M15 5v2.5M15.4 11v2.5M15.8 17v2.5" />
+      </g>
+    ),
+  },
+  {
     id: 'highway',
     group: 'road',
     label: 'Highway',

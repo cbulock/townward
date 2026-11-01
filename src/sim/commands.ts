@@ -1,6 +1,7 @@
 import { BALANCE } from '../shared/balance';
 import { BUILDINGS, footprintOrigin, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
+import { ROAD_SPECS, roadSpec } from './roadTypes';
 import { BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
@@ -52,15 +53,7 @@ function isWater(world: World, i: number): boolean {
   return t === Terrain.DeepWater || t === Terrain.ShallowWater;
 }
 
-const ROAD_COST: Readonly<Record<BuildableRoad, number>> = {
-  [RoadType.Road]: BALANCE.roadCost,
-  [RoadType.Highway]: BALANCE.highwayCost,
-};
 
-const BRIDGE_COST: Readonly<Record<BuildableRoad, number>> = {
-  [RoadType.Road]: BALANCE.bridgeCost,
-  [RoadType.Highway]: BALANCE.highwayBridgeCost,
-};
 
 /** Land a road can go on: not rock, no building. Existing roads count (they're kept or upgraded). */
 function roadableLand(world: World, i: number): boolean {
@@ -121,13 +114,16 @@ export function planRoad(world: World, path: readonly TilePos[], type: Buildable
       continue;
     }
 
-    const existing = world.road[i];
-    // Never downgrade a highway to a road; same type is already built.
-    if (existing === type || (existing === RoadType.Highway && type === RoadType.Road)) {
+    // The same or a bigger road is kept (never downgrade); a smaller one is upgraded in place,
+    // paying the difference (docs/specs/transport.md).
+    const spec = ROAD_SPECS[type];
+    const existing = roadSpec(world.road[i]);
+    if (existing && existing.rank >= spec.rank) {
       tiles.push({ ...p, valid: true, cost: 0, ...(water && { bridge }) });
       continue;
     }
-    const c = water ? BRIDGE_COST[type] : ROAD_COST[type] + clearCost(world, i);
+    const full = water ? spec.bridgeCost : spec.cost + clearCost(world, i);
+    const c = existing ? Math.max(1, full - (water ? existing.bridgeCost : existing.cost)) : full;
     tiles.push({ ...p, valid: true, cost: c, ...(water && { bridge }) });
     cost += c;
     count++;

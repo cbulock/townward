@@ -3,8 +3,11 @@ import type { World } from './World';
 /** Values stored in `World.road`. */
 export const RoadType = {
   None: 0,
+  /** A street: two lanes with footpaths (named Road for save compatibility). */
   Road: 1,
   Highway: 2,
+  /** Four lanes, a tree-lined median and footpaths (docs/specs/transport.md). */
+  Avenue: 3,
 } as const;
 export type RoadTypeId = (typeof RoadType)[keyof typeof RoadType];
 export type BuildableRoad = Exclude<RoadTypeId, typeof RoadType.None>;

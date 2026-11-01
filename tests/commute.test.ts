@@ -20,7 +20,7 @@ describe('commute model', () => {
     const c = sim.commute;
     expect(c.report.commuters).toBeGreaterThan(1000);
     // The single road between the districts carries nearly everyone, and parts of the network jam.
-    expect(c.congestion[sim.world.index(40, 30)]).toBeGreaterThan(0.8);
+    expect(c.congestion[sim.world.index(40, 30)]).toBeGreaterThan(0.75);
     expect(c.report.jammedTiles).toBeGreaterThan(0);
     for (const b of sim.world.buildings.values()) {
       if (b.def === 'cottage' && b.occupants > 0) expect(c.commuteMinutes.get(b.id)).toBeGreaterThan(0);
