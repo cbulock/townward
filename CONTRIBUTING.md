@@ -57,6 +57,10 @@ The code is strict, and types are part of the design:
 
 Commit messages follow the style already in the history: `feat: …`, `fix: …`, `refactor: …`, `docs: …`.
 
+## License
+
+Openpolis is [MIT licensed](LICENSE). By sending a pull request, you agree that your contribution is released under the same license.
+
 ## Writing style
 
 Docs, comments and in-game text are plain and direct: short sentences, everyday words, one idea per sentence. Explain *why* in comments, not *what*.

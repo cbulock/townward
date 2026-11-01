@@ -8,6 +8,8 @@ A free, open city-building game that runs in your browser. No download, no insta
 
 ### [▶ Play now at openpolis.space](https://openpolis.space)
 
+[![MIT License](https://img.shields.io/badge/license-MIT-f0b23e.svg)](LICENSE)
+
 ![An Openpolis city by day: glass towers, apartment blocks, parks and busy streets](docs/images/day.jpg)
 
 </div>
@@ -72,6 +74,12 @@ One Docker image serves the game and the API; it needs Postgres. See [docs/deplo
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) to get set up and to see how the project works.
+
+## License
+
+The code is released under the [MIT License](LICENSE): use it, change it, build on it.
+
+The name **Openpolis** and its logo aren't covered by the license. If you run your own fork publicly, please give it a different name so players can tell it apart from openpolis.space.
 
 ## Credits
 
