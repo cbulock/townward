@@ -30,6 +30,8 @@ const CATEGORY_LABEL: Readonly<Record<string, string>> = {
   civic: 'Civic',
 };
 
+const WEALTH_LABEL = { everyday: 'Everyday', comfortable: 'Comfortable', luxury: 'Luxury' } as const;
+
 /** Slides in from the right when a building is clicked with the Select tool. */
 export function InfoPanel() {
   const info = useAtomValue(inspectAtom);
@@ -44,6 +46,7 @@ export function InfoPanel() {
           <h2 className="info-title">{info.name}</h2>
           <span className={`info-chip chip-${info.category}`}>{CATEGORY_LABEL[info.category] ?? info.category}</span>
           {info.level > 0 && <span className="info-level">{'★'.repeat(info.level)}</span>}
+          {info.category === 'residential' && <span className={`info-chip wealth-${info.wealth}`}>{WEALTH_LABEL[info.wealth]}</span>}
         </div>
         <button type="button" className="icon-button" aria-label="Close" onClick={() => game?.inspect(null)}>
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -52,6 +55,7 @@ export function InfoPanel() {
         </button>
       </header>
       <p className="info-desc">{info.description}</p>
+      {info.investorValue > 0 && <div className="info-row"><span>Investor appeal</span><strong>+{info.investorValue}</strong></div>}
 
       {info.capacity > 0 && (
         <div className="info-occupancy">

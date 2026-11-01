@@ -27,6 +27,9 @@ account so they follow the player to any browser. Design decisions: D-034, D-062
 ## When It Saves
 
 - Autosave every **45 real seconds** if anything changed (an edit, or a new in-game day).
+- After a world edit or a simulation update that changes the world, a debounced save runs
+  after 1 second. This closes the refresh window where a newly grown shop or apartment
+  existed in memory but had not reached the 45-second autosave yet.
 - When the tab is hidden or closed (page `visibilitychange`), and when leaving to the start screen.
 - On `Ctrl/⌘ S` or the status button.
 - A failed cloud save keeps the city marked dirty and retries at the next autosave.

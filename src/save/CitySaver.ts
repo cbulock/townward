@@ -9,6 +9,7 @@ import type { CityRef, SaveStore, StoreKind } from './SaveStore';
 /** Autosave for the open city (docs/specs/saving.md, "When It Saves"). */
 
 export const AUTOSAVE_MS = 45_000;
+const EDIT_SAVE_DEBOUNCE_MS = 1_000;
 
 export type SaveStatus =
   | { readonly kind: 'new' }
@@ -36,6 +37,8 @@ export class CitySaver {
   private saved: ChangeStamp | null;
   private inFlight: Promise<void> | null = null;
   private readonly timer: ReturnType<typeof setInterval>;
+  private editTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly offWorldChanged: () => void;
   private readonly game: Game;
   private readonly opts: CitySaverOptions;
 
@@ -46,6 +49,7 @@ export class CitySaver {
     // A loaded city starts out saved.
     this.saved = opts.ref ? game.changeStamp : null;
     this.timer = setInterval(() => void this.autosave(), AUTOSAVE_MS);
+    this.offWorldChanged = game.events.on('worldChanged', () => this.scheduleEditSave());
     document.addEventListener('visibilitychange', this.onVisibility);
     opts.onStatus(opts.ref ? { kind: 'saved', at: Date.now(), store: opts.ref.store } : { kind: 'new' });
   }
@@ -81,12 +85,22 @@ export class CitySaver {
 
   dispose() {
     clearInterval(this.timer);
+    if (this.editTimer !== null) clearTimeout(this.editTimer);
+    this.offWorldChanged();
     document.removeEventListener('visibilitychange', this.onVisibility);
   }
 
   private readonly onVisibility = () => {
     if (document.visibilityState === 'hidden') void this.autosave();
   };
+
+  private scheduleEditSave() {
+    if (this.editTimer !== null) return;
+    this.editTimer = setTimeout(() => {
+      this.editTimer = null;
+      void this.autosave();
+    }, EDIT_SAVE_DEBOUNCE_MS);
+  }
 
   /** A guest city whose player has since logged in moves into the account. */
   private needsMove(): boolean {

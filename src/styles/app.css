@@ -645,6 +645,16 @@ kbd {
   font-size: 11px;
   letter-spacing: 1px;
 }
+.wealth-luxury {
+  margin-left: 6px;
+  color: #f5c96a;
+  background: rgba(245, 201, 106, 0.16);
+}
+.wealth-comfortable {
+  margin-left: 6px;
+  color: #9bd6ff;
+  background: rgba(155, 214, 255, 0.14);
+}
 .info-desc {
   margin: 0;
   color: var(--text-dim);

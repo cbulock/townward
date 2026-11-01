@@ -8,6 +8,11 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 
 ## Accepted
 
+- **D-073 — Wealth is an evolution gate, not a separate placement tool.** 2026-11-01.
+  Villas, premium apartments and investor offices emerge from successful zoning only after
+  the city has strong occupancy, happiness and job coverage. This preserves the existing
+  simulation loop while making high-end development feel earned.
+
 - **D-072 — Derived road-following power corridors.** 2026-11-01. Substations gate the
   advanced power network without adding a persistent wire layer: road islands and
   substation reach are deterministic from the existing world. Cities without substations

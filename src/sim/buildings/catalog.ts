@@ -4,6 +4,7 @@ export type Zone = 'R' | 'C' | 'I';
 /** Low density: houses and shops. High density: apartments and offices. Industry is always low. */
 export type Density = 'low' | 'high';
 export type BuildingCategory = 'residential' | 'commercial' | 'industrial' | 'civic';
+export type WealthTier = 'everyday' | 'comfortable' | 'luxury';
 /** City services with a coverage area (docs/specs/core.md). */
 export type ServiceKind = 'police' | 'fire' | 'health' | 'education';
 export const SERVICE_KINDS: readonly ServiceKind[] = ['police', 'fire', 'health', 'education'];
@@ -53,6 +54,10 @@ export interface BuildingDef {
   energy?: EnergyDef;
   /** Power corridor node: buildings on the same road island within this reach can connect. */
   substation?: { readonly radius: number; readonly capacity: number };
+  /** Resident/customer profile this building attracts. */
+  wealth?: WealthTier;
+  /** Investor confidence contributed by a successful high-value building. */
+  investorValue?: number;
 }
 
 export const BUILDINGS = {
@@ -122,6 +127,32 @@ export const BUILDINGS = {
     capacity: 260,
     description: 'A glass residential tower with terraces.',
   },
+  villa: {
+    name: 'Private Villa',
+    category: 'residential',
+    zone: 'R',
+    density: 'low',
+    level: 2,
+    size: { w: 2, h: 2 },
+    cost: 2600,
+    capacity: 8,
+    description: 'A landscaped villa for affluent residents and visiting investors.',
+    wealth: 'luxury',
+    investorValue: 8,
+  },
+  luxury_apartments: {
+    name: 'Luxury Apartments',
+    category: 'residential',
+    zone: 'R',
+    density: 'high',
+    level: 3,
+    size: { w: 2, h: 2 },
+    cost: 7600,
+    capacity: 180,
+    description: 'A premium residence with terraces, concierge spaces and a skyline view.',
+    wealth: 'luxury',
+    investorValue: 12,
+  },
   corner_shop: {
     name: 'Corner Shop',
     category: 'commercial',
@@ -155,6 +186,19 @@ export const BUILDINGS = {
     capacity: 40,
     description: 'Five floors of offices with bands of glass.',
   },
+  creative_office: {
+    name: 'Creative Office',
+    category: 'commercial',
+    zone: 'C',
+    density: 'high',
+    level: 2,
+    size: { w: 1, h: 1 },
+    cost: 1400,
+    capacity: 55,
+    description: 'Flexible studios and bright workspaces for growing companies.',
+    wealth: 'comfortable',
+    investorValue: 3,
+  },
   supermarket: {
     name: 'Supermarket',
     category: 'commercial',
@@ -187,6 +231,19 @@ export const BUILDINGS = {
     cost: 6500,
     capacity: 400,
     description: 'A glass skyscraper with a lit crown.',
+  },
+  tech_campus: {
+    name: 'Tech Campus',
+    category: 'commercial',
+    zone: 'C',
+    density: 'high',
+    level: 3,
+    size: { w: 2, h: 2 },
+    cost: 8200,
+    capacity: 480,
+    description: 'A next-generation campus that attracts ambitious firms and investors.',
+    wealth: 'luxury',
+    investorValue: 10,
   },
   workshop: {
     name: 'Workshop',
@@ -490,6 +547,10 @@ export const CATEGORY_ORDER: readonly BuildingCategory[] = ['residential', 'comm
 
 export function buildingDef(id: BuildingId): BuildingDef {
   return BUILDINGS[id];
+}
+
+export function wealthOf(id: BuildingId): WealthTier {
+  return buildingDef(id).wealth ?? 'everyday';
 }
 
 export interface BuildingInstance {

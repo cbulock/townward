@@ -4,6 +4,18 @@ Status: **4a done** (catalog, art, Build tool), **4b done** (zoning and growth),
 
 Try every building with plenty of money: `http://localhost:5173/?funds=100000`.
 
+## Dynamic wealth and evolution
+
+Residential and office buildings evolve through the existing daily growth pipeline. Each
+definition may declare an audience tier (`everyday`, `comfortable`, or `luxury`) and an
+investor value. Luxury homes, premium apartments, and landmark offices become eligible
+when investor confidence reaches 72%; confidence is derived from occupied housing,
+resident happiness, and job coverage. This keeps high-end development aspirational without
+adding a second placement system.
+
+The renderer gives each evolution tier a distinct procedural recipe, while each instance's
+stable variant keeps its facade deterministic across reloads and rotations.
+
 ## Two Ways Buildings Appear
 
 1. **Grown (zoned).** The player paints R/C/I zones and matching buildings appear and level up over time (Phase 4b).
@@ -23,6 +35,8 @@ All art is original and generated in code (`src/render/atlas/buildingArt.ts`), w
 | `walkup` | Walk-up Apartments | 1×1 | 2 | 4 | 24 | brick, balconies, roof parapet |
 | `apartment_block` | Apartment Block | 2×2 | 3 | 8 | 120 | balconies, rooftop water tank |
 | `condo_tower` | Condo Tower | 2×2 | 3 | 15 | 260 | glass tower, terraces, rooftop crown |
+| `villa` | Private Villa | 2×2 | 2 | 2 | 8 | landscaped garden, pool, garage |
+| `luxury_apartments` | Luxury Apartments | 2×2 | 3 | 13 | 180 | premium terraces, pool and rooftop garden |
 
 ### Commercial
 

@@ -1,5 +1,5 @@
 import type { SystemTiming } from '../sim/core/timings';
-import type { BuildingId } from '../sim/buildings/catalog';
+import type { BuildingId, WealthTier } from '../sim/buildings/catalog';
 import type { DemandWhy, ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
 import type { PowerReport } from '../sim/systems/energy';
@@ -88,6 +88,8 @@ export interface InspectInfo {
   name: string;
   category: string;
   level: number;
+  wealth: WealthTier;
+  investorValue: number;
   description: string;
   occupants: number;
   capacity: number;

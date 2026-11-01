@@ -766,6 +766,8 @@ export class Game {
       name: d.name,
       category: d.category,
       level: d.level,
+      wealth: d.wealth ?? 'everyday',
+      investorValue: d.investorValue ?? 0,
       description: d.description,
       occupants: b.occupants,
       capacity: d.capacity,
