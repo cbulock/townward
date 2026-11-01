@@ -21,7 +21,7 @@ import type { Traffic } from '../sim/systems/traffic';
 import { needsUtilities } from '../sim/systems/utilities';
 import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
 import { happinessColor, type OverlayTile } from '../render/Renderer';
-import { rectTiles, roadMask, type TilePos } from '../sim/roads';
+import { rectTiles, RoadType, roadMask, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
 import { deserialize, serialize, type SaveData } from '../sim/save';
@@ -155,7 +155,7 @@ export class Game {
     const renderer = await Renderer.create(host, world);
     const game = new Game(city, renderer, opts);
     // Start over downtown (a little zoomed out), or over the middle of a saved city.
-    const centre = demo?.centre ?? (opts.save ? buildingsCentre(world) : null);
+    const centre = demo?.centre ?? (opts.save ? builtCentre(world) : null);
     if (centre) {
       game.afterWorldChange(true);
       const p = tileToWorld(centre.x, centre.y);
@@ -918,14 +918,16 @@ export class Game {
   }
 }
 
-/** The centre of a city's buildings (or of the map, if it has none). */
-function buildingsCentre(world: World): TilePos {
+/** The centre of what the player built (roads and buildings), or of the map if nothing yet. */
+function builtCentre(world: World): TilePos {
   let x = 0;
   let y = 0;
-  for (const b of world.buildings.values()) {
-    x += b.x;
-    y += b.y;
+  let n = 0;
+  for (let i = 0; i < world.road.length; i++) {
+    if (world.road[i] === RoadType.None && world.building[i] === -1) continue;
+    x += i % world.width;
+    y += Math.floor(i / world.width);
+    n++;
   }
-  const n = world.buildings.size;
   return n === 0 ? { x: world.width / 2, y: world.height / 2 } : { x: Math.round(x / n), y: Math.round(y / n) };
 }

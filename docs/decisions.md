@@ -101,3 +101,8 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
   - Layout (user request: clean, structured backend): `config` → `db/` (driver and migrations) → `http/` (errors, validation, middleware) → `modules/<feature>/` (`*.schemas` → `*.routes` → `*.service` → `*.repository`). Routes stay thin. Services hold the rules and throw `HttpError`, and one error middleware formats the responses.
   - The server runs on Node's built-in TypeScript support (erasable syntax only: no enums or parameter properties), so it has no build step.
   - Guests save to IndexedDB. A guest city moves to the account on its first save after the player logs in.
+- **D-063 — Master plan for Phases 11–22 ([05-master-plan.md](05-master-plan.md)).** 2026-11-01. User answers to its §16:
+  - Residents are simulated as groups per home (age, education, wealth), with individuals sampled only for display.
+  - Every new map starts with a regional highway (a causeway on islands). Highways need ramps for new links. The Web Worker move comes first (Phase 11).
+  - Career mode unlocks buildings by city stage, and Sandbox opens everything. Buying map land is not planned. Road wear is an option, off by default.
+  - Disasters are realistic and tied to the terrain (tsunami and cyclones on islands and coasts, floods in river valleys and lakes, wildfire in forests, tornado and drought on plains). Each has a visible risk, a warning, a physical model, mitigation and an Off/Mild/Realistic setting.

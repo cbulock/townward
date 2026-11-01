@@ -31,6 +31,7 @@ pnpm typecheck && pnpm lint
 | [02-architecture.md](02-architecture.md) | Tech stack, folder layout, data model, rendering & performance strategy |
 | [03-roadmap.md](03-roadmap.md) | All phases with task checklists — **the progress tracker** |
 | [04-ui-ux.md](04-ui-ux.md) | Visual language, HUD layout, controls, "feel" rules |
+| [05-master-plan.md](05-master-plan.md) | Plan for every system after saving: people, land value, transport, services, economy, government, Phases 11–22 |
 | [specs/terrain.md](specs/terrain.md) | Terrain types, generator, new-game terrain picker |
 | [specs/roads.md](specs/roads.md) | Road tool, auto-tiling, bulldozing, costs |
 | [specs/buildings.md](specs/buildings.md) | Building catalog, footprints, placement; zoning and growth (planned) |

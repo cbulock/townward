@@ -2,6 +2,17 @@
 
 Newest first. One entry per work session.
 
+
+## 2026-11-01: Saving fix: "my island progress wasn't shown after logging in again"
+- Nothing was lost: both of the user's Island saves were in Postgres with their roads. But after logging in, the start screen led with "Found a new city", preselected with the same seed, so starting Island again gave an empty copy that looked like lost progress. The small, picture-less city card didn't help.
+- Fix: a **Continue** card for the last-played city with a live map preview, previews on every city card (lazy, queued, cached), *Found a new city* folded away when you have cities, unique default names, and the camera centred on roads and buildings when a city loads.
+- Verified in Chrome: play Island → log out → log in → Continue → the road is there.
+
+## 2026-11-01: Master plan for the simulation
+- Wrote [05-master-plan.md](05-master-plan.md): how the city should evolve after Phase 10. It covers resident groups, land value and building lifecycle, economy and goods, roads/bridges/outside connections, transit with mode choice, travel-time services with dispatch, utilities v2, government, performance and save v2. It also lays out Phases 11–22.
+- Roadmap "Later Phases" now follows it. No code changed.
+- The user answered §16 (D-063): resident groups, a regional highway on every map, ramps, stages, road wear as an option, Worker first, and realistic terrain-based disasters (added as §11.5).
+- **Next:** finish Phase 10 (saving), then write the Phase 11 spec.
 ## 2026-11-01: Phase 10 saving & accounts
 - **Save format** (`sim/save.ts`): the terrain settings (preset, seed, size and every slider the player changed), city state, RLE+base64 road/bridge/zone/cleared layers, and buildings as 10-number tuples. A grown demo city round-trips exactly. Parsing validates untrusted JSON and drops unknown buildings rather than failing. Growth and fire random streams now mix in the day, so a reloaded city doesn't replay day 0.
 - **Server**: the user switched storage to **Postgres in Docker** and asked for a cleanly structured backend (D-062). Express 5, modules (`auth`, `saves`) split into routes → service → repository, one `HttpError` handler, zod validation, scrypt passwords, hashed session tokens in httpOnly cookies, rate-limited login, owner-scoped saves with a 30-city cap. Tests run on PGlite, so no Docker is needed for `pnpm test`.

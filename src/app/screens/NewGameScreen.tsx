@@ -4,12 +4,18 @@ import { paintMinimap } from '../../render/minimap';
 import { ViewTransform } from '../../render/view/ViewTransform';
 import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { generateTerrain } from '../../sim/terrain/generate';
-import { PRESET_IDS, PRESETS, presetSettings, type PresetId, type TerrainSettings } from '../../sim/terrain/presets';
+import {
+  PRESET_IDS,
+  PRESETS,
+  presetSettings,
+  type PresetId,
+  type TerrainSettings,
+} from '../../sim/terrain/presets';
 import type { World } from '../../sim/World';
 import type { CityRef } from '../../save/SaveStore';
 import { AccountButton } from '../account/AccountButton';
 import { DEFAULT_SEED, randomSeed } from '../options';
-import { CityList } from './CityList';
+import { CityList, uniqueCityName, useCities } from './CityList';
 
 /** Settings changes repaint the preview after this pause (ms). Generation itself takes < 50 ms. */
 const PREVIEW_DEBOUNCE = 120;
@@ -87,11 +93,18 @@ interface NewGameScreenProps {
  */
 export function NewGameScreen({ onStart, onOpen, notice }: NewGameScreenProps) {
   const [name, setName] = useState('');
-  const [terrain, setTerrain] = useState<TerrainSettings>(() => presetSettings('riverValley', DEFAULT_SEED, DEFAULT_MAP_SIZE));
+  const [terrain, setTerrain] = useState<TerrainSettings>(() =>
+    presetSettings('riverValley', DEFAULT_SEED, DEFAULT_MAP_SIZE),
+  );
   const [seedText, setSeedText] = useState(String(DEFAULT_SEED));
   const previewRef = useRef<HTMLCanvasElement>(null);
   const backdropRef = useRef<HTMLCanvasElement>(null);
   const [genMs, setGenMs] = useState(0);
+  const cities = useCities();
+  const hasCities = (cities.entries?.length ?? 0) > 0;
+  /** With saved cities, the new-city form stays folded until asked for, so "Continue" leads. */
+  const [founding, setFounding] = useState(false);
+  const showForm = !hasCities || founding;
   const funds = useMemo(() => {
     const f = Number(new URLSearchParams(location.search).get('funds'));
     return Number.isFinite(f) && f > 0 ? f : undefined;
@@ -107,159 +120,223 @@ export function NewGameScreen({ onStart, onOpen, notice }: NewGameScreenProps) {
       paint(backdropRef.current, world, BACKDROP.w, BACKDROP.h);
     }, PREVIEW_DEBOUNCE);
     return () => clearTimeout(t);
-  }, [terrain]);
+  }, [terrain, showForm]);
 
   const set = (patch: Partial<TerrainSettings>) => setTerrain((t) => ({ ...t, ...patch }));
-  const choosePreset = (preset: PresetId) => setTerrain((t) => presetSettings(preset, t.seed, t.size));
+  const choosePreset = (preset: PresetId) =>
+    setTerrain((t) => presetSettings(preset, t.seed, t.size));
   const setSeed = (seed: number) => {
     setSeedText(String(seed));
     set({ seed });
   };
-  const start = () => onStart({ terrain, name: name.trim() || PRESETS[terrain.preset].name, funds });
+  // The default name never repeats an existing city's ("Island 2"), so cities are easy to tell apart.
+  const defaultName = uniqueCityName(PRESETS[terrain.preset].name, cities.entries);
+  const start = () => onStart({ terrain, name: name.trim() || defaultName, funds });
 
   return (
     <div className="new-game">
-      <canvas ref={backdropRef} className="ng-backdrop" style={{ width: BACKDROP.w, height: BACKDROP.h }} aria-hidden="true" />
+      <canvas
+        ref={backdropRef}
+        className="ng-backdrop"
+        style={{ width: BACKDROP.w, height: BACKDROP.h }}
+        aria-hidden="true"
+      />
       <div className="ng-account">
         <AccountButton />
       </div>
       <div className="ng-stack">
-      {notice && (
-        <p className="panel ng-notice" role="alert">
-          {notice}
-        </p>
-      )}
-      <CityList onOpen={onOpen} />
-      <form
-        className="panel ng-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          start();
-        }}
-      >
-        <header className="ng-header">
-          <h1>Found a new city</h1>
-          <p>Pick the land, tune it, then start building.</p>
-        </header>
+        {notice && (
+          <p className="panel ng-notice" role="alert">
+            {notice}
+          </p>
+        )}
+        <CityList cities={cities} onOpen={onOpen} />
+        {!showForm && (
+          <button type="button" className="panel ng-found" onClick={() => setFounding(true)}>
+            <span className="ng-found-plus" aria-hidden="true">
+              +
+            </span>
+            <span>
+              <strong>Found a new city</strong>
+              <small>Pick fresh land and start from scratch</small>
+            </span>
+          </button>
+        )}
+        {showForm && (
+          <form
+            className="panel ng-card"
+            onSubmit={(e) => {
+              e.preventDefault();
+              start();
+            }}
+          >
+            <header className="ng-header">
+              <h1>Found a new city</h1>
+              <p>Pick the land, tune it, then start building.</p>
+            </header>
 
-        <div className="ng-body">
-          <div className="ng-settings">
-            <Field label="City name">
-              <input
-                className="ng-input"
-                value={name}
-                maxLength={32}
-                placeholder={PRESETS[terrain.preset].name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Terrain">
-              <div className="ng-presets" role="radiogroup" aria-label="Terrain preset">
-                {PRESET_IDS.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={terrain.preset === id}
-                    className={`ng-preset ${terrain.preset === id ? 'is-active' : ''}`}
-                    title={PRESETS[id].description}
-                    onClick={() => choosePreset(id)}
-                  >
-                    <PresetThumb preset={id} seed={terrain.seed} />
-                    <span>{PRESETS[id].name}</span>
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <div className="ng-row">
-              <Field label="Map size">
-                <div className="ng-segmented" role="radiogroup" aria-label="Map size">
-                  {MAP_SIZES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="radio"
-                      aria-checked={terrain.size === s}
-                      className={terrain.size === s ? 'is-active' : ''}
-                      onClick={() => set({ size: s })}
-                    >
-                      {SIZE_LABEL[s]} <small>{s}</small>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label="Seed">
-                <div className="ng-seed">
+            <div className="ng-body">
+              <div className="ng-settings">
+                <Field label="City name">
                   <input
                     className="ng-input"
-                    inputMode="numeric"
-                    value={seedText}
-                    onChange={(e) => {
-                      setSeedText(e.target.value);
-                      const v = Number(e.target.value);
-                      if (e.target.value !== '' && Number.isInteger(v)) set({ seed: v });
-                    }}
+                    value={name}
+                    maxLength={32}
+                    placeholder={defaultName}
+                    onChange={(e) => setName(e.target.value)}
                   />
-                  <button type="button" className="ng-dice" title="Random seed" aria-label="Random seed" onClick={() => setSeed(randomSeed())}>
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                      <rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                      {[
-                        [9, 9],
-                        [15, 9],
-                        [12, 12],
-                        [9, 15],
-                        [15, 15],
-                      ].map(([cx, cy]) => (
-                        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.3" fill="currentColor" />
+                </Field>
+
+                <Field label="Terrain">
+                  <div className="ng-presets" role="radiogroup" aria-label="Terrain preset">
+                    {PRESET_IDS.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={terrain.preset === id}
+                        className={`ng-preset ${terrain.preset === id ? 'is-active' : ''}`}
+                        title={PRESETS[id].description}
+                        onClick={() => choosePreset(id)}
+                      >
+                        <PresetThumb preset={id} seed={terrain.seed} />
+                        <span>{PRESETS[id].name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <div className="ng-row">
+                  <Field label="Map size">
+                    <div className="ng-segmented" role="radiogroup" aria-label="Map size">
+                      {MAP_SIZES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          role="radio"
+                          aria-checked={terrain.size === s}
+                          className={terrain.size === s ? 'is-active' : ''}
+                          onClick={() => set({ size: s })}
+                        >
+                          {SIZE_LABEL[s]} <small>{s}</small>
+                        </button>
                       ))}
-                    </svg>
-                  </button>
+                    </div>
+                  </Field>
+                  <Field label="Seed">
+                    <div className="ng-seed">
+                      <input
+                        className="ng-input"
+                        inputMode="numeric"
+                        value={seedText}
+                        onChange={(e) => {
+                          setSeedText(e.target.value);
+                          const v = Number(e.target.value);
+                          if (e.target.value !== '' && Number.isInteger(v)) set({ seed: v });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="ng-dice"
+                        title="Random seed"
+                        aria-label="Random seed"
+                        onClick={() => setSeed(randomSeed())}
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                          <rect
+                            x="4"
+                            y="4"
+                            width="16"
+                            height="16"
+                            rx="3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          />
+                          {[
+                            [9, 9],
+                            [15, 9],
+                            [12, 12],
+                            [9, 15],
+                            [15, 15],
+                          ].map(([cx, cy]) => (
+                            <circle
+                              key={`${cx}-${cy}`}
+                              cx={cx}
+                              cy={cy}
+                              r="1.3"
+                              fill="currentColor"
+                            />
+                          ))}
+                        </svg>
+                      </button>
+                    </div>
+                  </Field>
                 </div>
-              </Field>
+
+                <details className="ng-advanced">
+                  <summary>Advanced</summary>
+                  <Slider
+                    label="Water"
+                    value={terrain.water}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    format={pct}
+                    onChange={(water) => set({ water })}
+                  />
+                  <Slider
+                    label="Trees"
+                    value={terrain.trees}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    format={pct}
+                    onChange={(trees) => set({ trees })}
+                  />
+                  <Slider
+                    label="Rivers"
+                    value={terrain.rivers}
+                    min={0}
+                    max={3}
+                    step={1}
+                    format={(v) => (v === 0 ? 'None' : String(v))}
+                    onChange={(rivers) => set({ rivers })}
+                  />
+                  <Slider
+                    label="Coast"
+                    value={terrain.coastSides}
+                    min={0}
+                    max={4}
+                    step={1}
+                    format={(v) =>
+                      v === 0 ? 'None' : v === 4 ? 'Island' : `${v} side${v === 1 ? '' : 's'}`
+                    }
+                    onChange={(coastSides) => set({ coastSides })}
+                  />
+                </details>
+              </div>
+
+              <div className="ng-preview">
+                <canvas
+                  ref={previewRef}
+                  style={{ width: PREVIEW.w, height: PREVIEW.h }}
+                  aria-label="Map preview"
+                />
+                <p className="ng-preview-caption">
+                  {PRESETS[terrain.preset].description}
+                  <span className="ng-dim">
+                    {' '}
+                    · {terrain.size}×{terrain.size} · generated in {genMs} ms
+                  </span>
+                </p>
+                <button type="submit" className="ng-start">
+                  Start building
+                </button>
+              </div>
             </div>
-
-            <details className="ng-advanced">
-              <summary>Advanced</summary>
-              <Slider label="Water" value={terrain.water} min={0} max={1} step={0.05} format={pct} onChange={(water) => set({ water })} />
-              <Slider label="Trees" value={terrain.trees} min={0} max={1} step={0.05} format={pct} onChange={(trees) => set({ trees })} />
-              <Slider
-                label="Rivers"
-                value={terrain.rivers}
-                min={0}
-                max={3}
-                step={1}
-                format={(v) => (v === 0 ? 'None' : String(v))}
-                onChange={(rivers) => set({ rivers })}
-              />
-              <Slider
-                label="Coast"
-                value={terrain.coastSides}
-                min={0}
-                max={4}
-                step={1}
-                format={(v) => (v === 0 ? 'None' : v === 4 ? 'Island' : `${v} side${v === 1 ? '' : 's'}`)}
-                onChange={(coastSides) => set({ coastSides })}
-              />
-            </details>
-          </div>
-
-          <div className="ng-preview">
-            <canvas ref={previewRef} style={{ width: PREVIEW.w, height: PREVIEW.h }} aria-label="Map preview" />
-            <p className="ng-preview-caption">
-              {PRESETS[terrain.preset].description}
-              <span className="ng-dim">
-                {' '}
-                · {terrain.size}×{terrain.size} · generated in {genMs} ms
-              </span>
-            </p>
-            <button type="submit" className="ng-start">
-              Start building
-            </button>
-          </div>
-        </div>
-      </form>
+          </form>
+        )}
       </div>
     </div>
   );

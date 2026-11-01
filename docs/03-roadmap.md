@@ -193,14 +193,23 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] A guest city moves into the account on its first save after logging in
 - [x] Verified in Chrome: sign up → build → save → list → reopen → reload; guest → log in migration; no errors
 
-## Later Phases (to be specced when we get there)
+## Later Phases
 
-User direction (2026-11-01): make the city *evolve*. Every feature is judged by what players will enjoy, how the game can grow in the browser, and staying smooth (60 FPS) as it grows.
+Planned in detail in [05-master-plan.md](05-master-plan.md) (accepted, D-063). Each phase still gets its own spec before code.
 
 | Phase | Theme |
 |---|---|
-| 11 | Economy & production: factories produce goods (materials, steel, electronics…) that unlock and supply big apartments and office towers; a fuller tax system (rates per zone, tax happiness) |
-| 12 | Road evolution: upgrade roads in place (street → avenue → boulevard), wider roads with more capacity as traffic grows |
-| 13 | City progression: universities, research centres and other unlocks that open new buildings and bonuses as the city grows |
-| 14 | Public transport (buses, trains), libraries and more services, pollution and data overlays |
-| 15 | Performance pass: sim in a Web Worker, 256×256+ maps |
+| 10 | Save/Load (in progress): Express + Postgres backend with email/password accounts, IndexedDB autosave, multiple cities (D-034, D-062) |
+| 11 | Engine for depth: sim in a Web Worker, segment road graph, fields, history, headless harness |
+| 12 | Land value and pollution: desirability, wealth tiers, decline and redevelopment, demand v2 |
+| 13 | People: resident groups, life stages, migration, regional highway |
+| 14 | Education and jobs: school tiers, university, wages |
+| 15 | Services v2: travel-time reach, capacity, dispatch, fire spread, crime |
+| 16 | Utilities v2: plant types, sewage, river pollution, garbage |
+| 17 | Transport I: avenues, ramps, overpasses, mode choice, bus lines |
+| 18 | Transport II: trams, metro, rail, freight |
+| 19 | Economy: goods chain, specialised industry, trade, loans |
+| 20 | Government: stages, districts, policies, approval |
+| 21a | Weather and terrain-based disasters (tsunami, floods, wildfire, tornado …) |
+| 21b | Living city: events, tourism, landmarks, seaport, airport |
+| 22 | Polish and modes: Sandbox/Career, tutorial, balance |

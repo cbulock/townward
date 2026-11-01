@@ -1,41 +1,51 @@
 import { useAtomValue } from 'jotai';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { storeFor } from '../../save/CitySaver';
 import type { CityRef, StoreKind } from '../../save/SaveStore';
 import type { SaveMeta } from '../../shared/api';
 import { PRESET_IDS, PRESETS } from '../../sim/terrain/presets';
 import { authAtom } from '../atoms';
 import { cityDate, timeAgo } from '../format';
+import { cityThumb } from './cityThumbs';
 
-interface Entry {
+export interface CityEntry {
   readonly store: StoreKind;
   readonly meta: SaveMeta;
 }
 
-/** This device's cities, plus the account's when logged in, newest first. */
-async function fetchCities(loggedIn: boolean): Promise<{ entries: Entry[]; error: string | null }> {
-  const [local, cloud] = await Promise.allSettled([storeFor('local').list(), loggedIn ? storeFor('cloud').list() : Promise.resolve([])]);
-  const entries: Entry[] = [];
-  if (local.status === 'fulfilled') entries.push(...local.value.map((meta) => ({ store: 'local' as const, meta })));
-  if (cloud.status === 'fulfilled') entries.push(...cloud.value.map((meta) => ({ store: 'cloud' as const, meta })));
-  entries.sort((a, b) => b.meta.updatedAt - a.meta.updatedAt);
-  return { entries, error: cloud.status === 'rejected' ? "Couldn't load your account's cities" : null };
+export interface Cities {
+  /** Newest first; null while loading. */
+  readonly entries: readonly CityEntry[] | null;
+  readonly error: string | null;
+  readonly reload: () => void;
 }
 
-const presetOf = (id: string) => PRESET_IDS.find((p) => p === id) ?? null;
+/** This device's cities, plus the account's when logged in, newest first. */
+async function fetchCities(
+  loggedIn: boolean,
+): Promise<{ entries: CityEntry[]; error: string | null }> {
+  const [local, cloud] = await Promise.allSettled([
+    storeFor('local').list(),
+    loggedIn ? storeFor('cloud').list() : Promise.resolve([]),
+  ]);
+  const entries: CityEntry[] = [];
+  if (local.status === 'fulfilled')
+    entries.push(...local.value.map((meta) => ({ store: 'local' as const, meta })));
+  if (cloud.status === 'fulfilled')
+    entries.push(...cloud.value.map((meta) => ({ store: 'cloud' as const, meta })));
+  entries.sort((a, b) => b.meta.updatedAt - a.meta.updatedAt);
+  return {
+    entries,
+    error: cloud.status === 'rejected' ? "Couldn't load your account's cities" : null,
+  };
+}
 
-/**
- * "Your cities": this device's cities, plus the account's once logged in, newest first.
- * Click to continue; local cities can be uploaded to the account; delete asks first.
- */
-export function CityList({ onOpen }: { onOpen: (ref: CityRef) => void }) {
+/** The player's cities, reloaded when they log in or out. */
+export function useCities(): Cities {
   const auth = useAtomValue(authAtom);
   const loggedIn = auth.status === 'user';
-  const [entries, setEntries] = useState<readonly Entry[] | null>(null);
+  const [entries, setEntries] = useState<readonly CityEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  /** Bumped after a delete or upload to reload the list. */
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -51,22 +61,68 @@ export function CityList({ onOpen }: { onOpen: (ref: CityRef) => void }) {
     };
   }, [auth.status, loggedIn, version]);
 
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  return { entries, error, reload };
+}
+
+const presetOf = (id: string) => PRESET_IDS.find((p) => p === id) ?? null;
+const keyOf = (e: CityEntry) => `${e.store}:${e.meta.id}`;
+const refOf = (e: CityEntry): CityRef => ({ store: e.store, id: e.meta.id });
+
+/** A saved city's map with the player's roads and buildings; blank until it's painted. */
+function CityThumb({ entry, className }: { entry: CityEntry; className: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    cityThumb(entry.store, entry.meta).then(
+      (u) => !cancelled && setUrl(u),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.store, entry.meta]);
+  return (
+    <span className={`city-thumb ${className}`}>
+      {url && <img src={url} alt="" draggable={false} />}
+    </span>
+  );
+}
+
+interface CityListProps {
+  cities: Cities;
+  onOpen: (ref: CityRef) => void;
+}
+
+/**
+ * "Your cities" (docs/specs/saving.md): the last city played as a big Continue card with its
+ * map, then the rest. Device cities can move to the account; delete asks first.
+ */
+export function CityList({ cities, onOpen }: CityListProps) {
+  const loggedIn = useAtomValue(authAtom).status === 'user';
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { entries, reload } = cities;
+  const error = actionError ?? cities.error;
+
   const run = async (key: string, action: () => Promise<void>) => {
     setBusy(key);
+    setActionError(null);
     try {
       await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setActionError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setBusy(null);
       setConfirming(null);
-      setVersion((v) => v + 1);
+      reload();
     }
   };
 
-  const remove = (e: Entry) => run(keyOf(e), () => storeFor(e.store).remove(e.meta.id));
+  const remove = (e: CityEntry) => run(keyOf(e), () => storeFor(e.store).remove(e.meta.id));
   /** Copy a device city into the account, then drop the device copy. */
-  const upload = (e: Entry) =>
+  const upload = (e: CityEntry) =>
     run(keyOf(e), async () => {
       const { data } = await storeFor('local').load(e.meta.id);
       const { name, population, funds, day, size, preset, seed } = e.meta;
@@ -75,6 +131,65 @@ export function CityList({ onOpen }: { onOpen: (ref: CityRef) => void }) {
     });
 
   if (!entries || (entries.length === 0 && !error)) return null;
+  const [latest, ...rest] = entries;
+
+  const details = (e: CityEntry) => {
+    const m = e.meta;
+    const preset = presetOf(m.preset);
+    return (
+      <>
+        <span className="city-tile-stats">
+          {m.population.toLocaleString()} people · {cityDate(m.day)}
+        </span>
+        <span className="city-tile-meta">
+          {preset ? PRESETS[preset].name : m.preset} · {m.size}² · saved {timeAgo(m.updatedAt)}
+        </span>
+        <span className={`city-badge is-${e.store}`}>
+          {e.store === 'cloud' ? 'Account' : 'This device'}
+        </span>
+      </>
+    );
+  };
+
+  const actions = (e: CityEntry) => {
+    const key = keyOf(e);
+    return (
+      <div className="city-actions">
+        {confirming === key ? (
+          <>
+            <span>Delete for good?</span>
+            <button type="button" className="link-button is-danger" onClick={() => void remove(e)}>
+              Delete
+            </button>
+            <button type="button" className="link-button" onClick={() => setConfirming(null)}>
+              Keep
+            </button>
+          </>
+        ) : (
+          <>
+            {e.store === 'local' && loggedIn && (
+              <button
+                type="button"
+                className="link-button"
+                disabled={busy === key}
+                onClick={() => void upload(e)}
+              >
+                Move to account
+              </button>
+            )}
+            <button
+              type="button"
+              className="link-button is-dim"
+              disabled={busy === key}
+              onClick={() => setConfirming(key)}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <section className="panel cities-card" aria-label="Your cities">
@@ -82,53 +197,58 @@ export function CityList({ onOpen }: { onOpen: (ref: CityRef) => void }) {
         <h2>Your cities</h2>
         {error && <span className="cities-error">{error}</span>}
       </header>
-      <ul className="cities-strip">
-        {entries.map((e) => {
-          const key = keyOf(e);
-          const m = e.meta;
-          const preset = presetOf(m.preset);
-          return (
-            <li key={key} className="city-tile">
-              <button type="button" className="city-open" disabled={busy === key} onClick={() => onOpen({ store: e.store, id: m.id })}>
-                <span className="city-tile-name">{m.name}</span>
-                <span className="city-tile-stats">
-                  {m.population.toLocaleString()} people · {cityDate(m.day)}
-                </span>
-                <span className="city-tile-meta">
-                  {preset ? PRESETS[preset].name : m.preset} · {m.size}² · {timeAgo(m.updatedAt)}
-                </span>
-                <span className={`city-badge is-${e.store}`}>{e.store === 'cloud' ? 'Account' : 'This device'}</span>
+      {latest && (
+        <div className="city-hero">
+          <button
+            type="button"
+            className="city-hero-map"
+            aria-label={`Continue ${latest.meta.name}`}
+            onClick={() => onOpen(refOf(latest))}
+          >
+            <CityThumb entry={latest} className="is-hero" />
+          </button>
+          <div className="city-hero-info">
+            <span className="city-hero-kicker">Last played</span>
+            <span className="city-hero-name">{latest.meta.name}</span>
+            {details(latest)}
+            <button
+              type="button"
+              className="ng-start city-continue"
+              disabled={busy === keyOf(latest)}
+              onClick={() => onOpen(refOf(latest))}
+            >
+              Continue
+            </button>
+            {actions(latest)}
+          </div>
+        </div>
+      )}
+      {rest.length > 0 && (
+        <ul className="cities-strip">
+          {rest.map((e) => (
+            <li key={keyOf(e)} className="city-tile">
+              <button
+                type="button"
+                className="city-open"
+                disabled={busy === keyOf(e)}
+                onClick={() => onOpen(refOf(e))}
+              >
+                <CityThumb entry={e} className="is-small" />
+                <span className="city-tile-name">{e.meta.name}</span>
+                {details(e)}
               </button>
-              <div className="city-actions">
-                {confirming === key ? (
-                  <>
-                    <span>Delete for good?</span>
-                    <button type="button" className="link-button is-danger" onClick={() => void remove(e)}>
-                      Delete
-                    </button>
-                    <button type="button" className="link-button" onClick={() => setConfirming(null)}>
-                      Keep
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {e.store === 'local' && loggedIn && (
-                      <button type="button" className="link-button" disabled={busy === key} onClick={() => void upload(e)}>
-                        Move to account
-                      </button>
-                    )}
-                    <button type="button" className="link-button is-dim" disabled={busy === key} onClick={() => setConfirming(key)}>
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
+              {actions(e)}
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
 
-const keyOf = (e: Entry) => `${e.store}:${e.meta.id}`;
+/** "Island", or "Island 2", "Island 3"… if that name is taken, so cities stay easy to tell apart. */
+export function uniqueCityName(base: string, entries: readonly CityEntry[] | null): string {
+  const taken = new Set((entries ?? []).map((e) => e.meta.name.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
+}

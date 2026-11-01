@@ -1669,3 +1669,125 @@ button.funds:hover {
     opacity: 0.35;
   }
 }
+
+/* ---------- Start screen: Continue card, previews, folded new-city button ---------- */
+.city-hero {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+@media (max-width: 760px) {
+  .city-hero {
+    grid-template-columns: 1fr;
+  }
+}
+.city-hero-map {
+  padding: 0;
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 120ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.city-hero-map:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.city-hero-map:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.city-thumb {
+  display: block;
+  background: rgba(255, 255, 255, 0.03);
+}
+.city-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: panel-in 300ms var(--ease-out) both;
+}
+.city-thumb.is-hero {
+  width: 100%;
+  aspect-ratio: 360 / 196;
+}
+.city-thumb.is-small {
+  width: calc(100% + 24px);
+  margin: -10px -12px 6px;
+  aspect-ratio: 360 / 196;
+}
+.city-hero-info {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.city-hero-info .city-badge {
+  top: 0;
+  right: 0;
+}
+.city-hero-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.city-hero-name {
+  padding-right: 80px;
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-continue {
+  margin-top: auto;
+}
+.city-hero-info .city-actions {
+  padding: 8px 0 0;
+  border-top: 0;
+}
+.cities-card .cities-strip {
+  margin-top: 14px;
+}
+.ng-found {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--ease-out);
+}
+.ng-found:hover {
+  background: var(--bg-panel-hover);
+}
+.ng-found:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.ng-found-plus {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(79, 209, 197, 0.16);
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 600;
+}
+.ng-found strong {
+  display: block;
+  font-size: 15px;
+}
+.ng-found small {
+  color: var(--text-dim);
+  font-size: 12.5px;
+}

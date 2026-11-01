@@ -6,9 +6,15 @@ account so they follow the player to any browser. Design decisions: D-034, D-062
 ## Player Experience
 
 - **Never lose a city.** Every city autosaves. A reload reopens the city you were playing.
-- **Start screen** lists *Your cities* (newest first) with population, date and last-saved
-  time. Click one to continue, or the bin icon to delete it (asks first). Founding a new
-  city is still the main card.
+- **Start screen** leads with *Your cities*: the last-played city as a big **Continue** card
+  with a map preview (terrain plus roads, zones and buildings), then the others as smaller
+  cards with previews. Delete asks first. When there are saved cities, *Found a new city* is
+  folded into one button; a new city's default name never repeats one ("Island 2").
+  (User report: after logging back in, the old screen led with "Found a new city" on the same
+  seed, and starting it gave an empty copy of the island that looked like lost progress.)
+- Previews are made lazily, one at a time with a frame's pause between, and cached until
+  the save changes, so the start screen stays smooth with 30 cities.
+- A loaded city opens with the camera over what the player built (roads and buildings).
 - **Account button** (start screen header and top bar): *Log in* / *Sign up* dialog with
   email and password (8+ characters). Once logged in it shows the email and *Log out*.
 - **Guest → account:** a guest's cities live on this device. After logging in, the open
