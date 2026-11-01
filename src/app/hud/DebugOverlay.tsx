@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect } from 'react';
+import { SYSTEM_BUDGETS_MS } from '../../sim/core/timings';
 import { debugStatsAtom, debugVisibleAtom, gridOnAtom, hoveredTileAtom } from '../atoms';
 
 /** Toggle with F3. Shows the numbers we use to check the 60 FPS budget. */
@@ -63,6 +64,25 @@ export function DebugOverlay() {
         <dt>Sim tick</dt>
         <dd>{stats.simTick}</dd>
       </dl>
+      {stats.systems.length > 0 && (
+        <>
+          <div className="debug-section">Sim · avg / max ms</div>
+          <dl>
+            {stats.systems.map((t) => {
+              const budget = SYSTEM_BUDGETS_MS[t.name];
+              const cls = budget === undefined || t.avgMs <= budget ? '' : t.avgMs > budget * 1.5 ? 'bad' : 'warn';
+              return (
+                <div key={t.name} className="debug-row">
+                  <dt>{t.name}</dt>
+                  <dd className={cls} title={budget === undefined ? undefined : `budget ${budget} ms`}>
+                    {t.avgMs.toFixed(1)} / {t.maxMs.toFixed(0)}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </>
+      )}
     </div>
   );
 }

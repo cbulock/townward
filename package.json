@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
+    "sim:run": "node --no-warnings --import ./scripts/resolve-ts.mjs scripts/sim-run.ts",
+    "bench": "pnpm sim:run --scenario demo --years 1 --budget",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server && tsc --noEmit -p scripts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

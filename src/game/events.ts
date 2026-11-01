@@ -1,3 +1,4 @@
+import type { SystemTiming } from '../sim/core/timings';
 import type { BuildingId } from '../sim/buildings/catalog';
 import type { ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
@@ -142,6 +143,8 @@ export interface DebugStats {
   mapSize: number;
   seed: number;
   simTick: number;
+  /** The slowest simulation hooks so far this game (sim/core/timings.ts). */
+  systems: readonly SystemTiming[];
 }
 
 type Listener<T> = (payload: T) => void;

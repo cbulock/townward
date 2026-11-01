@@ -116,6 +116,27 @@ body,
   font-weight: 500;
 }
 
+.debug-section {
+  margin: 10px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-panel);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* A dt/dd pair kept together for React keys, laid out by the dl's grid. */
+.debug-row {
+  display: contents;
+}
+.debug-overlay dd.warn {
+  color: var(--warn);
+}
+.debug-overlay dd.bad {
+  color: var(--danger);
+}
+
 /* ---------- Controls hint ---------- */
 .controls-hint {
   bottom: 20px;

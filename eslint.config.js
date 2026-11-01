@@ -35,6 +35,15 @@ export default tseslint.config(
     },
   },
   {
+    // Sim, shared code and scripts run straight on Node's TypeScript support (pnpm sim:run, the
+    // server, later the Worker), which only strips types: no parameter properties or enums.
+    files: ['src/sim/**/*.ts', 'src/shared/**/*.ts', 'scripts/**/*.ts', 'server/**/*.ts'],
+    rules: {
+      '@typescript-eslint/parameter-properties': 'error',
+      'no-restricted-syntax': ['error', { selector: 'TSEnumDeclaration', message: 'Use an `as const` object (erasable syntax only).' }],
+    },
+  },
+  {
     // The simulation must stay pure: no rendering, UI or DOM dependencies.
     files: ['src/sim/**/*.ts'],
     rules: {

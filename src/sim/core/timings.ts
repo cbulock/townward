@@ -51,3 +51,25 @@ export class SystemTimings {
     this.entries.clear();
   }
 }
+
+/**
+ * Per-call budgets in ms (docs/05-master-plan.md §13), for `pnpm bench`. A hook over 1.5× its
+ * budget fails the strict bench. Day work is budgeted as if it ran in one tick until
+ * time-slicing (step 11.3) spreads it out.
+ */
+export const SYSTEM_BUDGETS_MS: Readonly<Record<string, number>> = {
+  'commute.day': 25,
+  'commute.change': 25,
+  'needs.day': 4,
+  'needs.change': 4,
+  'growth.day': 2,
+  'traffic.day': 2,
+  'traffic.change': 2,
+  'traffic.frame': 1,
+  'access.change': 1,
+  'utilities.change': 1,
+  'coverage.change': 1,
+  'population.day': 1,
+  'fire.day': 1,
+  'budget.month': 1,
+};

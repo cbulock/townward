@@ -24,7 +24,7 @@ import { happinessColor, type OverlayTile } from '../render/Renderer';
 import { rectTiles, RoadType, roadMask, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
-import { deserialize, serialize, type SaveData } from '../sim/save';
+import { loadSimulation, serialize, type SaveData } from '../sim/save';
 import type { TerrainSettings } from '../sim/terrain/presets';
 import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
@@ -121,8 +121,9 @@ export class Game {
   private edits = 0;
   private readonly options: GameOptions;
 
-  private constructor(city: City, renderer: Renderer, options: GameOptions) {
-    this.city = city;
+  private constructor(sim: Simulation, renderer: Renderer, options: GameOptions) {
+    this.sim = sim;
+    this.city = sim.city;
     this.options = options;
     this.renderer = renderer;
     this.input = new InputController(renderer.app.canvas, renderer.camera, {
@@ -134,7 +135,6 @@ export class Game {
       onCancel: () => this.cancel(),
       onClick: (p) => this.onClick(p),
     });
-    this.sim = new Simulation(city);
     renderer.setAgentSource(
       () => this.traffic.agents,
       () => this.traffic.stops,
@@ -149,15 +149,24 @@ export class Game {
   }
 
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
-    const city = opts.save ? deserialize(opts.save) : new City(generateTerrain(opts.terrain), opts.funds);
-    const world = city.world;
-    const demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
+    // A saved city comes back with its systems already up to date (and continues exactly).
+    let sim: Simulation;
+    let demo: ReturnType<typeof buildDemoCity> | null = null;
+    if (opts.save) {
+      sim = loadSimulation(opts.save);
+    } else {
+      const city = new City(generateTerrain(opts.terrain), opts.funds);
+      demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
+      sim = new Simulation(city);
+      if (demo) sim.worldChanged({ roads: true });
+    }
+    const world = sim.world;
     const renderer = await Renderer.create(host, world);
-    const game = new Game(city, renderer, opts);
-    // Start over downtown (a little zoomed out), or over the middle of a saved city.
+    const game = new Game(sim, renderer, opts);
+    // Start over downtown (a little zoomed out), or over what the player built in a saved city.
     const centre = demo?.centre ?? (opts.save ? builtCentre(world) : null);
     if (centre) {
-      game.afterWorldChange(true);
+      game.afterSimChange();
       const p = tileToWorld(centre.x, centre.y);
       renderer.camera.jumpTo(p.x, p.y, 0.8);
     }
@@ -172,7 +181,7 @@ export class Game {
 
   /** The city as a save (docs/specs/saving.md). A few ms even for a big city. */
   snapshot(): SaveData {
-    return serialize(this.city, this.options.terrain, this.options.name);
+    return serialize(this.city, this.options.terrain, this.options.name, this.sim);
   }
 
   get changeStamp(): ChangeStamp {
@@ -844,6 +853,7 @@ export class Game {
         mapSize: this.world.width,
         seed: this.world.seed,
         simTick: this.simTick,
+        systems: this.sim.timings.snapshot().slice(0, 5),
       });
       this.statsTimer = 0;
       this.statsFrames = 0;

@@ -102,6 +102,14 @@ class Heap {
   }
 }
 
+/** The commute model's day-to-day memory: smoothed volume and each home's commute. */
+export interface CommuteState {
+  /** Per tile (0 off-road). */
+  readonly volume: Float32Array;
+  /** Minutes per home building id. */
+  readonly minutes: ReadonlyMap<number, number>;
+}
+
 export class CommuteSystem implements SimSystem {
   readonly name = 'commute';
   /** Smoothed commuters per day crossing each tile (0 off-road). */
@@ -135,6 +143,23 @@ export class CommuteSystem implements SimSystem {
 
   onWorldChanged(change: WorldChange) {
     if (change.roads) this.compute();
+  }
+
+  /** What carries over from one day to the next (saved, so a loaded city continues exactly). */
+  exportState(): CommuteState {
+    return { volume: this.volume, minutes: this.commuteMinutes };
+  }
+
+  /** Put back a saved state, on top of a fresh compute (sim/save.ts, loadSimulation). */
+  restoreState(state: CommuteState) {
+    const w = this.world;
+    for (let i = 0; i < this.volume.length; i++) {
+      this.volume[i] = w.road[i] === RoadType.None ? 0 : state.volume[i];
+      this.congestion[i] = w.road[i] === RoadType.None ? 0 : this.volume[i] / this.capacity(i);
+    }
+    this.commuteMinutes.clear();
+    for (const [id, m] of state.minutes) this.commuteMinutes.set(id, m);
+    this.computed = true;
   }
 
   onDay() {

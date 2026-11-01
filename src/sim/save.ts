@@ -1,5 +1,6 @@
 import { BUILDING_IDS, BUILDINGS, type BuildingId } from './buildings/catalog';
 import { City } from './City';
+import { Simulation } from './core/Simulation';
 import { BridgeAxis, RoadType } from './roads';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
@@ -47,6 +48,21 @@ export interface SavedLayers {
   readonly cleared: string;
 }
 
+/**
+ * The simulation's day-to-day memory, so a loaded city continues exactly as the running one
+ * would have (docs/specs/engine.md, "Determinism"). Optional: saves without it load with
+ * fresh random streams and a cold commute model.
+ */
+export interface SavedSimState {
+  /** RandomStream states. */
+  readonly growth: number;
+  readonly fire: number;
+  /** Smoothed commute volume on each road tile, in tile order: float32, base64. */
+  readonly volume: string;
+  /** Commute minutes per building, in `buildings` order (NaN = none): float64, base64. */
+  readonly minutes: string;
+}
+
 export interface SaveData {
   readonly v: typeof SAVE_VERSION;
   /** GENERATOR_VERSION of the terrain these layers were drawn on. */
@@ -56,6 +72,7 @@ export interface SaveData {
   readonly city: SavedCity;
   readonly layers: SavedLayers;
   readonly buildings: readonly SavedBuilding[];
+  readonly sim?: SavedSimState;
 }
 
 /** What the city list shows without loading the city. */
@@ -73,7 +90,8 @@ export class SaveError extends Error {}
 
 // ---------------------------------------------------------------- serialize
 
-export function serialize(city: City, terrain: TerrainSettings, name: string): SaveData {
+/** Save a city; pass its Simulation too so a load continues exactly (see SavedSimState). */
+export function serialize(city: City, terrain: TerrainSettings, name: string, sim?: Simulation): SaveData {
   const w = city.world;
   const cleared = new Uint8Array(w.width * w.height);
   for (let i = 0; i < cleared.length; i++) cleared[i] = w.tree[i] === 0 && w.decor[i] === Decor.None ? 1 : 0;
@@ -100,6 +118,22 @@ export function serialize(city: City, terrain: TerrainSettings, name: string): S
     city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate },
     layers: { road: encodeLayer(w.road), bridge: encodeLayer(w.bridge), zone: encodeLayer(w.zone), cleared: encodeLayer(cleared) },
     buildings,
+    ...(sim && { sim: saveSimState(sim) }),
+  };
+}
+
+function saveSimState(sim: Simulation): SavedSimState {
+  const w = sim.world;
+  const { volume, minutes } = sim.commute.exportState();
+  const roadVolume: number[] = [];
+  for (let i = 0; i < w.road.length; i++) if (w.road[i] !== RoadType.None) roadVolume.push(volume[i]);
+  const perBuilding: number[] = [];
+  for (const b of w.buildings.values()) perBuilding.push(minutes.get(b.id) ?? NaN);
+  return {
+    growth: sim.streams.growth.state,
+    fire: sim.streams.fire.state,
+    volume: toBase64(new Uint8Array(Float32Array.from(roadVolume).buffer)),
+    minutes: toBase64(new Uint8Array(Float64Array.from(perBuilding).buffer)),
   };
 }
 
@@ -138,6 +172,44 @@ export function deserialize(data: SaveData): City {
   city.clock = data.city.clock;
   city.taxRate = data.city.taxRate;
   return city;
+}
+
+/**
+ * Load a save into a running Simulation: rebuild the city, bring every system up to date,
+ * then put back the saved day-to-day state (random streams, commute) and re-score needs from it.
+ */
+export function loadSimulation(data: SaveData): Simulation {
+  const city = deserialize(data);
+  const sim = new Simulation(city);
+  sim.worldChanged({ roads: true });
+  if (data.sim) restoreSimState(sim, data.sim);
+  return sim;
+}
+
+function restoreSimState(sim: Simulation, saved: SavedSimState) {
+  const w = sim.world;
+  sim.streams.growth.state = saved.growth;
+  sim.streams.fire.state = saved.fire;
+  const roadVolume = floatsFrom(saved.volume, Float32Array);
+  const volume = new Float32Array(w.road.length);
+  let k = 0;
+  for (let i = 0; i < w.road.length && k < roadVolume.length; i++) if (w.road[i] !== RoadType.None) volume[i] = roadVolume[k++];
+  const perBuilding = floatsFrom(saved.minutes, Float64Array);
+  const minutes = new Map<number, number>();
+  let j = 0;
+  for (const b of w.buildings.values()) {
+    const m = perBuilding[j++];
+    if (m !== undefined && !Number.isNaN(m)) minutes.set(b.id, m);
+  }
+  sim.commute.restoreState({ volume, minutes });
+  sim.needs.onWorldChanged();
+}
+
+/** Decode base64 bytes as a float array; a corrupt or misaligned blob decodes to nothing. */
+function floatsFrom<T extends Float32Array | Float64Array>(text: string, Kind: { new (b: ArrayBuffer): T; readonly BYTES_PER_ELEMENT: number }): T {
+  const bytes = fromBase64(text);
+  const usable = bytes.length - (bytes.length % Kind.BYTES_PER_ELEMENT);
+  return new Kind(bytes.slice(0, usable).buffer);
 }
 
 const ROAD_VALUES: ReadonlySet<number> = new Set(Object.values(RoadType));
@@ -230,7 +302,16 @@ export function parseSave(json: unknown): SaveData {
     city: { funds: num(c, 'funds'), day: num(c, 'day', 0), clock: num(c, 'clock', 0), taxRate: num(c, 'taxRate', 0, 100) },
     layers: { road: str(l, 'road'), bridge: str(l, 'bridge'), zone: str(l, 'zone'), cleared: str(l, 'cleared') },
     buildings,
+    ...parseSimState(json.sim),
   };
+}
+
+/** The optional sim block; anything malformed is dropped (the city still loads, just cold). */
+function parseSimState(v: unknown): { sim?: SavedSimState } {
+  if (!isObj(v)) return {};
+  const { growth, fire, volume, minutes } = v;
+  if (!isInt(growth) || !isInt(fire) || typeof volume !== 'string' || typeof minutes !== 'string') return {};
+  return { sim: { growth, fire, volume, minutes } };
 }
 
 // ---------------------------------------------------------------- layer encoding
