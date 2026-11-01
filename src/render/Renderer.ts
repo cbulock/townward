@@ -20,6 +20,7 @@ import { mapWorldBounds, tileToWorld, worldToTileFloat } from './iso';
 import { HoverHighlight } from './overlays/HoverHighlight';
 import { ToolPreview } from './overlays/ToolPreview';
 import { Effects } from './fx/Effects';
+import { Rotors } from './fx/Rotors';
 import { Smoke } from './fx/Smoke';
 import { AgentRenderer } from './agents/AgentRenderer';
 import { Indicators } from './overlays/Indicators';
@@ -85,6 +86,10 @@ export class Renderer {
   effects!: Effects;
   /** Animated plumes from smokestacks and cooling towers. */
   smoke!: Smoke;
+  /** Spinning wind-turbine blades. */
+  rotors!: Rotors;
+  /** Blade speed in radians per real second (set by the game from wind and game speed). */
+  private rotorSpin: () => number = () => 0;
   agents!: AgentRenderer;
   indicators!: Indicators;
   private viewWorld!: ViewWorld;
@@ -151,6 +156,11 @@ export class Renderer {
   }
 
   /** Where the complaint bubbles read each building's needs from. */
+  /** How fast turbine blades turn, in radians per real second. */
+  setRotorSpin(spin: () => number) {
+    this.rotorSpin = spin;
+  }
+
   setNeedsSource(source: () => ReadonlyMap<number, BuildingNeeds>) {
     this.needsSource = source;
   }
@@ -196,6 +206,7 @@ export class Renderer {
     this.textures = tex;
     this.effects = new Effects(tex.fx, this.viewRef);
     this.smoke = new Smoke(tex.fx.puff, this.viewRef);
+    this.rotors = new Rotors(this.viewRef);
     this.agents = new AgentRenderer(tex, this.viewRef);
     this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater }, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
@@ -208,7 +219,7 @@ export class Renderer {
 
     this.daylight.blendMode = 'multiply';
     this.daylight.visible = false;
-    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.smoke.container, this.effects.container, this.daylight, this.overlay);
+    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.rotors.container, this.smoke.container, this.effects.container, this.daylight, this.overlay);
     this.app.stage.addChild(this.worldRoot);
 
     this.camera.setScreenSize(this.app.screen.width, this.app.screen.height);
@@ -227,6 +238,7 @@ export class Renderer {
     this.viewWorld.sync(this.world);
     this.viewRef.ground = this.viewWorld;
     this.smoke?.invalidate();
+    this.rotors?.invalidate();
     this.ground = new ChunkRenderer(this.viewWorld, this.textures);
     this.border = new BorderRenderer(this.ext, this.ring, this.viewWorld, this.view.r, this.textures);
     this.terrain.addChild(
@@ -383,6 +395,7 @@ export class Renderer {
     this.toolPreview.update(dt);
     this.effects.update(dt);
     this.smoke.update(dt, viewRect, cam.zoom);
+    this.rotors.update(dt, viewRect, this.rotorSpin());
     this.indicators.update(dt);
     this.bubbles.update(dt, this.world, this.needsSource(), viewRect, cam.zoom);
 

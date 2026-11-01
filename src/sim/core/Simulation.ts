@@ -1,4 +1,5 @@
 import { BALANCE } from '../../shared/balance';
+import { SIM_TICK_HZ } from '../../shared/constants';
 import { RandomStream, subSeed } from '../../shared/rng';
 import type { City } from '../City';
 import { AccessSystem, updateRoadAccess } from '../systems/access';
@@ -14,6 +15,9 @@ import { UtilitiesSystem, updateUtilities, type UtilityReport } from '../systems
 import type { World } from '../World';
 import { emptyOutcome, type DayOutcome, type SimSystem, type WorldChange } from './System';
 import { SystemTimings } from './timings';
+
+/** A calendar day every this many ticks. */
+export const TICKS_PER_DAY = BALANCE.secondsPerDay * SIM_TICK_HZ;
 
 /** Salts for the systems' random streams (each system gets its own, so they never interfere). */
 const SALT = { growth: 0x6077, fire: 0xf12e } as const;
@@ -48,7 +52,7 @@ export class Simulation {
     this.city = city;
     const world = city.world;
     this.access = new AccessSystem(world);
-    this.utilities = new UtilitiesSystem(world);
+    this.utilities = new UtilitiesSystem(world, () => ({ hour: Math.floor(city.hour), day: city.day, seed: world.seed, step: false }));
     this.coverage = new CoverageSystem(world);
     // Mixing in the day means a loaded city doesn't replay the events of day 0 (identical for new cities).
     const seed = world.seed ^ city.day;
@@ -88,9 +92,26 @@ export class Simulation {
     return out;
   }
 
-  /** Every frame: `dt` in sim seconds, already scaled by game speed. */
+  /**
+   * One fixed tick (1 / SIM_TICK_HZ sim seconds): advances the clock, runs the hourly work on
+   * each clock-hour boundary, and a whole day every TICKS_PER_DAY ticks. The only way sim time
+   * moves (D-068). Returns the day's outcome when a day ran.
+   */
+  tick(): DayOutcome | null {
+    const before = Math.floor(this.city.hour);
+    this.city.ticks++;
+    const hour = Math.floor(this.city.hour);
+    if (hour !== before) this.timings.run('utilities.hour', () => this.utilities.onHour(hour, this.city.day));
+    return this.city.ticks % TICKS_PER_DAY === 0 ? this.day() : null;
+  }
+
+  /** Run whole days through tick(), as the game does (harness, tests). */
+  runDays(days: number) {
+    for (let t = 0; t < days * TICKS_PER_DAY; t++) this.tick();
+  }
+
+  /** Every frame, for the visible agents only: `dt` in sim seconds, already scaled by game speed. */
   frame(dt: number) {
-    this.city.clock += dt;
     this.timings.run('traffic.frame', () => this.traffic.onFrame(dt, this.city.hour));
   }
 }

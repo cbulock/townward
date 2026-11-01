@@ -21,7 +21,7 @@ function BuildingThumb({ id }: { id: BuildingId }) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, ((THUMB - f.w * scale) / 2) * dpr, (THUMB - f.h * scale) * dpr);
-    paintBuilding(ctx, id, 0);
+    paintBuilding(ctx, id, 0, 0, { stillParts: true });
   }, [id]);
   return <canvas ref={ref} className="building-thumb" style={{ width: THUMB, height: THUMB }} aria-hidden="true" />;
 }

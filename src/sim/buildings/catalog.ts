@@ -7,6 +7,17 @@ export type BuildingCategory = 'residential' | 'commercial' | 'industrial' | 'ci
 /** City services with a coverage area (docs/specs/core.md). */
 export type ServiceKind = 'police' | 'fire' | 'health' | 'education';
 export const SERVICE_KINDS: readonly ServiceKind[] = ['police', 'fire', 'health', 'education'];
+/** How a power building makes (or stores) its power (docs/specs/energy.md). */
+export type EnergySource = 'coal' | 'gas' | 'wind' | 'solar' | 'battery';
+export const ENERGY_SOURCES: readonly EnergySource[] = ['coal', 'gas', 'wind', 'solar', 'battery'];
+
+export interface EnergyDef {
+  readonly source: EnergySource;
+  /** Batteries: how much they hold, and how much they can take in or give out per clock hour. */
+  readonly storage?: number;
+  readonly rate?: number;
+}
+
 /** Civic panel tabs. */
 export type CivicGroup = 'services' | 'utilities' | 'parks';
 
@@ -30,8 +41,10 @@ export interface BuildingDef {
   /** Services: what it provides and how far (tiles from the footprint centre). */
   service?: ServiceKind;
   radius?: number;
-  /** Utilities: power and water supplied to buildings on the same road network. */
+  /** Utilities: power and water supplied to buildings on the same road network (power: peak output). */
   supplies?: { power?: number; water?: number };
+  /** Power buildings: what drives their output (sim/systems/energy.ts). */
+  energy?: EnergyDef;
 }
 
 export const BUILDINGS = {
@@ -287,7 +300,7 @@ export const BUILDINGS = {
     radius: 14,
   },
   power_plant: {
-    name: 'Power Plant',
+    name: 'Coal Power Plant',
     category: 'civic',
     zone: null,
     density: null,
@@ -299,6 +312,66 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 150,
     supplies: { power: 4000 },
+    energy: { source: 'coal' },
+  },
+  gas_plant: {
+    name: 'Gas Power Plant',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 6500,
+    capacity: 30,
+    description: 'Steady power day and night with half the smoke of coal, but costly to run.',
+    group: 'utilities',
+    upkeep: 260,
+    supplies: { power: 5000 },
+    energy: { source: 'gas' },
+  },
+  wind_turbine: {
+    name: 'Wind Turbine',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 900,
+    capacity: 2,
+    description: 'Clean power that rises and falls with the wind over the days.',
+    group: 'utilities',
+    upkeep: 15,
+    supplies: { power: 450 },
+    energy: { source: 'wind' },
+  },
+  solar_farm: {
+    name: 'Solar Farm',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 3200,
+    capacity: 3,
+    description: 'Clean power while the sun is up, and none at night. Pair it with batteries.',
+    group: 'utilities',
+    upkeep: 30,
+    supplies: { power: 1000 },
+    energy: { source: 'solar' },
+  },
+  battery_bank: {
+    name: 'Battery Bank',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 2500,
+    capacity: 2,
+    description: 'Stores spare power and gives it back when demand peaks or the sun goes down.',
+    group: 'utilities',
+    upkeep: 25,
+    energy: { source: 'battery', storage: 2400, rate: 800 },
   },
   water_tower: {
     name: 'Water Tower',
@@ -374,6 +447,8 @@ export interface BuildingInstance {
   moodDays: number;
   /** Run-down and empty after a long unhappy spell (docs/specs/needs.md). */
   abandoned: boolean;
+  /** Battery banks: power held right now (sim/systems/energy.ts); 0 for everything else. */
+  stored: number;
 }
 
 /** What a caller supplies when placing or growing; the runtime fields start empty. */

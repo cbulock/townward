@@ -61,8 +61,9 @@ sim.timings.reset();
 
 const samples: CitySample[] = [sampleCity(sim)];
 const t1 = performance.now();
+// Through tick(), as the game runs it: the clock, hourly power, then whole days (D-068).
 for (let d = 0; d < days; d++) {
-  sim.day();
+  sim.runDays(1);
   if (sim.city.day % BALANCE.daysPerMonth === 0) samples.push(sampleCity(sim));
 }
 const runMs = performance.now() - t1;

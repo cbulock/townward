@@ -202,6 +202,15 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [ ] 11.5 Road segment graph + Dijkstra + isochrones: `commute.day` under 25 ms on /demo
 - [ ] 11.6 Simulation in a Web Worker: main-thread sim cost under 1 ms per frame
 
+## Feature Track (user order, D-067)
+
+- [x] **A. Energy v2** → [specs/energy.md](specs/energy.md): coal, gas, wind (daily wind), solar (sun curve) and battery banks; demand follows the clock with an evening peak; hourly per-island balance; brownout notice; Energy Mix in the budget panel; deterministic tick clock (D-068); 4 energy tests
+- [ ] **B. Water, sewage and drainage**: shore water pumps, treatment, sewage outlets and plants, river flow carries pollution downstream, storm drains and street flooding (master plan §12.2, §12.2b)
+- [ ] **C. Health and education**: hospital (beds, ambulances), clinic, elementary and high school, university, library, research centre
+- [ ] **D. Proper traffic**: road segment graph + Dijkstra (fixes the 92 ms day), avenues, junction control, isochrone reach for services
+- [ ] **E. Public transport**: stops, player bus lines, mode choice; then trams, metro, rail
+- [ ] **F. Research tree**: points from universities and research centres; energy, mobility and city branches
+
 ## Art Track (runs alongside the phases; D-066)
 
 - [ ] Split tile and building art into small single-purpose modules (ground, water edges, road pieces, bridge parts, furniture, building massing, roofs, facades, rooftop details), refactor first with no visual change

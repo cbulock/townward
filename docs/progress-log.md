@@ -3,6 +3,15 @@
 Newest first. One entry per work session.
 
 
+## 2026-11-01: Feature track A, Energy v2 (D-067, D-068)
+- User direction: focus on the master plan's features (public transport, hospitals, universities, research, proper traffic, drainage, sewage, more advanced water and power). Set the order A–F (D-067) and added drainage (§12.2b) and research (§12.4) to the master plan.
+- **Deterministic clock (D-068):** `City.ticks` and `Simulation.tick()` replace frame-time clock advance. Hours and days come from fixed ticks, so every machine plays a city the same way. The game, the harness (`runDays`) and the tests all use it.
+- **Energy:** Coal (renamed), new Gas Power Plant, Wind Turbine, Solar Farm and Battery Bank. Hourly per-island balance in `sim/systems/energy.ts`: wind and sun are pure functions of seed, day and hour; demand follows an evening-peak curve; batteries charge on surplus and cover shortfalls (charge saved per building, an optional 11th save field). Edits and days re-balance at the current hour without moving charge.
+- **UI:** Energy Mix in the budget panel (a stacked meter by source, demand marker, battery %); a brownout notice once per clock day that explains the fix; refreshed after every edit (it used to wait for the next day: a bug found in the browser test).
+- **Art (D-066 applied):** each new building has its own painter file in `render/atlas/energy/` (`gasPlant`, `windTurbine`, `solarFarm`, `batteryBank`), sharing colour tokens in `energy/tones.ts`; the shared lot helpers moved out of `civicArt.ts` into `lot.ts`.
+- Gas counts as a lighter polluter (0.4 vs coal 0.8) in the clean-air need.
+- Verified: 4 new energy tests (solar browns out at night, batteries carry the evening, steady plants cover every hour, wind varies by day); the determinism test now runs through ticks with solar, wind and batteries; /demo hashes unchanged on three seeds; in Chrome all five plants place and draw, and the panel shows the live mix. 144 tests; typecheck, lint and build are clean.
+
 ## 2026-11-01: Phase 11.1 harness, timings and exact save continuation
 - Started the master plan (05-master-plan.md). Phase 11 is split into six measured steps (specs/engine.md, D-065).
 - **Timings:** every sim hook is timed (`SystemTimings`); F3 shows the five slowest against their budgets.

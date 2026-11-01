@@ -634,11 +634,29 @@ Delivery stays over road islands (D-052). What grows is what's produced and its 
 - **Sewage:** every building makes sewage equal to its water use. Without a **sewage outlet** or **treatment plant** it backs up (a complaint, then health damage). An outlet dumps it into water.
 - **Rivers flow:** each water tile knows its downstream direction (computed once from the generator's river paths). **Water pollution travels downstream**, so an outlet upstream of your pump poisons your own city. Treatment plants remove most of it. This uses the River Valley terrain the game started with.
 
+### 12.2b Drainage (user request, 2026-11-01)
+
+- **Rain** (from the Weather system) falls on every tile. Grass, parks and trees soak most of it up; roads, roofs and paved lots shed it as **runoff**.
+- **Storm drains** come with every road: each road tile drains a little. **Drainage capacity** grows with storm-drain upgrades (a road upgrade, like avenues) and **retention ponds** (2×2 parks that hold water).
+- Runoff that the drains can't take **pools on low streets**: flooded road tiles slow traffic, then close. It ties into the river-flood model (§11.5), which uses the same water-depth field.
+- **Combined sewers:** in older districts, storm water and sewage share pipes. Heavy rain overflows them into the river unless a treatment plant has spare capacity. That's a reason to build separate drains.
+
 ### 12.3 Garbage
 
 - Every building makes garbage daily (more for commerce and density, less with the recycling policy).
 - **Garbage trucks** run rounds from a **landfill** (fills up and pollutes the ground), an **incinerator** (makes power and air pollution) or a **recycling centre** (cuts landfill use, sells materials).
 - Uncollected garbage piles up on the building (visible bags at high zoom), lowers land value and raises sickness.
+
+---
+
+## 12.4 Research (user request, 2026-11-01)
+
+- **Research points** come from universities and **research centres** (new, 2×2, Town stage), scaled by educated workers and funding.
+- Points go into a **research tree** the player picks from, with three branches:
+  - *Energy:* gas turbine efficiency, better batteries, then nuclear and other advanced plants.
+  - *Mobility:* adaptive signals, trams, metro, electric buses (less noise and air).
+  - *City:* better water treatment, drainage materials, recycling, medical upgrades (hospital capacity, ambulance speed).
+- Each upgrade is a **modifier** in the same central table as policies (§11.3), so systems never special-case research. The tree, the progress and the unlocks are saved.
 
 ---
 
@@ -678,6 +696,15 @@ condition 1, wealth from land value.
 ---
 
 ## 15. Phased Roadmap (after Phase 10)
+
+**Current order (user direction, 2026-11-01, D-067):** features first, in this order:
+**A** energy v2 (§12.1) → **B** water, sewage and drainage (§12.2, §12.2b) → **C** health and
+education, with hospitals, universities and research centres (§5.4, §10, §12.4) → **D** proper
+traffic: the road segment graph, avenues and junctions (§4.4, §8) → **E** public transport
+(§9) → **F** the research tree (§12.4). Each step brings the engine pieces it needs (the
+deterministic tick clock arrives with A, the segment graph with D, and so on). The table below
+is the original grouping, kept for reference.
+
 
 Each phase is shippable and keeps 60 FPS. Order follows the dependencies: the engine first,
 then the drivers of evolution (land value and people), then networks that act on them,

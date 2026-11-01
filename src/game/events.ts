@@ -2,6 +2,7 @@ import type { SystemTiming } from '../sim/core/timings';
 import type { BuildingId } from '../sim/buildings/catalog';
 import type { ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
+import type { PowerReport } from '../sim/systems/energy';
 import type { UtilityTotals } from '../sim/systems/utilities';
 import type { CommuteReport } from '../sim/systems/commute';
 import type { NeedKind, NeedsReport } from '../sim/systems/needs';
@@ -66,8 +67,11 @@ export interface BudgetInfo {
   last: BudgetReport | null;
   /** Next month at today's numbers. */
   forecast: BudgetReport;
-  power: UtilityTotals;
+  /** This hour's grid: output by source, demand and battery charge (docs/specs/energy.md). */
+  power: PowerReport;
   water: UtilityTotals;
+  /** Clock hour the grid was balanced for. */
+  hour: number;
 }
 
 /** What a civic building provides (shown in the info panel). */

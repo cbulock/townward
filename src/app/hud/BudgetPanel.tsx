@@ -3,6 +3,7 @@ import type { UtilityTotals } from '../../sim/systems/utilities';
 import { BALANCE } from '../../shared/balance';
 import type { BudgetReport } from '../../sim/systems/budget';
 import { budgetAtom, budgetOpenAtom, gameAtom } from '../atoms';
+import { EnergyMix } from './EnergyMix';
 
 const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString()}`;
 
@@ -99,7 +100,7 @@ export function BudgetPanel() {
       )}
 
       <h3 className="budget-heading">Utilities</h3>
-      <Supply label="⚡ Power" t={info.power} />
+      <EnergyMix power={info.power} hour={info.hour} />
       <Supply label="💧 Water" t={info.water} />
     </aside>
   );

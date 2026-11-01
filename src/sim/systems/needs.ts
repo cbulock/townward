@@ -1,5 +1,5 @@
 import { BALANCE } from '../../shared/balance';
-import { BUILDINGS, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
+import { BUILDINGS, type BuildingDef, type BuildingId, type BuildingInstance } from '../buildings/catalog';
 import type { DayOutcome, SimSystem } from '../core/System';
 import { RoadType } from '../roads';
 import type { World } from '../World';
@@ -46,7 +46,8 @@ const WEIGHTS = {
 
 const RADIUS = { shopping: 12, customers: 12, pollution: 6, parks: 6, highway: 2 } as const;
 /** Pollution weight per source at distance 0 (it falls off linearly to the radius). */
-const POLLUTERS: Readonly<Record<string, number>> = { workshop: 0.25, warehouse: 0.35, factory: 0.7, power_plant: 0.8 };
+/** Clean-air weight of each polluting building (gas burns cleaner than coal; wind, solar and batteries don't pollute). */
+const POLLUTERS: Readonly<Partial<Record<BuildingId, number>>> = { workshop: 0.25, warehouse: 0.35, factory: 0.7, power_plant: 0.8, gas_plant: 0.4 };
 
 /** One building's needs (only the ones it has) and the result. */
 export interface BuildingNeeds {
@@ -156,7 +157,8 @@ export class NeedsSystem implements SimSystem {
     for (const b of all) {
       const d: BuildingDef = BUILDINGS[b.def];
       const c = centre(b);
-      if (POLLUTERS[b.def] && b.construction === 0) polluters.push({ ...c, weight: POLLUTERS[b.def] });
+      const weight = POLLUTERS[b.def];
+      if (weight !== undefined && b.construction === 0) polluters.push({ ...c, weight });
       if (!isActive(b) || b.abandoned) continue;
       if (d.category === 'commercial') shops.push({ ...c, jobs: d.capacity });
       if (d.category === 'residential') homes.push({ ...c, people: b.occupants });

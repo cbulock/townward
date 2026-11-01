@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phase 11 (engine for depth): step 11.1 ✅ (harness, timings, exact save continuation). Phases 0–10 built ✅ |
-| **Next phase** | Step 11.2: city history + Graphs panel (see [specs/engine.md](specs/engine.md)) |
+| **Current phase** | Feature track (D-067): **A. Energy v2 ✅**. Earlier: Phases 0–10 ✅, step 11.1 ✅ (harness, timings, exact saves) |
+| **Next phase** | **B. Water, sewage and drainage** (master plan §12.2, §12.2b; spec to write first) |
 | **Last updated** | 2026-11-01 |
 
 ## Run It
@@ -46,6 +46,7 @@ pnpm typecheck && pnpm lint
 | [specs/saving.md](specs/saving.md) | Save format, accounts, save server, autosave |
 | [05-master-plan.md](05-master-plan.md) | The plan for Phases 11–22: people, land value, transport, economy, government, disasters |
 | [specs/engine.md](specs/engine.md) | Phase 11: harness, timings, determinism, time-slicing, fields, road graph, Worker |
+| [specs/energy.md](specs/energy.md) | Power plants, day/night demand, batteries, the tick clock |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

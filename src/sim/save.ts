@@ -1,4 +1,4 @@
-import { BUILDING_IDS, BUILDINGS, type BuildingId } from './buildings/catalog';
+import { BUILDING_IDS, BUILDINGS, buildingDef, type BuildingId } from './buildings/catalog';
 import { City } from './City';
 import { Simulation } from './core/Simulation';
 import { BridgeAxis, RoadType } from './roads';
@@ -16,8 +16,8 @@ import { ZoneType } from './zones';
 
 export const SAVE_VERSION = 1;
 
-/** `[def, x, y, variant, flags, construction, fullDays, occupants, happiness %, moodDays]`. */
-export type SavedBuilding = readonly [
+/** `[def, x, y, variant, flags, construction, fullDays, occupants, happiness %, moodDays]`: every building has these. */
+type SavedBuildingCore = readonly [
   def: BuildingId,
   x: number,
   y: number,
@@ -29,6 +29,9 @@ export type SavedBuilding = readonly [
   happiness: number,
   moodDays: number,
 ];
+
+/** The core fields, plus `stored` (battery charge) when there is any. */
+export type SavedBuilding = SavedBuildingCore | readonly [...SavedBuildingCore, stored: number];
 
 const FLAG = { grown: 1, abandoned: 2 } as const;
 
@@ -97,7 +100,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
   for (let i = 0; i < cleared.length; i++) cleared[i] = w.tree[i] === 0 && w.decor[i] === Decor.None ? 1 : 0;
   const buildings: SavedBuilding[] = [];
   for (const b of w.buildings.values()) {
-    buildings.push([
+    const core: SavedBuildingCore = [
       b.def,
       b.x,
       b.y,
@@ -108,7 +111,8 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       b.occupants,
       Math.round(b.happiness * 100),
       b.moodDays,
-    ]);
+    ];
+    buildings.push(b.stored > 0 ? [...core, b.stored] : core);
   }
   return {
     v: SAVE_VERSION,
@@ -217,7 +221,7 @@ const BRIDGE_VALUES: ReadonlySet<number> = new Set(Object.values(BridgeAxis));
 const ZONE_VALUES: ReadonlySet<number> = new Set(Object.values(ZoneType));
 
 function addSavedBuilding(world: World, s: SavedBuilding) {
-  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays] = s;
+  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored = 0] = s;
   const { w, h } = BUILDINGS[def].size;
   if (!world.inBounds(x, y) || !world.inBounds(x + w - 1, y + h - 1)) return;
   for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) if (world.building[world.index(tx, ty)] !== -1) return;
@@ -226,6 +230,7 @@ function addSavedBuilding(world: World, s: SavedBuilding) {
   b.happiness = Math.min(1, Math.max(0, happiness / 100));
   b.moodDays = moodDays;
   b.abandoned = (flags & FLAG.abandoned) !== 0;
+  b.stored = Math.max(0, Math.min(stored, buildingDef(def).energy?.storage ?? 0));
 }
 
 // ---------------------------------------------------------------- parse (untrusted JSON → SaveData)
@@ -287,12 +292,13 @@ export function parseSave(json: unknown): SaveData {
   for (const item of list) {
     if (!Array.isArray(item)) continue;
     const fields: readonly unknown[] = item;
-    if (fields.length !== 10) continue;
+    if (fields.length !== 10 && fields.length !== 11) continue;
     const [def, ...rest] = fields;
     if (!isBuildingId(def)) continue;
     if (!rest.every(isInt)) continue;
-    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays] = rest;
-    buildings.push([def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays]);
+    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored] = rest;
+    const core: SavedBuildingCore = [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays];
+    buildings.push(stored === undefined ? core : [...core, stored]);
   }
   return {
     v: SAVE_VERSION,

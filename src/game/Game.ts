@@ -16,6 +16,7 @@ import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
 import { serviceBit } from '../sim/systems/coverage';
+import { windFactor } from '../sim/systems/energy';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
 import { needsUtilities } from '../sim/systems/utilities';
@@ -59,6 +60,9 @@ const STATS_INTERVAL = 0.25;
 const MAX_RIPPLE_TIME = 0.5;
 /** Particle budget shared across all tiles of one action. */
 const PARTICLE_BUDGET = 900;
+/** Turbine blade speed at full wind and 1× (radians per second, about 17 rpm), and its cap at high game speeds. */
+const ROTOR_SPIN = 1.8;
+const ROTOR_SPIN_MAX = 4;
 /** Sim-time multipliers for pause, 1×, 2×, 3×. */
 export const GAME_SPEEDS = [0, 1, 2, 3] as const;
 const DAY_NIGHT_KEY = 'citybuilder.dayNightMode';
@@ -103,7 +107,6 @@ export class Game {
   private toolId: ToolId = 'select';
   private buildingChoice: BuildingId = 'park';
   private speedIndex = 1;
-  private dayTimer = 0;
   private inspected: number | null = null;
   private drag: ToolDrag | null = null;
   private lastPointer: ScreenPoint | null = null;
@@ -117,6 +120,8 @@ export class Game {
   private statsTimer = 0;
   private statsFrames = 0;
   private statsTime = 0;
+  /** The clock day of the last brownout notice (one per clock day). */
+  private brownoutDay = -1;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
   private edits = 0;
   private readonly options: GameOptions;
@@ -141,6 +146,8 @@ export class Game {
       () => this.traffic.lights(),
     );
     renderer.setNeedsSource(() => this.sim.needs.byBuilding);
+    // Blades turn with the day's wind, faster at higher game speeds, and stop when paused.
+    renderer.setRotorSpin(() => Math.min(ROTOR_SPIN_MAX, GAME_SPEEDS[this.speedIndex] * ROTOR_SPIN * windFactor(this.world.seed, this.city.day)));
     this.loop = new GameLoop(
       SIM_TICK_HZ,
       () => this.tick(),
@@ -341,6 +348,8 @@ export class Game {
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
     this.emitInspect();
     this.emitCity();
+    // Power and water change with every edit, not only at the next hour or day.
+    this.emitBudget();
   }
 
   // ---------------------------------------------------------------- simulation
@@ -366,8 +375,7 @@ export class Game {
     }
   }
 
-  private newDay() {
-    const out = this.sim.day();
+  private newDay(out: DayOutcome) {
     this.showDay(out);
     // Congestion changes every day, even when no buildings did.
     if (out.changed.length === 0) this.refreshDataView();
@@ -561,7 +569,7 @@ export class Game {
       this.notify(
         'info',
         kind === 'power'
-          ? 'Buildings need power: build a Power Plant (Civic → Utilities) on the same roads'
+          ? 'Buildings need power: build a power plant (Civic → Utilities) on the same roads. Coal and gas run day and night; wind and solar are clean but vary'
           : 'Buildings need water: build a Water Tower (Civic → Utilities) on the same roads',
       );
     }
@@ -589,7 +597,27 @@ export class Game {
       forecast: this.sim.budget.forecast(),
       power: u.power,
       water: u.water,
+      hour: Math.floor(this.city.hour),
     });
+  }
+
+  /**
+   * A new clock hour: the grid was re-balanced, so refresh the budget panel, and explain the
+   * first brownout of each clock day (docs/specs/energy.md).
+   */
+  private newHour() {
+    this.emitBudget();
+    const p = this.sim.utilities.report.power;
+    const clockDay = Math.floor(this.city.clock / BALANCE.secondsPerClockDay);
+    if (p.short === 0 || this.brownoutDay === clockDay) return;
+    this.brownoutDay = clockDay;
+    const hour = String(Math.floor(this.city.hour)).padStart(2, '0');
+    const cause = p.sources.solar === 0 && p.sources.wind < 1 && p.storage === 0 ? ' Solar makes nothing at night;' : '';
+    this.notify(
+      'error',
+      `Brownout at ${hour}:00: ${p.short} building${p.short === 1 ? '' : 's'} without power.${cause} add Battery Banks or a steady Coal or Gas plant.`,
+    );
+    this.emitCity();
   }
 
   /** Push current city stats to listeners (also used by the UI bridge on connect). */
@@ -816,11 +844,10 @@ export class Game {
   /** Fixed-step simulation: runs SIM_TICK_HZ × speed times per second (GameLoop handles speed). */
   private tick() {
     this.simTick++;
-    this.dayTimer += 1 / SIM_TICK_HZ;
-    if (this.dayTimer >= BALANCE.secondsPerDay) {
-      this.dayTimer -= BALANCE.secondsPerDay;
-      this.newDay();
-    }
+    const hour = Math.floor(this.city.hour);
+    const out = this.sim.tick();
+    if (Math.floor(this.city.hour) !== hour) this.newHour();
+    if (out) this.newDay(out);
   }
 
   private frame(dt: number) {

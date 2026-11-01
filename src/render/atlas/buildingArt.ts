@@ -2,7 +2,9 @@ import { HALF_H, HALF_W } from '../../shared/constants';
 import { mulberry32 } from '../../shared/rng';
 import { ART_VARIANTS, BUILDINGS, type BuildingId } from '../../sim/buildings/catalog';
 import { ART, type BuildingArt, type CustomArtId, type Extra, type Facade, type RecipeId } from './buildingRecipes';
-import { CIVIC_ART, type SmokeSource } from './civicArt';
+import { CIVIC_ART } from './civicArt';
+import type { SmokeSource } from './lot';
+import { paintRotorStill, type RotorSource } from './energy/rotor';
 import { GROUND_PAD } from './geometry';
 import {
   boxOut,
@@ -25,7 +27,7 @@ import {
 } from './isoPaint';
 
 export { BUILDING_ROTATIONS, type BuildingRotation } from './isoPaint';
-export type { SmokeSource } from './civicArt';
+export type { SmokeSource } from './lot';
 
 /**
  * Procedural building art (docs/specs/buildings.md, docs/specs/city-art.md).
@@ -83,6 +85,22 @@ export function buildingFrameSize(id: BuildingId, variant = 0): { w: number; h: 
 }
 
 const smokeCache = new Map<string, readonly SmokeSource[]>();
+const rotorCache = new Map<string, readonly RotorSource[]>();
+
+/** Wind-turbine hubs of a building in view space (render/fx/Rotors.ts spins blades there). */
+export function rotorSources(id: BuildingId, variant: number, rot: BuildingRotation): readonly RotorSource[] {
+  const key = `${id}:${variant}:${rot}`;
+  const hit = rotorCache.get(key);
+  if (hit) return hit;
+  let out: readonly RotorSource[] = [];
+  if (isCustom(id)) {
+    const c = CIVIC_ART[id];
+    const { w, h } = BUILDINGS[id].size;
+    out = c.rotors?.(new Orient(rot, w, h), variant % c.variants) ?? [];
+  }
+  rotorCache.set(key, out);
+  return out;
+}
 
 /**
  * Smokestack and cooling-tower tops of a building in view space (tile units from the
@@ -152,7 +170,12 @@ function resolveMasses(art: BuildingArt, o: Orient): MassBox[] {
   });
 }
 
-export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, variant: number, rot: BuildingRotation = 0) {
+export interface PaintOptions {
+  /** Also paint parts that move in the game (turbine blades) as a still frame: thumbnails. */
+  stillParts?: boolean;
+}
+
+export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, variant: number, rot: BuildingRotation = 0, opts: PaintOptions = {}) {
   const { w, h } = BUILDINGS[id].size;
   const o = new Orient(rot, w, h);
   const iso = new IsoFrame(ctx, GROUND_PAD + o.vh * HALF_W, GROUND_PAD + buildingHeadroom(id, variant));
@@ -160,6 +183,12 @@ export function paintBuilding(ctx: CanvasRenderingContext2D, id: BuildingId, var
   if (isCustom(id)) {
     const c = CIVIC_ART[id];
     c.paint(iso, o, rng, variant % c.variants);
+    if (opts.stillParts) {
+      for (const r of c.rotors?.(o, variant % c.variants) ?? []) {
+        const [x, y] = iso.p(r.u, r.v, r.z);
+        paintRotorStill(ctx, x + r.dx, y, 0.35 + variant);
+      }
+    }
     return;
   }
 

@@ -24,6 +24,9 @@ function town(): Simulation {
     road(k, 8, k, 56);
   }
   applyPlace(city, planPlace(world, 'power_plant', 10, 10), 0);
+  applyPlace(city, planPlace(world, 'solar_farm', 20, 10), 0);
+  applyPlace(city, planPlace(world, 'battery_bank', 23, 10), 0);
+  applyPlace(city, planPlace(world, 'wind_turbine', 24, 10), 0);
   applyPlace(city, planPlace(world, 'water_tower', 14, 10), 0);
   applyPlace(city, planPlace(world, 'water_tower', 15, 10), 0);
   const zone = (x0: number, y0: number, z: ZonedType) =>
@@ -47,19 +50,22 @@ function fingerprint(sim: Simulation) {
     buildings: [...w.buildings.values()].map((b) => [b.def, b.x, b.y, b.variant, b.occupants, b.construction, b.fullDays, b.happiness, b.moodDays, b.abandoned]),
     volume: Array.from(sim.commute.volume),
     streams: [sim.streams.growth.state, sim.streams.fire.state],
+    clock: sim.city.ticks,
+    stored: [...w.buildings.values()].map((b) => b.stored),
   };
 }
 
 describe('determinism (docs/specs/engine.md)', () => {
   it('a saved and reloaded city continues exactly as the running one', () => {
+    // Through tick(), as the game runs, so hourly power and battery steps are covered too.
     const running = town();
-    for (let d = 0; d < 40; d++) running.day();
+    running.runDays(40);
 
     const first = town();
-    for (let d = 0; d < 10; d++) first.day();
+    first.runDays(10);
     const json: unknown = JSON.parse(JSON.stringify(serialize(first.city, terrain, 'Twin', first)));
     const loaded = loadSimulation(parseSave(json));
-    for (let d = 0; d < 30; d++) loaded.day();
+    loaded.runDays(30);
 
     const a = fingerprint(running);
     expect(a.buildings.length).toBeGreaterThan(50); // the town really grew

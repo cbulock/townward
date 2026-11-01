@@ -1,4 +1,5 @@
 import { BALANCE } from '../shared/balance';
+import { SIM_TICK_HZ } from '../shared/constants';
 import type { World } from './World';
 
 /** City-wide state that isn't per-tile: money and the calendar. */
@@ -8,14 +9,26 @@ export class City {
   day = 0;
   /** Tax rate in percent (0 … BALANCE.maxTaxRate). */
   taxRate: number = BALANCE.baseTaxRate;
-  /** Sim seconds on the time-of-day clock (separate from the calendar; see docs/04-ui-ux.md). */
-  clock = 0;
+  /**
+   * Fixed sim ticks since founding (SIM_TICK_HZ per sim second). The time of day comes from
+   * this integer, never from frame time, so every machine plays a city the same way (D-068).
+   */
+  ticks = 0;
 
   readonly world: World;
 
   constructor(world: World, funds: number = BALANCE.startingFunds) {
     this.world = world;
     this.funds = funds;
+  }
+
+  /** Sim seconds on the time-of-day clock (separate from the calendar; see docs/04-ui-ux.md). */
+  get clock(): number {
+    return this.ticks / SIM_TICK_HZ;
+  }
+
+  set clock(seconds: number) {
+    this.ticks = Math.round(seconds * SIM_TICK_HZ);
   }
 
   /** Hour of day, 0 ≤ hour < 24. The clock starts at 07:00. */

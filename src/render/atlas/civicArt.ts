@@ -12,59 +12,24 @@ import {
   type Orient,
   type Rng,
 } from './isoPaint';
+import { at, drawItems, pole, type CivicArt, type Item, type SmokeSource } from './lot';
+import { ENERGY_ART } from './energy';
 import { INK } from './palette';
 import { paintPine } from './treeArt';
 
 /**
- * Buildings with their own painters (docs/specs/city-art.md): parks, the town hall and the
- * two utilities. Everything is laid out in local space (front at +v) and mapped through
+ * Buildings with their own painters (docs/specs/city-art.md): parks, the town hall, the coal
+ * plant and the water tower. Newer painters live in their own modules (energy/, D-066) and are
+ * registered here. Everything is laid out in local space (front at +v) and mapped through
  * `Orient`, and standing items are drawn back to front by view depth.
  */
 
-/** Where an animated plume leaves a building (render/fx/Smoke.ts): view tile point plus height in px. */
-export interface SmokeSource {
-  u: number;
-  v: number;
-  z: number;
-  kind: 'smoke' | 'steam';
-}
-
-export interface CivicArt {
-  variants: number;
-  headroom: (variant: number) => number;
-  paint: (iso: IsoFrame, o: Orient, rng: Rng, variant: number) => void;
-  /** Plume sources in view space (local layout mapped through `o`). */
-  smoke?: (o: Orient, variant: number) => SmokeSource[];
-}
-
-/** Something standing on the lot, drawn in depth order (u + v of its base, view space). */
-interface Item {
-  depth: number;
-  draw: () => void;
-}
-
-function drawItems(items: Item[]) {
-  items.sort((a, b) => a.depth - b.depth);
-  for (const it of items) it.draw();
-}
-
-/** A local point mapped to view space, plus its depth. */
-function at(o: Orient, u: number, v: number): { u: number; v: number; depth: number } {
-  const [vu, vv] = o.point(u, v);
-  return { u: vu, v: vv, depth: vu + vv };
-}
 
 function glazing(iso: IsoFrame, f: FaceRef, a0: number, a1: number, z0: number, z1: number) {
   wallOn(iso, f, a0, a1, z0, z1, f.face === 'sw' ? '#34506b' : shade('#34506b', -0.25));
   wallOn(iso, f, a0, a1, z1 - 0.8, z1, 'rgba(255, 255, 255, 0.35)');
 }
 
-/** Vertical pole from the ground at a view point. */
-function pole(iso: IsoFrame, u: number, v: number, z0: number, z1: number, w: number, color: string) {
-  const [x, y] = iso.p(u, v, z0);
-  iso.ctx.fillStyle = color;
-  iso.ctx.fillRect(x - w / 2, y - (z1 - z0), w, z1 - z0);
-}
 
 function line(iso: IsoFrame, a: readonly [number, number], b: readonly [number, number], color: string, width: number) {
   const c = iso.ctx;
@@ -786,4 +751,5 @@ export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   town_hall: { variants: 3, headroom: () => 72, paint: paintTownHall },
   power_plant: { variants: 3, headroom: () => 92, paint: paintPowerPlant, smoke: powerPlantSmoke },
   water_tower: { variants: 3, headroom: (v) => (v === 0 ? 62 : v === 1 ? 56 : 30), paint: paintWaterTower },
+  ...ENERGY_ART,
 };
