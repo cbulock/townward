@@ -16,9 +16,9 @@ import { roadSpec } from '../roadTypes';
  * complain about their worst need.
  */
 
-export type NeedKind = 'jobs' | 'shopping' | 'safety' | 'health' | 'education' | 'commute' | 'air' | 'parks' | 'workers' | 'customers';
+export type NeedKind = 'jobs' | 'shopping' | 'safety' | 'health' | 'education' | 'commute' | 'traffic' | 'air' | 'parks' | 'workers' | 'customers';
 
-export const NEED_KINDS: readonly NeedKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers'];
+export const NEED_KINDS: readonly NeedKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'traffic', 'air', 'parks', 'workers', 'customers'];
 
 /** Complaint shown for a need, plus one for abandoned buildings. */
 export type ComplaintKind = NeedKind | 'abandoned';
@@ -30,6 +30,7 @@ export const COMPLAINT_TEXT: Readonly<Record<ComplaintKind, string>> = {
   health: 'We need a clinic nearby',
   education: 'We need a school nearby',
   commute: 'The commute is terrible',
+  traffic: 'Traffic is making it hard to reach customers',
   air: 'Too much smoke and noise',
   parks: 'No parks to enjoy',
   workers: "We can't find workers",
@@ -40,11 +41,11 @@ export const COMPLAINT_TEXT: Readonly<Record<ComplaintKind, string>> = {
 /** Need weights per kind of building (they sum to 1). */
 const WEIGHTS = {
   residential: { jobs: 0.2, safety: 0.15, commute: 0.13, shopping: 0.12, air: 0.12, health: 0.1, education: 0.1, parks: 0.08 },
-  commercial: { workers: 0.35, safety: 0.25, customers: 0.25, air: 0.15 },
+  commercial: { workers: 0.3, safety: 0.2, customers: 0.2, traffic: 0.2, air: 0.1 },
   industrial: { workers: 0.6, safety: 0.4 },
 } as const satisfies Record<string, Partial<Record<NeedKind, number>>>;
 
-const RADIUS = { shopping: 12, customers: 12, pollution: 6, parks: 6, highway: 2 } as const;
+const RADIUS = { shopping: 12, pollution: 6, parks: 6, highway: 2 } as const;
 /** Pollution weight per source at distance 0 (it falls off linearly to the radius). */
 /** Clean-air weight of each polluting building (gas burns cleaner than coal; wind, solar and batteries don't pollute). */
 const POLLUTERS: Readonly<Partial<Record<BuildingId, number>>> = { workshop: 0.25, warehouse: 0.35, factory: 0.7, power_plant: 0.8, gas_plant: 0.4 };
@@ -66,6 +67,8 @@ export interface Complaint {
   building: number;
   x: number;
   y: number;
+  /** Authoritative values behind the complaint, shown by the HUD. */
+  stats: readonly { label: string; value: string }[];
 }
 
 export interface NeedsReport {
@@ -144,6 +147,7 @@ export class NeedsSystem implements SimSystem {
     const workforce = stats.population * BALANCE.workforceShare;
     const jobCover = workforce === 0 ? 1 : Math.min(1, stats.jobs / workforce);
     const workerShare = stats.jobs === 0 ? 1 : Math.min(1, stats.workers / stats.jobs);
+    const traffic = this.commute ? Math.max(0, Math.min(1, 1 - Math.max(0, this.commute.report.avgMinutes - 15) / 45)) : 1;
     const police = serviceBit('police');
     const fire = serviceBit('fire');
     const health = serviceBit('health');
@@ -182,7 +186,8 @@ export class NeedsSystem implements SimSystem {
           health: b.services & health ? 1 : 0,
           education: b.services & education ? 1 : 0,
           shops: () => shops.filter((s) => near(c, s, RADIUS.shopping)).reduce((n, s) => n + s.jobs, 0),
-          residents: () => homes.filter((h) => near(c, h, RADIUS.customers)).reduce((n, h) => n + h.people, 0),
+          residents: () => (b.entrance === -1 ? 0 : homes.reduce((n, h) => n + h.people, 0)),
+          traffic,
           parks: () => parks.filter((p) => near(c, p, RADIUS.parks)).length,
           pollution: () => {
             let p = 0;
@@ -221,6 +226,7 @@ export class NeedsSystem implements SimSystem {
       jobCover: number;
       workerShare: number;
       safety: number;
+      traffic: number;
       health: number;
       education: number;
       shops: () => number;
@@ -255,7 +261,9 @@ export class NeedsSystem implements SimSystem {
       case 'workers':
         return ctx.workerShare;
       case 'customers':
-        return Math.min(1, ctx.residents() / 200);
+        return Math.min(1, ctx.residents() / 200) * ctx.traffic;
+      case 'traffic':
+        return ctx.traffic;
     }
   }
 
@@ -297,9 +305,46 @@ export class NeedsSystem implements SimSystem {
     for (const [kind, g] of groups) {
       if (!g.worst) continue;
       const c = centre(g.worst);
-      complaints.push({ kind, text: COMPLAINT_TEXT[kind], count: g.count, building: g.worst.id, x: c.x, y: c.y });
+      complaints.push({
+        kind,
+        text: COMPLAINT_TEXT[kind],
+        count: g.count,
+        building: g.worst.id,
+        x: c.x,
+        y: c.y,
+        stats: this.complaintStats(kind, g.worst),
+      });
     }
     complaints.sort((a, b) => b.count - a.count);
     this.report = { happiness: people === 0 ? 1 : weighted / people, abandoned, complaints: complaints.slice(0, 4) };
+  }
+
+  private complaintStats(kind: ComplaintKind, b: BuildingInstance): readonly { label: string; value: string }[] {
+    const d = BUILDINGS[b.def];
+    if (kind === 'customers') {
+      let residents = 0;
+      for (const home of this.world.buildings.values()) {
+        const homeDef = BUILDINGS[home.def];
+        if (homeDef.category === 'residential' && isActive(home) && !home.abandoned) residents += home.occupants;
+      }
+      return [
+        { label: 'Road-accessible residents', value: `${residents.toLocaleString()} / 200 target` },
+        { label: 'Business capacity', value: `${d.capacity.toLocaleString()} jobs` },
+      ];
+    }
+    if (kind === 'traffic') {
+      const minutes = this.commute?.report.avgMinutes ?? 0;
+      return [{ label: 'Average travel time', value: `${Math.round(minutes)} minutes` }];
+    }
+    if (kind === 'workers') {
+      const stats = cityStats(this.world);
+      return [
+        { label: 'Available workers', value: stats.workers.toLocaleString() },
+        { label: 'Building jobs', value: d.capacity.toLocaleString() },
+      ];
+    }
+    const n = this.byBuilding.get(b.id);
+    if (!n || kind === 'abandoned') return [];
+    return [{ label: 'Need score', value: `${Math.round((n.scores[kind] ?? 0) * 100)}%` }];
   }
 }

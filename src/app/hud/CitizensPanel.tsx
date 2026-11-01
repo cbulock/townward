@@ -11,6 +11,7 @@ const TONE: Readonly<Record<ComplaintKind, string>> = {
   health: '#e23b3b',
   education: '#2f8f5b',
   commute: '#f08a24',
+  traffic: '#ef6c43',
   air: '#8b9097',
   parks: '#3fa34d',
   workers: '#3b6fd8',
@@ -40,8 +41,11 @@ export function CitizensPanel() {
               <i style={{ background: TONE[c.kind] }} />
               <span className="citizens-text">
                 “{c.text}”<span className="citizens-count">{c.count}</span>
+                <span className="citizens-stats">
+                  {c.stats.map((stat) => <span key={stat.label}>{stat.label}: {stat.value}</span>)}
+                </span>
               </span>
-              <button type="button" className="citizens-show" onClick={() => game?.focusTile(c.x, c.y)}>
+              <button type="button" className="citizens-show" onClick={() => game?.focusBuilding(c.building)}>
                 Show me
               </button>
             </li>

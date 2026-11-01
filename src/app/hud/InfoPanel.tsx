@@ -10,6 +10,7 @@ const NEED_LABEL: Readonly<Record<NeedKind, string>> = {
   health: 'Health',
   education: 'Education',
   commute: 'Commute',
+  traffic: 'Traffic',
   air: 'Clean air',
   parks: 'Parks',
   workers: 'Workers',

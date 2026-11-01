@@ -622,6 +622,14 @@ export class Game {
     this.lookAt(this.renderer.view.pointToView(x, y));
   }
 
+  /** Focus and inspect the building selected by a complaint diagnostic. */
+  focusBuilding(id: number) {
+    const b = this.world.buildings.get(id);
+    if (!b) return;
+    this.focusTile(b.x, b.y);
+    this.inspect(id);
+  }
+
   get dayNight(): DayNightMode {
     return this.dayNightMode;
   }

@@ -81,13 +81,13 @@ export function investorScore(world: World): number {
   return Math.max(0, Math.min(1, homes * 0.35 + mood * 0.4 + jobs * 0.25));
 }
 
-function isAffluentBuilding(world: World, id: BuildingId): boolean {
+function isAffluentBuilding(id: BuildingId, confidence: number): boolean {
   const wealth = wealthOf(id);
-  return wealth !== 'luxury' || investorScore(world) >= 0.72;
+  return wealth !== 'luxury' || confidence >= 0.72;
 }
 
-function eligibleBuildings(world: World, ids: readonly BuildingId[]): BuildingId[] {
-  return ids.filter((id) => isAffluentBuilding(world, id));
+function eligibleBuildings(ids: readonly BuildingId[], confidence: number): BuildingId[] {
+  return ids.filter((id) => isAffluentBuilding(id, confidence));
 }
 
 const DEMAND_FLOOR = { r: 50, c: 20, o: 40, i: 20 } as const;
@@ -236,6 +236,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
   }
 
   const demand = zoneDemand(world, taxRate);
+  const confidence = investorScore(world);
   const build = (def: BuildingId, x: number, y: number, occupants = 0) => {
     const { w, h } = BUILDINGS[def].size;
     for (let ty = y; ty < y + h; ty++) {
@@ -281,7 +282,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
       waiting[demandKey(z)] += empty.get(z)?.length ?? 0;
       continue;
     }
-    const ids = eligibleBuildings(world, zonedBuildings(ZONE_LETTER[z], ZONE_DENSITY[z], startLevel(ZONE_LETTER[z], ZONE_DENSITY[z]), 1));
+    const ids = eligibleBuildings(zonedBuildings(ZONE_LETTER[z], ZONE_DENSITY[z], startLevel(ZONE_LETTER[z], ZONE_DENSITY[z]), 1), confidence);
     if (ids.length === 0) continue;
     for (const t of sample(empty.get(z) ?? [], Math.ceil(d * BALANCE.growthPerDay), rng)) build(pick(ids, rng), t.x, t.y);
   }
@@ -308,7 +309,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
       if (budget === 0) break;
       // An earlier merge today may already have absorbed this building.
       if (world.buildings.get(b.id) !== b) continue;
-      if (upgrade(world, b, z, rng, build)) budget--;
+      if (upgrade(world, b, z, rng, build, confidence)) budget--;
     }
   }
 
@@ -317,7 +318,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
 
 type Build = (def: BuildingId, x: number, y: number, occupants?: number) => void;
 
-function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build): boolean {
+function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build, confidence: number): boolean {
   const def: BuildingDef = BUILDINGS[b.def];
   const letter = ZONE_LETTER[zone];
   const density = ZONE_DENSITY[zone];
@@ -333,14 +334,14 @@ function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, b
   };
 
   if (def.size.w === 2) {
-    const two = eligibleBuildings(world, zonedBuildings(letter, density, next, 2));
+    const two = eligibleBuildings(zonedBuildings(letter, density, next, 2), confidence);
     if (two.length === 0) return false;
     replace([b], b.x, b.y, pick(two, rng));
     return true;
   }
 
-  const one = eligibleBuildings(world, zonedBuildings(letter, density, next, 1));
-  const two = eligibleBuildings(world, zonedBuildings(letter, density, next, 2));
+  const one = eligibleBuildings(zonedBuildings(letter, density, next, 1), confidence);
+  const two = eligibleBuildings(zonedBuildings(letter, density, next, 2), confidence);
   const tryMerge = () => {
     if (two.length === 0) return false;
     const square = findMergeSquare(world, b, zone, def.level, rng);

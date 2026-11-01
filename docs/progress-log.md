@@ -21,6 +21,9 @@ Newest first. One entry per work session.
 - Autosaves now also trigger one second after world changes, instead of relying only on the
   45-second timer. This prevents newly grown shops, houses and offices from being lost when
   the player refreshes immediately after development.
+- Customer demand now allows road-accessible businesses to attract residents from across the
+  city. Commercial happiness separates customer availability from traffic quality, so heavy
+  congestion produces a traffic complaint with average travel-time diagnostics.
 
 ## 2026-11-01: Parks and shopping landmarks
 - Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.

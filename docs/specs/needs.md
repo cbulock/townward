@@ -4,6 +4,16 @@ Status: **Implemented** (2026-11-01). Step 3 of the plan (D-057). Residents reac
 
 ## Needs (`sim/systems/needs.ts`, after every change and daily)
 
+Complaint summaries include the same live values used by the needs simulation. For example,
+“Not enough customers” shows road-accessible residents and the business capacity, and its
+Show me action opens the affected building's inspection panel. (`sim/systems/needs.ts`, after every change and daily)
+
+Commercial customers are citywide when the business has road access: residents can drive to
+far-away offices and shops. The customer score uses the city's active residents and is reduced
+by the commute traffic score. Commercial buildings also carry a separate traffic need, so
+congested roads produce “Traffic is making it hard to reach customers” rather than incorrectly
+reporting that there are no customers. (`sim/systems/needs.ts`, after every change and daily)
+
 Every finished, connected zoned building scores each need it has from 0 (bad) to 1 (fine).
 
 | Need | Who | Score |
