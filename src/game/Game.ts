@@ -1,6 +1,7 @@
 import { turn, type Rotation } from '../render/view/ViewTransform';
 import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildingArt';
-import { buildingTexture } from '../render/atlas/tiles';
+import { bridgeTexture, buildingTexture, roadTexture } from '../render/atlas/tiles';
+import { roadVariant } from '../render/atlas/roads';
 import { BRIDGE_ANCHOR_Y, GROUND_PAD } from '../render/atlas/geometry';
 import { Renderer } from '../render/Renderer';
 import { BALANCE } from '../shared/balance';
@@ -18,12 +19,13 @@ import { findEntrance } from '../sim/systems/access';
 import { serviceBit } from '../sim/systems/coverage';
 import { windFactor } from '../sim/systems/energy';
 import { demandFor } from '../sim/systems/growth';
+import { PAVEMENTS, ROAD_SPECS } from '../sim/roadTypes';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
 import { needsUtilities } from '../sim/systems/utilities';
 import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
 import { happinessColor, type OverlayTile } from '../render/Renderer';
-import { rectTiles, RoadType, roadMask, type TilePos } from '../sim/roads';
+import { rectTiles, RoadType, roadMask, type BuildableRoad, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
 import { loadSimulation, serialize, type SaveData } from '../sim/save';
@@ -35,7 +37,7 @@ import type { Point, ViewTransform } from '../render/view/ViewTransform';
 import { EventBus, type DayNightMode, type GameEventMap, type InspectInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { isZoneTool, planTool, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
+import { isRoadTool, isZoneTool, planTool, type RoadToolId, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
 
 export interface GameOptions {
   /** Preset, seed, size and sliders (see sim/terrain/presets.ts). */
@@ -128,6 +130,8 @@ export class Game {
   private readonly waitNoticeDay = { r: -Infinity, c: -Infinity, o: -Infinity, i: -Infinity };
   /** The clock day of the last brownout notice (one per clock day). */
   private brownoutDay = -1;
+  private recentRoadTool: RoadToolId = 'road';
+  private pavementChoice = 0;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
   private edits = 0;
   private readonly options: GameOptions;
@@ -228,7 +232,29 @@ export class Game {
 
   // ---------------------------------------------------------------- tools
 
+  /** The road tool the Roads button returns to. */
+  get lastRoadTool(): RoadToolId {
+    return this.recentRoadTool;
+  }
+
+  /** Footpath style for new roads (0 = each road type's default; else PAVEMENTS index + 1). */
+  get pavement(): number {
+    return this.pavementChoice;
+  }
+
+  setPavement(pave: number) {
+    this.pavementChoice = Math.max(0, Math.min(PAVEMENTS.length, Math.round(pave)));
+    this.sound.play('tool');
+    this.events.emit('pavement', this.pavementChoice);
+  }
+
+  /** The style to store for a road: the pick, if the road has footpaths to pave. */
+  private pavementFor(type: BuildableRoad): number {
+    return ROAD_SPECS[type].pavement ? this.pavementChoice : 0;
+  }
+
   setTool(tool: ToolId) {
+    if (isRoadTool(tool)) this.recentRoadTool = tool;
     if (tool !== this.toolId) this.sound.play('tool');
     this.toolId = tool;
     this.drag = null;
@@ -301,7 +327,7 @@ export class Game {
       }
     }
     let result: ApplyResult;
-    if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType);
+    if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType, this.pavementFor(p.roadType));
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
     else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
     else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
@@ -770,13 +796,20 @@ export class Game {
       const tex = this.renderer.textures;
       const view = this.renderer.view;
       const type = p.roadType;
+      // The look the renderer will use: a one-way direction turned into the view, or the pavement.
+      const variantOf = (t: PlannedTile) => {
+        const i = this.world.index(t.x, t.y);
+        const lane = this.world.lane[i];
+        const viewLane = lane === 0 ? 0 : Math.log2(view.mask(1 << (lane - 1))) + 1;
+        return roadVariant(type, viewLane, this.world.pave[i]);
+      };
       fx.pop(
         tiles.map((t) => ({
           x: t.x,
           y: t.y,
           texture: t.bridge
-            ? tex.bridges[type][view.bridgeAxis(t.bridge)]
-            : tex.roads[type][view.mask(roadMask(this.world, t.x, t.y))],
+            ? bridgeTexture(tex, type, view.bridgeAxis(t.bridge), variantOf(t))
+            : roadTexture(tex, type, view.mask(roadMask(this.world, t.x, t.y)), variantOf(t)),
           anchorY: t.bridge ? BRIDGE_ANCHOR_Y : 0.5,
         })),
         stagger,

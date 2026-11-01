@@ -209,7 +209,8 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [ ] **C. Health and education**: hospital (beds, ambulances), clinic, elementary and high school, university, library, research centre
 - [ ] **D + E. Transport** → [specs/transport.md](specs/transport.md) (D-069), steps T1–T7:
   - [x] T1 Road-type table (`sim/roadTypes.ts`) with every system reading it; **Avenue** (4 lanes, planted median, brick footpaths, median trees and lamps); upgrade in place paying the difference; road art split into `render/atlas/roads/` (one file per type)
-  - [ ] T2 2-tile dual carriageways: Boulevard (6 lanes), Expressway (8 lanes), ramps; pedestrian street; pavement styles
+  - [x] T2 Boulevard (6 lanes) and Expressway (8 lanes) as 2-tile one-way carriageways (`World.lane`), ramps (expressways join only ramps and highways), pedestrian streets (walkers only), pavement styles (concrete, brick, granite setts, promenade; `World.pave`), turnarounds at wide-road ends, one-way routing for commutes and cars, Road picker UI; avenue trees redesigned after user feedback
+  - [ ] **Next (user requests):** Move tool (pick up a building and place it elsewhere); camera: rotate by dragging (middle mouse / Alt) with an animated quarter turn
   - [ ] T3 Flyovers, interchange prefabs, truss / cable-stayed / suspension bridges, tunnels
   - [ ] T4 Road segment graph + Dijkstra (fixes the 92 ms day), junction control, adaptive lights, isochrones
   - [ ] T5 Buses: stops, line tool, depots, line panel, mode choice, transit view

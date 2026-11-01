@@ -2,6 +2,8 @@ import { HALF_W } from '../../shared/constants';
 import { GROUND_FRAME_H, GROUND_FRAME_W, GROUND_PAD } from './geometry';
 import { IsoFrame, paintRoundTree, shade, type Box } from './isoPaint';
 import { paintAvenueFurniture } from './roads/avenueFurniture';
+import { paintPedestrianFurniture } from './roads/pedestrianFurniture';
+import { paintBoulevardFurniture, paintExpresswayFurniture } from './roads/wideFurniture';
 
 /**
  * Street furniture (docs/specs/city-art.md): one sprite per road tile, drawn in the objects
@@ -26,7 +28,10 @@ export type FurniturePiece =
   | { kind: 'highwayLamp'; axis: RoadAxis }
   | { kind: 'gantry'; axis: RoadAxis }
   | { kind: 'overbridge'; axis: RoadAxis }
-  | { kind: 'avenue'; axis: RoadAxis; style: number };
+  | { kind: 'avenue'; axis: RoadAxis; style: number }
+  | { kind: 'boulevard'; dir: number; style: number }
+  | { kind: 'expressway'; dir: number; style: number }
+  | { kind: 'pedestrian'; axis: RoadAxis; style: number };
 
 export const POLE = '#545b64';
 export const LAMP = '#fff1b8';
@@ -127,6 +132,15 @@ export function paintFurniture(ctx: CanvasRenderingContext2D, piece: FurniturePi
       return;
     case 'avenue':
       paintAvenueFurniture(iso, piece.axis, piece.style);
+      return;
+    case 'boulevard':
+      paintBoulevardFurniture(iso, piece.dir, piece.style);
+      return;
+    case 'expressway':
+      paintExpresswayFurniture(iso, piece.dir, piece.style);
+      return;
+    case 'pedestrian':
+      paintPedestrianFurniture(iso, piece.axis, piece.style);
       return;
   }
 }

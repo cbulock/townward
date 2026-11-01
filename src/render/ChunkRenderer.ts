@@ -19,7 +19,8 @@ import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { FURNITURE_HEADROOM } from './atlas/streetArt';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/palette';
-import { buildingTexture, type TerrainTextures } from './atlas/tiles';
+import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from './atlas/tiles';
+import { roadVariant } from './atlas/roads';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
 import { TREE_VARIANTS } from './atlas/treeArt';
 import { tileToWorld } from './iso';
@@ -183,13 +184,15 @@ export class ChunkRenderer {
         const bridge = w.bridge[w.index(x, y)];
         if (!bridge) {
           const shade = shadeColor(1);
-          const texture = this.tex.roads[type as BuildableRoad][roadMask(w, x, y)];
+          const variant = roadVariant(type as BuildableRoad, w.lane[w.index(x, y)], w.pave[w.index(x, y)]);
+          const texture = roadTexture(this.tex, type as BuildableRoad, roadMask(w, x, y), variant);
           roads.add({ texture, points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
           continue;
         }
         // Bridge decks are level, at the height of the land they start from.
         const p = tileToWorld(x, y);
-        const s = new Sprite(this.tex.bridges[type as BuildableRoad][bridge]);
+        const variant = roadVariant(type as BuildableRoad, w.lane[w.index(x, y)], w.pave[w.index(x, y)]);
+        const s = new Sprite(bridgeTexture(this.tex, type as BuildableRoad, bridge, variant));
         s.x = p.x - HALF_W - GROUND_PAD;
         s.y = p.y - GROUND_PAD - BRIDGE_HEADROOM - this.deckLevel(x, y, bridge) * HEIGHT_STEP;
         c.roads.addChild(s);
@@ -336,6 +339,15 @@ export class ChunkRenderer {
       // Avenues: median trees and lamps on straights; nothing in junctions (the crossings stay clear).
       return straight ? f.avenue[axis][hash % f.avenue[axis].length] : null;
     }
+    if (w.road[i] === RoadType.Pedestrian) return straight ? f.pedestrian[axis][hash % f.pedestrian[axis].length] : null;
+    if (w.lane[i] !== 0) {
+      // One-way carriageways: only plain stretches (both ends joined, nothing from the sides).
+      const d = w.lane[i] - 1;
+      if (mask !== ((1 << d) | (1 << ((d + 2) % 4)))) return null;
+      const set = w.road[i] === RoadType.Expressway ? f.expressway[d] : f.boulevard[d];
+      return set[hash % set.length];
+    }
+    if (w.road[i] === RoadType.Ramp) return null;
     if (straight) {
       const style = hash % 5;
       return style < f.street[axis].length ? f.street[axis][style] : null;

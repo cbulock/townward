@@ -1,6 +1,8 @@
 import { useAtomValue } from 'jotai';
 import { isZoneTool } from '../../game/tools';
 import { toolPreviewAtom } from '../atoms';
+import { isRoadTool, ROAD_TOOLS } from '../../game/tools';
+import { ROAD_SPECS } from '../../sim/roadTypes';
 
 const CURSOR_GAP = 18;
 /** Space the label needs before it flips to the other side of the cursor. */
@@ -12,7 +14,7 @@ export function CostLabel() {
   const p = useAtomValue(toolPreviewAtom);
   if (!p) return null;
 
-  const verb = p.label ?? (p.tool === 'clear' ? 'Clear' : p.tool === 'highway' ? 'Highway' : p.tool === 'avenue' ? 'Avenue' : 'Road');
+  const verb = p.label ?? (p.tool === 'clear' ? 'Clear' : isRoadTool(p.tool) ? ROAD_SPECS[ROAD_TOOLS[p.tool]].name : 'Build');
   const empty = p.count === 0;
   // Flip to the other side of the cursor near the right/bottom edges so the label never clips.
   const flipX = p.screen.x > window.innerWidth - LABEL_ROOM_X;

@@ -3,6 +3,7 @@ import type { Game } from '../game/Game';
 import {
   activeToolAtom,
   buildingChoiceAtom,
+  pavementAtom,
   cityAtom,
   debugStatsAtom,
   fundsAtom,
@@ -35,6 +36,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
   store.set(activeToolAtom, game.tool);
   store.set(mutedAtom, game.muted);
   store.set(buildingChoiceAtom, game.building);
+  store.set(pavementAtom, game.pavement);
   store.set(rotationAtom, game.rotation);
   store.set(dayNightAtom, game.dayNight);
 
@@ -45,6 +47,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('grid', (on) => store.set(gridOnAtom, on)),
     game.events.on('tool', (t) => store.set(activeToolAtom, t)),
     game.events.on('building', (b) => store.set(buildingChoiceAtom, b)),
+    game.events.on('pavement', (p) => store.set(pavementAtom, p)),
     game.events.on('funds', (f) => store.set(fundsAtom, f)),
     game.events.on('muted', (m) => store.set(mutedAtom, m)),
     game.events.on('rotation', (r) => store.set(rotationAtom, r)),

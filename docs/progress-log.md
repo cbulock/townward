@@ -3,6 +3,16 @@
 Newest first. One entry per work session.
 
 
+## 2026-11-01: Transport T2, wide roads, ramps, pedestrian streets, paving
+- **Wide roads:** Boulevard (6 lanes) and Expressway (8 lanes) are two parallel one-way carriageways laid by one straight drag (`World.lane` holds each tile's direction). `roadMask` follows the rules in one place: carriageways join end to end, open into each other at crossings and at their ends (turnarounds), and never sideways otherwise; expressways join only expressways, highways and **ramps**. `stepAllowed` keeps the commute model and visible cars from going against the flow; the trip home is routed fresh on one-way roads.
+- **Pedestrian streets:** paved, car-free, walkable; cars never route through them.
+- **Paving:** concrete, brick, granite setts, promenade, per tile (`World.pave`), picked in the road tool; each road type has a default.
+- **UI:** one Roads button opens a Road picker with cross-section icons, lanes, price and hotkeys (K R V U J H X) and paving chips.
+- **Art (D-066):** one file per road type in `render/atlas/roads/` (+ `paving.ts`, `oneway.ts`, furniture modules). The avenue trees were redesigned after user feedback ("they don't look good"): the city's own clustered-canopy trees at half size, one per tile in grates, alternating with clipped hedges and lamps.
+- Saves gain optional `lane` and `pave` layers.
+- Mid-session the dev build briefly rendered nothing (the road list gained types before their art existed); fixed, and the Fast Refresh warnings were cleared by moving `useCities` and `uniqueCityName` out of component files.
+- Verified: 5 new rule tests (one-way rows, crossings, turnarounds, expressway access, pedestrian routing, saves); a road scene built with the real sim and art modules in Chrome; the Road picker in the game UI. 152 tests; typecheck and lint clean.
+
 ## 2026-11-01: Workers vs jobs fix (Demand v2), transport spec, T1 avenues
 - **"Jobs but people asking for jobs" (user report):** the blue bubbles were factories saying "We can't find workers" (804 workers for 1,515 jobs), and the red bags were homes with nowhere to shop. Industry demand ignored jobs that shops, offices and civic buildings already filled. **Demand v2 (D-070):** four bars (Homes, Shops, Offices, Industry); offices and industry share `open jobs = workforce × 1.05 − all jobs`; shops follow residents. /demo after a year: +1,059 people, +725 workers, power and water shortages 78/121 → 0, commercial no longer stuck at −100%.
 - **Transport spec** (specs/transport.md, D-069): one road-type table; Street, Avenue, Boulevard (6 lanes, 2 tiles), Highway, Expressway (8 lanes, 2 tiles), pedestrian street; pavement styles; flyovers, interchanges, cable-stayed and suspension bridges, tunnels; buses, trams, metro, rail, ferries with mode choice; parks and leisure variety. Steps T1–T7.

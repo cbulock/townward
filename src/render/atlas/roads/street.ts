@@ -1,4 +1,6 @@
-import { armQuad, bits, body, DASHES, dashes, incomingSide, isStraight, onTop } from './kit';
+import type { PavementStyle } from '../../../sim/roadTypes';
+import { armQuad, bits, body, DASHES, dashes, incomingSide, isStraight } from './kit';
+import { pavingLook, pavingPattern } from './paving';
 
 /**
  * Street cross-section (tile units from the centre line), docs/specs/city-art.md. Agents use
@@ -15,22 +17,15 @@ export const STREET = {
   zebra: [0.3, 0.44] as const,
 } as const;
 
-export function paintStreet(ctx: CanvasRenderingContext2D, mask: number) {
+export function paintStreet(ctx: CanvasRenderingContext2D, mask: number, style: PavementStyle = 'concrete') {
   const { road, kerb, footpath, zebra } = STREET;
   const arms = bits(mask);
   const junction = arms.length >= 3;
   // Footpath: an edge, then paving with joints, all the way round junction corners.
-  body(ctx, mask, footpath, '#b7b0a2');
-  body(ctx, mask, footpath - 0.015, '#d8d2c5');
-  onTop(ctx, () => {
-    ctx.fillStyle = 'rgba(90, 80, 60, 0.13)';
-    for (let a = 0.1; a < 1; a += 0.1) {
-      ctx.fillRect(a, 0, 0.008, 1);
-      ctx.fillRect(0, a, 1, 0.008);
-    }
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    for (let k = 0; k < 10; k++) ctx.fillRect(((k * 37) % 19) / 19, ((k * 53) % 17) / 17, 0.1, 0.1);
-  });
+  const look = pavingLook(style);
+  body(ctx, mask, footpath, look.edge);
+  body(ctx, mask, footpath - 0.015, look.base);
+  pavingPattern(ctx, style);
   // Kerb stone, gutter, then the carriageway.
   body(ctx, mask, kerb, '#f0eee8');
   body(ctx, mask, road + 0.01, '#8a8780');

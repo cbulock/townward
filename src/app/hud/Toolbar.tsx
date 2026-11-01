@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { Fragment, type ReactNode } from 'react';
-import type { ToolId } from '../../game/tools';
+import { isRoadTool, type ToolId } from '../../game/tools';
 import { BALANCE } from '../../shared/balance';
 import { activeToolAtom, gameAtom } from '../atoms';
 
@@ -119,41 +119,13 @@ const TOOLS: readonly ToolDef[] = [
   {
     id: 'road',
     group: 'road',
-    label: 'Road',
+    label: 'Roads',
     key: 'R',
-    hint: `Drag to build · $${BALANCE.roadCost}/tile · Shift for straight`,
+    hint: 'Streets, avenues, boulevards, expressways and more · pick a type above',
     icon: (
       <g {...stroke}>
         <path d="M8 3L5 21M16 3l3 18" />
         <path d="M12 4v3M12 10.5v3M12 17v3" />
-      </g>
-    ),
-  },
-  {
-    id: 'avenue',
-    group: 'road',
-    label: 'Avenue',
-    key: 'V',
-    hint: `Drag to build · $${BALANCE.avenueCost}/tile · 4 lanes, planted median · drag over a road to upgrade it`,
-    icon: (
-      <g {...stroke}>
-        <path d="M6 3L3 21M18 3l3 18" />
-        <path d="M12 3v18" strokeWidth="2.6" opacity="0.55" />
-        <path d="M9 5v2.5M8.6 11v2.5M8.2 17v2.5M15 5v2.5M15.4 11v2.5M15.8 17v2.5" />
-      </g>
-    ),
-  },
-  {
-    id: 'highway',
-    group: 'road',
-    label: 'Highway',
-    key: 'H',
-    hint: `Drag to build · $${BALANCE.highwayCost}/tile · Shift for straight`,
-    icon: (
-      <g {...stroke}>
-        <path d="M5 3L2 21M19 3l3 18" />
-        <path d="M11 3l-.5 18M13 3l.5 18" />
-        <path d="M7.5 5v2.5M7 11v2.5M6.5 17v2.5M16.5 5v2.5M17 11v2.5M17.5 17v2.5" />
       </g>
     ),
   },
@@ -162,6 +134,8 @@ const TOOLS: readonly ToolDef[] = [
 export function Toolbar() {
   const game = useAtomValue(gameAtom);
   const active = useAtomValue(activeToolAtom);
+  // Every road type lives behind the one Roads button.
+  const isActive = (id: ToolId) => (id === 'road' ? isRoadTool(active) : active === id);
 
   return (
     <div className="panel toolbar" role="toolbar" aria-label="Build tools">
@@ -170,10 +144,15 @@ export function Toolbar() {
         {k > 0 && TOOLS[k - 1].group !== t.group && <span className="toolbar-divider" aria-hidden="true" />}
         <button
           type="button"
-          className={`tool-button ${t.tone ?? ''} ${active === t.id ? 'is-active' : ''}`}
-          aria-pressed={active === t.id}
+          className={`tool-button ${t.tone ?? ''} ${isActive(t.id) ? 'is-active' : ''}`}
+          aria-pressed={isActive(t.id)}
           disabled={!game}
-          onClick={() => game?.setTool(active === t.id && t.id !== 'select' ? 'select' : t.id)}
+          onClick={() => {
+            if (!game) return;
+            if (isActive(t.id) && t.id !== 'select') game.setTool('select');
+            // The Roads button returns to the road type used last (the picker chooses others).
+            else game.setTool(t.id === 'road' ? game.lastRoadTool : t.id);
+          }}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             {t.icon}

@@ -121,7 +121,7 @@ function links(world: World, x: number, y: number, d: number): boolean {
  * the rules in `links` (docs/specs/transport.md).
  */
 export function roadMask(world: World, x: number, y: number): number {
-  if (world.road[world.index(x, y)] === RoadType.None) return 0;
+  // Also asked of empty tiles (tool previews): then it reports the roads around them.
   let mask = 0;
   for (let d = 0; d < 4; d++) if (links(world, x, y, d)) mask |= 1 << d;
   return mask;

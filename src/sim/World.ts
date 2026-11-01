@@ -71,6 +71,16 @@ export class World {
     return instance;
   }
 
+  /** Move a building's footprint to a new top tile, keeping its id and state. Caller has validated the target. */
+  moveBuilding(id: number, x: number, y: number, w: number, h: number) {
+    const b = this.buildings.get(id);
+    if (!b) return;
+    for (let ty = b.y; ty < b.y + h; ty++) for (let tx = b.x; tx < b.x + w; tx++) this.building[this.index(tx, ty)] = -1;
+    b.x = x;
+    b.y = y;
+    for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) this.building[this.index(tx, ty)] = id;
+  }
+
   removeBuilding(id: number, w: number, h: number) {
     const b = this.buildings.get(id);
     if (!b) return;

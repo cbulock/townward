@@ -18,6 +18,8 @@ export const BALANCE = {
   rampCost: 30,
   rampBridgeCost: 120,
   pedestrianCost: 20,
+  /** Moving a building costs this share of its price (plus clearing the new lot). */
+  moveCostShare: 0.2,
   /** Bridges replace the per-tile road cost while over water. */
   bridgeCost: 60,
   highwayBridgeCost: 160,

@@ -16,6 +16,8 @@ export interface GameEventMap {
   grid: boolean;
   tool: ToolId;
   building: BuildingId;
+  /** Footpath style for new roads (0 = default, else PAVEMENTS index + 1). */
+  pavement: number;
   funds: number;
   /** Live cost label for an in-progress drag; null when there's nothing to show. */
   toolPreview: ToolPreviewInfo | null;

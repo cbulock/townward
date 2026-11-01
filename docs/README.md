@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Transport (specs/transport.md): **T1 ✅** road-type table + Avenue. Earlier: energy ✅, Demand v2 ✅, Phases 0–10 ✅, step 11.1 ✅ |
-| **Next phase** | **T2**: 6-lane Boulevard and 8-lane Expressway (2-tile dual carriageways), ramps, pedestrian street, pavement styles |
+| **Current phase** | Transport (specs/transport.md): T1 ✅ avenue, **T2 ✅** boulevard, expressway, ramps, pedestrian streets, paving |
+| **Next phase** | User requests: Move tool and drag-to-rotate camera; then T3 (flyovers, interchanges, big bridges, tunnels) |
 | **Last updated** | 2026-11-01 |
 
 ## Run It

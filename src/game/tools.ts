@@ -11,11 +11,25 @@ import { BALANCE } from '../shared/balance';
 import { ZONE_TINT } from '../render/atlas/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
+import { ROAD_SPECS } from '../sim/roadTypes';
 
 export type ZoneToolId = 'zone-r' | 'zone-rh' | 'zone-c' | 'zone-ch' | 'zone-i';
 /** Tools that lay roads, and the road type each lays (sim/roadTypes.ts). */
-export const ROAD_TOOLS = { road: RoadType.Road, avenue: RoadType.Avenue, highway: RoadType.Highway } as const satisfies Record<string, BuildableRoad>;
+export const ROAD_TOOLS = {
+  pedestrian: RoadType.Pedestrian,
+  road: RoadType.Road,
+  avenue: RoadType.Avenue,
+  boulevard: RoadType.Boulevard,
+  ramp: RoadType.Ramp,
+  highway: RoadType.Highway,
+  expressway: RoadType.Expressway,
+} as const satisfies Record<string, BuildableRoad>;
 export type RoadToolId = keyof typeof ROAD_TOOLS;
+export const ROAD_TOOL_IDS = Object.keys(ROAD_TOOLS) as RoadToolId[]; // the keys of a literal object, in order
+
+export function isRoadTool(tool: ToolId): tool is RoadToolId {
+  return tool in ROAD_TOOLS;
+}
 
 export type ToolId = 'select' | 'clear' | RoadToolId | 'build' | ZoneToolId;
 
@@ -36,9 +50,13 @@ export function isZoneTool(tool: ToolId): tool is ZoneToolId {
 export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   select: 'KeyQ',
   clear: 'KeyB',
+  pedestrian: 'KeyK',
   road: 'KeyR',
   avenue: 'KeyV',
+  boulevard: 'KeyU',
+  ramp: 'KeyJ',
   highway: 'KeyH',
+  expressway: 'KeyX',
   build: 'KeyE',
   'zone-r': 'Digit1',
   'zone-rh': 'Digit2',
@@ -116,14 +134,14 @@ export function planTool(
   const anchor = drag ?? (hovered ? { start: hovered, current: hovered, straight: false } : null);
   if (!anchor) return null;
 
+  if (isRoadTool(tool)) {
+    const roadType = ROAD_TOOLS[tool];
+    // Two-tile roads are laid in straight runs (docs/specs/transport.md).
+    const straight = anchor.straight || ROAD_SPECS[roadType].width === 2;
+    const path = roadPath(anchor.start, anchor.current, straight);
+    return { kind: 'road', tool, plan: planRoad(world, path, roadType), roadType };
+  }
   switch (tool) {
-    case 'road':
-    case 'avenue':
-    case 'highway': {
-      const roadType = ROAD_TOOLS[tool];
-      const path = roadPath(anchor.start, anchor.current, anchor.straight);
-      return { kind: 'road', tool, plan: planRoad(world, path, roadType), roadType };
-    }
     case 'clear':
       return { kind: 'clear', tool, plan: planClear(world, rectTiles(anchor.start, anchor.current)) };
     case 'build':

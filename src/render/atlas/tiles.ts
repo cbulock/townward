@@ -7,8 +7,11 @@ import { DECOR_VARIANTS, paintDecor } from './decorArt';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
+import { roadVariants } from './roads';
 import { BUILDABLE_ROADS } from '../../sim/roadTypes';
 import { AVENUE_STYLES } from './roads/avenueFurniture';
+import { PEDESTRIAN_STYLES } from './roads/pedestrianFurniture';
+import { WIDE_STYLES } from './roads/wideFurniture';
 import { BUILDING_ROTATIONS, buildingFrameSize, buildingVariantCount, paintBuilding } from './buildingArt';
 import {
   paintPerson,
@@ -72,9 +75,9 @@ export interface TerrainTextures {
   trees: Texture[][];
   /** Decorations, indexed [DecorId][variant]. Index 0 (None) is empty. */
   decor: Texture[][];
-  /** Road pieces, indexed by road type then 4-bit connection mask. */
+  /** Road pieces by road type, then `variant * 16 + mask` (use roadTexture). */
   roads: Readonly<Record<BuildableRoad, Texture[]>>;
-  /** Bridge spans (taller frames: see BRIDGE_HEADROOM), indexed by road type then BridgeAxis (0 is Texture.EMPTY). */
+  /** Bridge spans (taller frames: see BRIDGE_HEADROOM) by road type, then `variant * 3 + BridgeAxis` (use bridgeTexture). */
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Street furniture (streetArt.ts). Mask-indexed arrays hold Texture.EMPTY where a mask has none. */
   furniture: StreetFurniture;
@@ -126,6 +129,11 @@ export interface StreetFurniture {
   overbridge: Readonly<Record<RoadAxis, Texture>>;
   /** Straight avenues, indexed by axis then style (roads/avenueFurniture.ts). */
   avenue: Readonly<Record<RoadAxis, readonly Texture[]>>;
+  /** One-way carriageways, indexed by travel direction then style (roads/wideFurniture.ts). */
+  boulevard: readonly (readonly Texture[])[];
+  expressway: readonly (readonly Texture[])[];
+  /** Pedestrian streets, indexed by axis then style. */
+  pedestrian: Readonly<Record<RoadAxis, readonly Texture[]>>;
 }
 
 const armCount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
@@ -140,9 +148,16 @@ function furniturePieces(): [string, FurniturePiece][] {
     out.push([`furn_gantry_${axis}`, { kind: 'gantry', axis }]);
     out.push([`furn_overbridge_${axis}`, { kind: 'overbridge', axis }]);
     for (let style = 0; style < AVENUE_STYLES; style++) out.push([`furn_avenue_${axis}_${style}`, { kind: 'avenue', axis, style }]);
+    for (let style = 0; style < PEDESTRIAN_STYLES; style++) out.push([`furn_ped_${axis}_${style}`, { kind: 'pedestrian', axis, style }]);
   }
   for (let m = 0; m < 16; m++) {
     if (isBend(m)) out.push([`furn_corner_${m}`, { kind: 'cornerLamp', mask: m }]);
+  }
+  for (let dir = 0; dir < 4; dir++) {
+    for (let style = 0; style < WIDE_STYLES; style++) {
+      out.push([`furn_blvd_${dir}_${style}`, { kind: 'boulevard', dir, style }]);
+      out.push([`furn_xway_${dir}_${style}`, { kind: 'expressway', dir, style }]);
+    }
   }
   return out;
 }
@@ -342,8 +357,10 @@ export function buildTerrainTextures(): TerrainTextures {
     for (let v = 0; v < DECOR_VARIANTS; v++) b.add(`decor_${k}_${v}`, W, TREE_FRAME_H, (ctx) => paintDecor(ctx, k, v));
   }
   for (const t of ROAD_TYPES) {
-    for (let m = 0; m < 16; m++) b.add(`road_${t}_${m}`, W, H, (ctx) => paintRoad(ctx, t, m));
-    for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis));
+    for (let v = 0; v < roadVariants(t); v++) {
+      for (let m = 0; m < 16; m++) b.add(`road_${t}_${v}_${m}`, W, H, (ctx) => paintRoad(ctx, t, m, v));
+      for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${v}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis, v));
+    }
   }
   for (const [name, piece] of furniturePieces()) b.add(name, FURNITURE_FRAME_W, FURNITURE_FRAME_H, (ctx) => paintFurniture(ctx, piece));
   b.add('selection', W, H, paintSelection);
@@ -399,12 +416,15 @@ export function buildTerrainTextures(): TerrainTextures {
     foam: masks('foam'),
     trees: [[], ...([1, 2, 3] as const).map((d) => range(TREE_VARIANTS, (v) => get(`tree_${d}_${v}`)))],
     decor: [[], ...decorKinds.map((k) => range(DECOR_VARIANTS, (v) => get(`decor_${k}_${v}`)))],
-    roads: Object.fromEntries(ROAD_TYPES.map((t) => [t, range(16, (m) => get(`road_${t}_${m}`))])) as Record<
+    roads: Object.fromEntries(ROAD_TYPES.map((t) => [t, range(roadVariants(t) * 16, (k) => get(`road_${t}_${Math.floor(k / 16)}_${k % 16}`))])) as Record<
       BuildableRoad,
       Texture[]
     >,
     bridges: Object.fromEntries(
-      ROAD_TYPES.map((t) => [t, [Texture.EMPTY, get(`bridge_${t}_${BridgeAxis.X}`), get(`bridge_${t}_${BridgeAxis.Y}`)]]),
+      ROAD_TYPES.map((t) => [
+        t,
+        range(roadVariants(t) * 3, (k) => (k % 3 === 0 ? Texture.EMPTY : get(`bridge_${t}_${Math.floor(k / 3)}_${k % 3}`))),
+      ]),
     ) as Record<BuildableRoad, Texture[]>,
     furniture: {
       street: { u: range(STREET_STYLES, (k) => get(`furn_street_u_${k}`)), v: range(STREET_STYLES, (k) => get(`furn_street_v_${k}`)) },
@@ -413,6 +433,9 @@ export function buildTerrainTextures(): TerrainTextures {
       gantry: { u: get('furn_gantry_u'), v: get('furn_gantry_v') },
       overbridge: { u: get('furn_overbridge_u'), v: get('furn_overbridge_v') },
       avenue: { u: range(AVENUE_STYLES, (k) => get(`furn_avenue_u_${k}`)), v: range(AVENUE_STYLES, (k) => get(`furn_avenue_v_${k}`)) },
+      boulevard: range(4, (d) => range(WIDE_STYLES, (k) => get(`furn_blvd_${d}_${k}`))),
+      expressway: range(4, (d) => range(WIDE_STYLES, (k) => get(`furn_xway_${d}_${k}`))),
+      pedestrian: { u: range(PEDESTRIAN_STYLES, (k) => get(`furn_ped_u_${k}`)), v: range(PEDESTRIAN_STYLES, (k) => get(`furn_ped_v_${k}`)) },
     },
     selection: get('selection'),
     zoneLot: get('zone_lot'),
@@ -438,4 +461,13 @@ export function buildTerrainTextures(): TerrainTextures {
     gridLine: get('grid'),
     sources: b.sources,
   };
+}
+
+/** A road piece's texture: its look (direction or pavement, roads/index.ts roadVariant) and connections. */
+export function roadTexture(tex: TerrainTextures, type: BuildableRoad, mask: number, variant: number): Texture {
+  return tex.roads[type][variant * 16 + mask] ?? tex.roads[type][mask];
+}
+
+export function bridgeTexture(tex: TerrainTextures, type: BuildableRoad, axis: number, variant: number): Texture {
+  return tex.bridges[type][variant * 3 + axis] ?? tex.bridges[type][axis];
 }

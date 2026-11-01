@@ -1,4 +1,6 @@
-import { armQuad, bits, body, DASHES, dashes, incomingSide, isStraight, onTop } from './kit';
+import type { PavementStyle } from '../../../sim/roadTypes';
+import { armQuad, bits, body, DASHES, dashes, incomingSide, isStraight } from './kit';
+import { pavingLook, pavingPattern } from './paving';
 
 /**
  * Avenue (docs/specs/transport.md): two lanes each way around a planted median, granite kerbs
@@ -26,10 +28,6 @@ export const AVENUE = {
 
 /** Colour tokens (D-066), kept together so a theme can restyle avenues in one place. */
 const TONE = {
-  pavingEdge: '#b3a48d',
-  paving: '#dccdb4',
-  pavingJoint: 'rgba(110, 80, 50, 0.16)',
-  pavingSheen: 'rgba(255, 245, 225, 0.18)',
   kerb: '#efece5',
   gutter: '#8a867e',
   asphalt: '#3f444c',
@@ -43,23 +41,6 @@ const TONE = {
   shrub: '#3f8a34',
   shrubLight: '#82c95c',
 } as const;
-
-/** Brick paving: running-bond joints across the footpath (cheap: a grid with offset rows). */
-function paving(ctx: CanvasRenderingContext2D) {
-  onTop(ctx, () => {
-    ctx.fillStyle = TONE.pavingJoint;
-    const row = 0.05;
-    for (let r = 0, y = 0; y < 1; r++, y += row) {
-      ctx.fillRect(0, y, 1, 0.006);
-      ctx.fillRect(y, 0, 0.006, 1);
-      // Every other course is shifted half a brick.
-      const shift = r % 2 === 0 ? 0 : row / 2;
-      for (let x = shift; x < 1; x += row * 2) ctx.fillRect(x, y, 0.006, row);
-    }
-    ctx.fillStyle = TONE.pavingSheen;
-    for (let k = 0; k < 12; k++) ctx.fillRect(((k * 41) % 23) / 23, ((k * 29) % 19) / 19, 0.08, 0.05);
-  });
-}
 
 /** The planted median along arm `b` from `from` to the tile edge: kerb, soil, grass and shrubs. */
 function median(ctx: CanvasRenderingContext2D, b: number, from: number) {
@@ -79,15 +60,16 @@ function median(ctx: CanvasRenderingContext2D, b: number, from: number) {
   }
 }
 
-export function paintAvenue(ctx: CanvasRenderingContext2D, mask: number) {
+export function paintAvenue(ctx: CanvasRenderingContext2D, mask: number, style: PavementStyle = 'brick') {
   const { road, kerb, footpath, laneLine, zebra, stopLine, nose } = AVENUE;
   const arms = bits(mask);
   const junction = arms.length >= 3;
 
   // Footpath: edge, then brick paving all round the corners.
-  body(ctx, mask, footpath, TONE.pavingEdge);
-  body(ctx, mask, footpath - 0.015, TONE.paving);
-  paving(ctx);
+  const look = pavingLook(style);
+  body(ctx, mask, footpath, look.edge);
+  body(ctx, mask, footpath - 0.015, look.base);
+  pavingPattern(ctx, style);
   // Kerb, gutter, carriageway.
   body(ctx, mask, kerb, TONE.kerb);
   body(ctx, mask, road + 0.012, TONE.gutter);

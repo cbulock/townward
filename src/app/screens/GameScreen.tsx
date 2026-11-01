@@ -7,6 +7,7 @@ import { authAtom, saveStatusAtom } from '../atoms';
 import { connectGameToStore } from '../bridge';
 import { randomSeed } from '../options';
 import { BuildingPicker } from '../hud/BuildingPicker';
+import { RoadPicker } from '../hud/RoadPicker';
 import { ControlsHint } from '../hud/ControlsHint';
 import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
@@ -130,6 +131,7 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       <InfoPanel />
       <BudgetPanel />
       <BuildingPicker />
+      <RoadPicker />
       <Toolbar />
       <Minimap />
       <TrafficLegend />

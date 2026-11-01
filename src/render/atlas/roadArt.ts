@@ -8,8 +8,8 @@ import { armQuad, bits, body, inTileSpace, PX } from './roads/kit';
  * look lives in its own module under roads/ (D-066); this file paints them into atlas frames.
  */
 
-export function paintRoad(ctx: CanvasRenderingContext2D, type: BuildableRoad, mask: number) {
-  inTileSpace(ctx, () => ROAD_ART[type].paint(ctx, mask));
+export function paintRoad(ctx: CanvasRenderingContext2D, type: BuildableRoad, mask: number, variant = 0) {
+  inTileSpace(ctx, () => ROAD_ART[type].paint(ctx, mask, variant));
 }
 
 /**
@@ -20,7 +20,7 @@ export function paintRoad(ctx: CanvasRenderingContext2D, type: BuildableRoad, ma
  * The deck stays at ground level; height is suggested by everything hanging below it
  * into the water. Drawn in a taller frame: BRIDGE_HEADROOM above, BRIDGE_DROP below.
  */
-export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, axis: number) {
+export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, axis: number, variant = 0) {
   const mask = bridgeAxisMask(axis);
   /** Half-width of the whole deck, out to the parapets. */
   const edge = ROAD_ART[type].deckEdge;
@@ -63,7 +63,7 @@ export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, 
     false,
   );
 
-  inTileSpace(ctx, () => ROAD_ART[type].paint(ctx, mask), BRIDGE_HEADROOM);
+  inTileSpace(ctx, () => ROAD_ART[type].paint(ctx, mask, variant), BRIDGE_HEADROOM);
 
   inTileSpace(
     ctx,

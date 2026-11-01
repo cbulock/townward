@@ -307,6 +307,67 @@ export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyR
   return { ok: true, changed: bounds(plan.tiles), tiles: plan.tiles };
 }
 
+export interface MovePlan extends PlacePlan {
+  /** The building being moved. */
+  moving: number;
+}
+
+/** Can a building move here? Built buildings only, same rules as placing; its own tiles count as free. */
+export function planMove(world: World, id: number, cx: number, cy: number): MovePlan | null {
+  const b = world.buildings.get(id);
+  if (!b) return null;
+  const def = BUILDINGS[b.def];
+  const origin = footprintOrigin(b.def, cx, cy);
+  const tiles: PlannedTile[] = [];
+  let clearing = 0;
+  let ok = b.construction === 0 && (origin.x !== b.x || origin.y !== b.y);
+  for (let y = origin.y; y < origin.y + def.size.h; y++) {
+    for (let x = origin.x; x < origin.x + def.size.w; x++) {
+      if (!world.inBounds(x, y)) {
+        ok = false;
+        continue;
+      }
+      const i = world.index(x, y);
+      const occupant = world.building[i];
+      const valid = !isWater(world, i) && world.terrain[i] !== Terrain.Rock && world.road[i] === RoadType.None && (occupant === -1 || occupant === id);
+      const c = valid ? clearCost(world, i) : 0;
+      tiles.push({ x, y, valid, cost: c });
+      clearing += c;
+      if (!valid) ok = false;
+    }
+  }
+  const fee = Math.round(def.cost * BALANCE.moveCostShare);
+  return { tiles, cost: fee + clearing, count: ok ? 1 : 0, building: b.def, origin, ok, moving: id };
+}
+
+/**
+ * Move a building, keeping everything about it (residents, level, happiness, battery charge).
+ * A grown home or business brings its zone along; the lot it leaves stays zoned, so something
+ * new can grow there.
+ */
+export function applyMove(city: City, plan: MovePlan): ApplyResult {
+  if (!plan.ok) return { ok: false, reason: 'nothing-to-do' };
+  if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
+  const w = city.world;
+  const b = w.buildings.get(plan.moving);
+  if (!b) return { ok: false, reason: 'nothing-to-do' };
+  const def: BuildingDef = BUILDINGS[b.def];
+  const from: TilePos[] = [
+    { x: b.x, y: b.y },
+    { x: b.x + def.size.w - 1, y: b.y + def.size.h - 1 },
+  ];
+  const zone = b.grown && def.zone && def.density ? zoneOf(def.zone, def.density) : ZoneType.None;
+  for (const t of plan.tiles) {
+    const i = w.index(t.x, t.y);
+    w.tree[i] = 0;
+    w.decor[i] = Decor.None;
+    w.zone[i] = zone;
+  }
+  w.moveBuilding(b.id, plan.origin.x, plan.origin.y, def.size.w, def.size.h);
+  city.funds -= plan.cost;
+  return { ok: true, changed: bounds([...from, ...plan.tiles]), tiles: plan.tiles };
+}
+
 /** Remove the building covering tile `i`, if any. Returns its footprint corners for refresh bounds. */
 function removeBuildingAt(w: World, i: number): TilePos[] {
   const b = w.buildings.get(w.building[i]);
