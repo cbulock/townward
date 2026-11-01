@@ -2773,6 +2773,54 @@ button.funds:hover {
   color: var(--paper-dim);
   text-align: right;
 }
+.landing-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 48px;
+  padding: 56px 0 64px;
+  border-top: 1px solid var(--rule);
+}
+.landing-faq details {
+  border-bottom: 1px solid var(--rule);
+}
+.landing-faq details:first-child {
+  border-top: 1px solid var(--rule);
+}
+.landing-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 2px;
+  font-size: 16.5px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.landing-faq summary::-webkit-details-marker {
+  display: none;
+}
+.landing-faq summary::after {
+  content: '+';
+  color: var(--sign);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  transition: transform 150ms ease-out;
+}
+.landing-faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+.landing-faq summary:focus-visible {
+  outline: 2px solid var(--sign);
+  outline-offset: 2px;
+}
+.landing-faq details p {
+  max-width: 620px;
+  margin: 0 0 18px;
+  color: var(--paper-dim);
+  font-size: 15px;
+  line-height: 1.6;
+}
 .landing-footer {
   display: flex;
   align-items: center;
@@ -2792,7 +2840,8 @@ button.funds:hover {
     padding-top: 36px;
   }
   .landing-steps ol,
-  .landing-saves {
+  .landing-saves,
+  .landing-faq {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
   }

@@ -5,6 +5,9 @@ Newest first. One entry per work session.
 ## 2026-11-01: The game is called Openpolis (D-001)
 - Name chosen and domain registered: **Openpolis**, openpolis.space. Browser title, landing wordmark and footer, sign-up heading, package name, Docker image and docs use it. Added a favicon, page description, canonical URL and Open Graph tags.
 - Internal identifiers keep the old `citybuilder` names (browser storage keys, IndexedDB, Postgres) so existing cities and accounts keep working.
+- Bun replaces pnpm and Node (D-074): `bun.lock`, `bun run …` scripts, the server and headless sim run on bun, Docker image on `oven/bun`. Verified: checks, tests, build, `sim:run`, the server under bun, and the image end to end.
+- SEO: keyword title and description, canonical URL, Open Graph/Twitter cards with a 1200×630 share image rendered from the game's art (`public/og.png`, from `/src/dev/og.html`), `VideoGame` + `WebSite` structured data, a crawlable static copy of the landing content inside `#root` (replaced by React on load), `robots.txt`, `sitemap.xml`, web manifest and icons, and an FAQ section on the landing page.
+- `README.md` (with day and night screenshots in `docs/images/`) and `CONTRIBUTING.md`.
 
 ## 2026-11-01: Backend hardening and the account flow (D-073)
 - Rate limits count failures only (per email and per address), clear on success, and send `Retry-After`; `TRUST_PROXY` so a deployed server sees real client addresses.

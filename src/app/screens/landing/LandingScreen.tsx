@@ -17,6 +17,15 @@ const PINS: readonly { label: string; x: number; y: number; z: number; side: 'le
   { label: 'Main street', x: 4.5, y: 8.6, z: 0, side: 'right' },
 ];
 
+/** Questions people actually ask before playing; also what search engines read. */
+const FAQ: readonly { q: string; a: string }[] = [
+  { q: 'Is Openpolis free?', a: 'Yes. The whole game is free to play, with no ads in the game and nothing to buy.' },
+  { q: 'Do I need to download anything?', a: 'No. Openpolis is a city building game that runs in your web browser. Open the page and start building; there is nothing to install.' },
+  { q: 'What kind of game is it?', a: 'A classic-style city builder: you lay roads, zone land, build a town block by block and run it like a mayor, with power, water, services, budgets and traffic.' },
+  { q: 'Are my cities saved?', a: 'Always. As a guest your cities save on your device as you play. With a free account they save to the cloud, so you can carry on from any browser.' },
+  { q: 'What do I play it on?', a: 'Any modern browser on a computer. It is built for a mouse or trackpad, and runs smoothly on ordinary laptops.' },
+];
+
 const STEPS: readonly { title: string; text: string }[] = [
   { title: 'Zone', text: 'Lay roads, then paint homes, shops and industry along them. Lots fill up when people want to live and work there.' },
   { title: 'Serve', text: 'Run power and water, open schools, clinics and stations. Citizens tell you exactly what their street is missing.' },
@@ -119,6 +128,20 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="landing-faq" aria-labelledby="landing-faq-title">
+          <h2 id="landing-faq-title" className="landing-section-title">
+            Questions
+          </h2>
+          <div className="landing-faq-list">
+            {FAQ.map((f) => (
+              <details key={f.q}>
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
         </section>
 
         <section className="landing-saves">
