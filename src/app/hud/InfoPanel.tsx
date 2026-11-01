@@ -151,9 +151,14 @@ export function InfoPanel() {
         </span>
       </div>
 
-      <button type="button" className="danger-button" onClick={() => game?.demolish(info.id)}>
-        Demolish
-      </button>
+      <div className="info-actions">
+        <button type="button" className="secondary-button" onClick={() => game?.startMove(info.id)} title="Pick it up and set it down somewhere else (P)">
+          Move
+        </button>
+        <button type="button" className="danger-button" onClick={() => game?.demolish(info.id)}>
+          Demolish
+        </button>
+      </div>
     </aside>
   );
 }

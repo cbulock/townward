@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/shared/balance';
 import { BUILDING_IDS, BUILDINGS, footprintOrigin } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
-import { applyClear, applyPlace, applyRoad, planClear, planPlace, planRoad } from '../src/sim/commands';
+import { applyClear, applyMove, applyPlace, applyRoad, planClear, planMove, planPlace, planRoad } from '../src/sim/commands';
 import { rectTiles, RoadType } from '../src/sim/roads';
 import { Terrain } from '../src/sim/terrain/types';
 import { World } from '../src/sim/World';
@@ -99,5 +99,42 @@ describe('clearing buildings', () => {
     expect(w.buildings.size).toBe(0);
     for (const t of rectTiles({ x: 3, y: 3 }, { x: 4, y: 4 })) expect(w.building[w.index(t.x, t.y)]).toBe(-1);
     expect(res.changed).toEqual({ minX: 3, minY: 3, maxX: 4, maxY: 4 });
+  });
+});
+
+describe('moving buildings', () => {
+  it('moves a building with everything about it, and charges a fee', () => {
+    const w = grassWorld();
+    const city = new City(w, 10_000);
+    applyPlace(city, planPlace(w, 'cottage', 2, 2), 0);
+    const b = [...w.buildings.values()][0];
+    b.occupants = 3;
+    b.happiness = 0.9;
+    w.tree[w.index(6, 6)] = 2;
+    const plan = planMove(w, b.id, 6, 6);
+    expect(plan?.ok).toBe(true);
+    // A fee for the move, plus clearing the trees on the new lot.
+    expect(plan?.cost).toBeGreaterThan(Math.round(BUILDINGS.cottage.cost * BALANCE.moveCostShare));
+    const funds = city.funds;
+    expect(plan && applyMove(city, plan).ok).toBe(true);
+    expect(w.buildings.get(b.id)).toMatchObject({ x: 6, y: 6, occupants: 3, happiness: 0.9 });
+    expect(w.building[w.index(2, 2)]).toBe(-1);
+    expect(w.building[w.index(6, 6)]).toBe(b.id);
+    expect(w.tree[w.index(6, 6)]).toBe(0);
+    expect(city.funds).toBe(funds - (plan?.cost ?? 0));
+  });
+
+  it("can't move onto roads, water or other buildings, but may overlap its own lot", () => {
+    const w = grassWorld();
+    const city = new City(w, 10_000);
+    applyPlace(city, planPlace(w, 'park', 3, 3), 0);
+    applyPlace(city, planPlace(w, 'cottage', 6, 3), 0);
+    applyRoad(city, planRoad(w, [{ x: 3, y: 6 }], RoadType.Road), RoadType.Road);
+    const park = [...w.buildings.values()].find((x) => x.def === 'park');
+    if (!park) throw new Error('no park');
+    expect(planMove(w, park.id, 6, 3)?.ok).toBe(false); // the cottage is there
+    expect(planMove(w, park.id, 3, 6)?.ok).toBe(false); // road
+    expect(planMove(w, park.id, 3, 3)?.ok).toBe(false); // same spot: nothing to do
+    expect(planMove(w, park.id, 4, 3)?.ok).toBe(true); // shifting onto part of its own lot is fine
   });
 });

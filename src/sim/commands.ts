@@ -1,11 +1,11 @@
 import { BALANCE } from '../shared/balance';
-import { BUILDINGS, footprintOrigin, type BuildingId } from './buildings/catalog';
+import { BUILDINGS, footprintOrigin, type BuildingDef, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
 import { DIRS, BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
-import { ZoneType, type ZoneTypeId } from './zones';
+import { ZoneType, zoneOf, type ZoneTypeId } from './zones';
 
 /**
  * Every world mutation goes through a plan → apply pair (docs/decisions.md D-014).

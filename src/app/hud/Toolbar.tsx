@@ -117,6 +117,19 @@ const TOOLS: readonly ToolDef[] = [
     tone: 'tone-i',
   },
   {
+    id: 'move',
+    group: 'edit',
+    label: 'Move',
+    key: 'P',
+    hint: 'Click a building to pick it up, then click where it should go · costs 20% of its price',
+    icon: (
+      <g {...stroke}>
+        <path d="M12 3v18M3 12h18" />
+        <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
+      </g>
+    ),
+  },
+  {
     id: 'road',
     group: 'road',
     label: 'Roads',

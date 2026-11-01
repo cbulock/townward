@@ -1,10 +1,11 @@
 import type { PreviewTile } from '../render/overlays/ToolPreview';
 import { buildingHeadroom } from '../render/atlas/buildingArt';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
-import type { TerrainTextures } from '../render/atlas/tiles';
+import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from '../render/atlas/tiles';
+import { roadVariant } from '../render/atlas/roads';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
-import { planClear, planPlace, planRoad, planZone, type Plan, type PlacePlan } from '../sim/commands';
+import { planClear, planMove, planPlace, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
 import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/systems/access';
 import { BALANCE } from '../shared/balance';
@@ -31,7 +32,7 @@ export function isRoadTool(tool: ToolId): tool is RoadToolId {
   return tool in ROAD_TOOLS;
 }
 
-export type ToolId = 'select' | 'clear' | RoadToolId | 'build' | ZoneToolId;
+export type ToolId = 'select' | 'clear' | 'move' | RoadToolId | 'build' | ZoneToolId;
 
 /** What each zone tool paints. Removing a zone is done with Clear (D-051). */
 export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZonedType>> = {
@@ -50,6 +51,7 @@ export function isZoneTool(tool: ToolId): tool is ZoneToolId {
 export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   select: 'KeyQ',
   clear: 'KeyB',
+  move: 'KeyP',
   pedestrian: 'KeyK',
   road: 'KeyR',
   avenue: 'KeyV',
@@ -76,7 +78,8 @@ export type ToolPlan =
   | { kind: 'road'; tool: RoadToolId; plan: Plan; roadType: BuildableRoad }
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
   | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZonedType }
-  | { kind: 'place'; tool: 'build'; plan: PlacePlan };
+  | { kind: 'place'; tool: 'build'; plan: PlacePlan }
+  | { kind: 'move'; tool: 'move'; plan: MovePlan };
 
 const TINT_VALID = 0x8ff7ec;
 const TINT_INVALID = 0xff5a5a;
@@ -129,8 +132,14 @@ export function planTool(
   drag: ToolDrag | null,
   hovered: TilePos | null,
   building: BuildingId,
+  /** The Move tool: the building picked up (id), if any. */
+  carrying: number | null = null,
 ): ToolPlan | null {
   if (tool === 'select') return null;
+  if (tool === 'move') {
+    const plan = carrying !== null && hovered ? planMove(world, carrying, hovered.x, hovered.y) : null;
+    return plan ? { kind: 'move', tool, plan } : null;
+  }
   const anchor = drag ?? (hovered ? { start: hovered, current: hovered, straight: false } : null);
   if (!anchor) return null;
 
@@ -161,7 +170,7 @@ export function planTool(
  * Ghost sprites for a plan, in world tiles (ToolPreview places them in the view).
  * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
  */
-export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform): PreviewTile[] {
+export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform, pave = 0): PreviewTile[] {
   if (p.kind === 'zone') {
     const tint = ZONE_TINT[p.zone];
     return p.plan.tiles.map((t) => {
@@ -185,6 +194,33 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
       tint: t.valid ? TINT_CLEAR : 0xffffff,
       alpha: t.valid ? 0.75 : 0.3,
     }));
+  }
+
+  if (p.kind === 'move') {
+    const { building, origin, ok, moving } = p.plan;
+    const b = world.buildings.get(moving);
+    const { w, h } = BUILDINGS[building].size;
+    // The lot it's leaving, dimmed, then the new footprint and a ghost of the building itself.
+    const leaving: PreviewTile[] = b
+      ? rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }).map((t) => ({ ...t, texture: tex.selection, tint: 0x4fd1c5, alpha: 0.3 }))
+      : [];
+    const footprint: PreviewTile[] = p.plan.tiles.map((t) => ({
+      x: t.x,
+      y: t.y,
+      texture: tex.selection,
+      tint: t.valid ? TINT_VALID : TINT_INVALID,
+      alpha: t.valid ? 0.35 : 0.65,
+    }));
+    const ghost: PreviewTile = {
+      x: origin.x,
+      y: origin.y,
+      texture: buildingTexture(tex, building, b?.variant ?? 0, view.r),
+      footprint: BUILDINGS[building].size,
+      offsetY: buildingHeadroom(building, b?.variant ?? 0),
+      tint: ok ? 0xffffff : TINT_INVALID,
+      alpha: ok ? 0.85 : 0.55,
+    };
+    return [...leaving, ...footprint, ghost];
   }
 
   if (p.kind === 'place') {
@@ -212,15 +248,19 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
   const hasRoad = (x: number, y: number) =>
     world.inBounds(x, y) && (planned.has(world.index(x, y)) || world.road[world.index(x, y)] !== RoadType.None);
   const roadType = p.roadType;
-  const roads = tex.roads[roadType];
   return p.plan.tiles.map((t) => {
-    const mask =
+    let mask =
       (hasRoad(t.x, t.y - 1) ? 1 : 0) | (hasRoad(t.x + 1, t.y) ? 2 : 0) | (hasRoad(t.x, t.y + 1) ? 4 : 0) | (hasRoad(t.x - 1, t.y) ? 8 : 0);
+    // One-way rows preview as plain carriageways: end-to-end links only.
+    if (t.lane !== undefined) mask &= (1 << t.lane) | (1 << ((t.lane + 2) % 4));
+    // The look the renderer will use: the direction turned into the view, or the pavement.
+    const viewLane = t.lane === undefined ? 0 : Math.log2(view.mask(1 << t.lane)) + 1;
+    const variant = roadVariant(roadType, viewLane, pave);
     const texture = !t.valid
       ? tex.selection
       : t.bridge
-        ? tex.bridges[roadType][view.bridgeAxis(t.bridge)]
-        : roads[view.mask(mask)];
+        ? bridgeTexture(tex, roadType, view.bridgeAxis(t.bridge), variant)
+        : roadTexture(tex, roadType, view.mask(mask), variant);
     return {
       x: t.x,
       y: t.y,

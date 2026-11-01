@@ -9,7 +9,7 @@ import { HALF_H, SIM_TICK_HZ } from '../shared/constants';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
-import { applyClear, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { applyClear, applyMove, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
 import { isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
@@ -131,6 +131,8 @@ export class Game {
   /** The clock day of the last brownout notice (one per clock day). */
   private brownoutDay = -1;
   private recentRoadTool: RoadToolId = 'road';
+  /** The Move tool's picked-up building (id), if any. */
+  private carrying: number | null = null;
   private pavementChoice = 0;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
   private edits = 0;
@@ -227,7 +229,7 @@ export class Game {
   }
 
   private plan(drag: ToolDrag | null, hovered: TilePos | null) {
-    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice);
+    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice, this.carrying);
   }
 
   // ---------------------------------------------------------------- tools
@@ -253,7 +255,45 @@ export class Game {
     return ROAD_SPECS[type].pavement ? this.pavementChoice : 0;
   }
 
+  /**
+   * The Move tool: the first click picks a building up, the next sets it down where the
+   * cursor is (docs/specs/buildings.md, "Moving"). Esc or right-click drops the pick.
+   */
+  private moveClick(t: TilePos) {
+    if (this.carrying === null) {
+      const b = this.world.buildings.get(this.world.building[this.world.index(t.x, t.y)]);
+      if (!b) return;
+      if (b.construction > 0) {
+        this.sound.play('error');
+        this.notify('error', 'That one is still being built: move it once it\'s finished');
+        return;
+      }
+      this.carrying = b.id;
+      this.sound.play('tool');
+      this.notify('info', `Moving the ${BUILDINGS[b.def].name}: click where it should go (Esc to cancel)`);
+      this.updatePreview();
+      return;
+    }
+    const p = this.plan(null, t);
+    if (!p || p.kind !== 'move') return;
+    const funds = this.city.funds;
+    this.execute(p);
+    // Moved (money spent): ready to pick up the next one.
+    if (this.city.funds < funds) this.carrying = null;
+    this.updatePreview();
+  }
+
+  /** Start moving a building straight away (the info panel's Move button). */
+  startMove(id: number) {
+    if (!this.world.buildings.has(id)) return;
+    this.setTool('move');
+    const b = this.world.buildings.get(id);
+    if (b) this.moveClick({ x: b.x, y: b.y });
+    this.inspect(null);
+  }
+
   setTool(tool: ToolId) {
+    if (tool !== 'move') this.carrying = null;
     if (isRoadTool(tool)) this.recentRoadTool = tool;
     if (tool !== this.toolId) this.sound.play('tool');
     this.toolId = tool;
@@ -289,6 +329,11 @@ export class Game {
   private onPrimaryDown(screen: ScreenPoint, shift: boolean): boolean {
     if (this.toolId === 'select') return false;
     const t = this.tileAt(screen);
+    if (this.toolId === 'move') {
+      this.lastPointer = screen;
+      this.moveClick(t);
+      return true;
+    }
     this.drag = { start: t, current: t, straight: shift };
     this.lastPointer = screen;
     this.updatePreview();
@@ -330,9 +375,13 @@ export class Game {
     if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType, this.pavementFor(p.roadType));
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
     else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
+    else if (p.kind === 'move') result = applyMove(this.city, p.plan);
     else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
 
-    if (p.kind === 'place' && !p.plan.ok) {
+    if (p.kind === 'move' && !p.plan.ok) {
+      this.sound.play('error');
+      this.notify('error', "Can't move it there: needs clear land, no roads, water or other buildings");
+    } else if (p.kind === 'place' && !p.plan.ok) {
       this.sound.play('error');
       this.notify('error', "Can't build there: needs clear land, no roads or water");
     } else if (result.ok && result.changed) {
@@ -766,6 +815,14 @@ export class Game {
     const n = tiles.length;
     if (n === 0) return;
     const fx = this.renderer.effects;
+    if (p.kind === 'move') {
+      // It lands with a pop and a little dust.
+      const b = this.world.buildings.get(p.plan.moving);
+      if (b) this.popBuilding(b, 0);
+      for (const t of tiles) fx.burst(t.x, t.y, 'dust', 4, Math.random() * 0.15);
+      this.sound.play('build');
+      return;
+    }
     const stagger = Math.min(0.02, MAX_RIPPLE_TIME / n);
     const perTile = Math.max(1, Math.min(6, Math.floor(PARTICLE_BUDGET / n)));
 
@@ -838,6 +895,12 @@ export class Game {
 
   /** Right click / Esc: drop the drag if there is one, otherwise put the tool away. */
   cancel() {
+    if (this.carrying !== null) {
+      // Put it back down where it was (nothing moved yet).
+      this.carrying = null;
+      this.updatePreview();
+      return;
+    }
     if (this.drag) {
       this.drag = null;
       this.updatePreview();
@@ -862,21 +925,23 @@ export class Game {
         })),
       );
     } else if (!p) this.renderer.toolPreview.clear();
-    else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p, this.renderer.view));
+    else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p, this.renderer.view, this.pavementChoice));
     this.emitPreviewLabel();
   }
 
   private emitPreviewLabel() {
     // Drags always show a label; the Build tool also labels the hovered spot before you click.
-    const p = this.drag ? this.plan(this.drag, null) : this.toolId === 'build' ? this.plan(null, this.hovered) : null;
+    const hoverLabel = this.toolId === 'build' || (this.toolId === 'move' && this.carrying !== null);
+    const p = this.drag ? this.plan(this.drag, null) : hoverLabel ? this.plan(null, this.hovered) : null;
     if (!p || !this.lastPointer) {
       this.events.emit('toolPreview', null);
       return;
     }
     this.events.emit('toolPreview', {
       tool: this.toolId,
-      label: p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' ? TOOL_LABEL[p.tool] : null,
-      blocked: p.kind === 'place' && !p.plan.ok,
+      label:
+        p.kind === 'move' ? `Move ${BUILDINGS[p.plan.building].name}` : p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' ? TOOL_LABEL[p.tool] : null,
+      blocked: (p.kind === 'place' || p.kind === 'move') && !p.plan.ok,
       screen: this.lastPointer,
       cost: p.plan.cost,
       count: p.plan.count,
