@@ -24,6 +24,17 @@ export default tseslint.config(
     },
   },
   {
+    // The save server runs on Node and must not reach into the client beyond shared types.
+    files: ['server/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['pixi.js', 'react', 'react-dom', 'jotai', '**/src/render/**', '**/src/app/**', '**/src/game/**'] },
+      ],
+    },
+  },
+  {
     // The simulation must stay pure: no rendering, UI or DOM dependencies.
     files: ['src/sim/**/*.ts'],
     rules: {

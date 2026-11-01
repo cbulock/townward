@@ -2,6 +2,8 @@ import { atom } from 'jotai';
 import type { BudgetInfo, CityInfo, DayNightMode, DebugStats, InspectInfo, Notice, ToolPreviewInfo } from '../game/events';
 import type { Game } from '../game/Game';
 import type { ToolId } from '../game/tools';
+import type { SaveStatus } from '../save/CitySaver';
+import type { ApiUser } from '../shared/api';
 import type { BuildingId } from '../sim/buildings/catalog';
 
 /** UI state only. Game state lives in the City/World; these atoms mirror what the HUD shows. */
@@ -31,3 +33,14 @@ export const clockAtom = atom(7);
 export const worldVersionAtom = atom(0);
 /** View rotation in quarter turns (0–3). */
 export const rotationAtom = atom(0);
+
+/** Who is playing: still checking, a guest (online = the save server answered), or logged in. */
+export type AuthState =
+  | { readonly status: 'checking' }
+  | { readonly status: 'guest'; readonly online: boolean }
+  | { readonly status: 'user'; readonly user: ApiUser };
+export const authAtom = atom<AuthState>({ status: 'checking' });
+/** The log in / sign up dialog, if open. */
+export const authDialogAtom = atom<'login' | 'signup' | null>(null);
+/** Save state of the open city; null when it isn't saved at all (the demo). */
+export const saveStatusAtom = atom<SaveStatus | null>(null);

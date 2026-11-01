@@ -2,6 +2,8 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
 import { budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { AccountButton } from '../account/AccountButton';
+import { SaveStatus } from './SaveStatus';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -148,10 +150,14 @@ function DemandMeter({ demand }: { demand: CityInfo['demand'] | undefined }) {
 interface TopBarProps {
   cityName: string;
   onNewCity: () => void;
+  /** Save now (the save status button). */
+  onSave: () => void;
+  /** Runs before logging out, so the city is saved while the session still works. */
+  beforeLogout: () => Promise<void>;
 }
 
 /** Floating top bar: city, date, population, jobs, funds, speed and sound. */
-export function TopBar({ cityName, onNewCity }: TopBarProps) {
+export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProps) {
   const funds = useAtomValue(fundsAtom);
   const city = useAtomValue(cityAtom);
   const muted = useAtomValue(mutedAtom);
@@ -168,7 +174,7 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
 
   return (
     <div className="panel top-bar">
-      <button type="button" className="icon-button" title="New city" aria-label="New city" onClick={onNewCity}>
+      <button type="button" className="icon-button" title="Your cities" aria-label="Your cities" onClick={onNewCity}>
         <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
           <g {...icon}>
             <path d="M4 20V10l5-4 5 4v10M14 20v-7h6v7M2 20h20" />
@@ -177,6 +183,7 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
         </svg>
       </button>
       <span className="city-name">{cityName}</span>
+      <SaveStatus onSave={onSave} />
       <span className="top-divider" />
       <Stat title="Date" glyph={<g {...icon}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></g>}>
         <span className="stat-value date">{date}</span>
@@ -307,6 +314,7 @@ export function TopBar({ cityName, onNewCity }: TopBarProps) {
           )}
         </svg>
       </button>
+      <AccountButton compact beforeLogout={beforeLogout} />
     </div>
   );
 }

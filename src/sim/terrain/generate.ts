@@ -57,6 +57,12 @@ interface Point {
   y: number;
 }
 
+/**
+ * Bump whenever a change to the generator alters the map for an existing seed. Saves record
+ * it (sim/save.ts) because they regenerate terrain from the seed instead of storing it.
+ */
+export const GENERATOR_VERSION = 1;
+
 /** River Valley at its default sliders: the approved reference map (seed 42). */
 export function generateRiverValley({ seed, size }: TerrainParams): World {
   return generateTerrain(presetSettings('riverValley', seed, size));

@@ -1341,3 +1341,331 @@ button.funds:hover {
   font-size: 12px;
   font-style: italic;
 }
+
+/* ---------- Start screen: your cities + new city (docs/specs/saving.md) ---------- */
+.ng-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(880px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+}
+.ng-stack > .panel {
+  position: relative;
+}
+.ng-stack .ng-card {
+  width: auto;
+  max-height: none;
+  min-height: 0;
+  flex: 0 1 auto;
+}
+.ng-account {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+.ng-notice {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--danger);
+  font-size: 13px;
+}
+.cities-card {
+  flex: none;
+  padding: 14px 16px 12px;
+}
+.cities-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cities-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.cities-error {
+  color: var(--warn);
+  font-size: 12px;
+}
+.cities-strip {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.city-tile {
+  display: flex;
+  flex: 0 0 210px;
+  flex-direction: column;
+  scroll-snap-align: start;
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+.city-open {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--ease-out);
+}
+.city-open:hover {
+  background: var(--bg-panel-hover);
+}
+.city-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.city-tile-name {
+  padding-right: 64px;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-tile-stats {
+  font-size: 13px;
+}
+.city-tile-meta {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.city-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.city-badge.is-cloud {
+  background: rgba(79, 209, 197, 0.16);
+  color: var(--accent);
+}
+.city-badge.is-local {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+}
+.city-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--border-panel);
+  font-size: 12px;
+}
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
+.link-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.link-button.is-dim {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+.link-button.is-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ---------- Loading ---------- */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg-app);
+}
+.loading-card {
+  position: relative;
+  padding: 16px 22px;
+  color: var(--text-dim);
+}
+
+/* ---------- Account: button, menu, log in / sign up dialog ---------- */
+.account-login {
+  padding: 7px 14px;
+  border: 1px solid var(--border-panel);
+  border-radius: 9px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(var(--blur));
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.account-login:hover:not(:disabled) {
+  background: var(--bg-panel-hover);
+}
+.account-login:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+.account-login.is-compact {
+  margin: -4px -6px -4px 0;
+  padding: 4px 10px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: none;
+  font-size: 12.5px;
+}
+.account {
+  position: relative;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #08201d;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.account-avatar:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.account-menu {
+  top: calc(100% + 10px);
+  right: -6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 6px;
+  z-index: 10;
+}
+.account-email {
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--border-panel);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.account-menu-item {
+  margin-top: 4px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu-item:hover {
+  background: var(--bg-panel-hover);
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 8, 12, 0.55);
+}
+.auth-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 22px 24px;
+  background: rgba(18, 22, 30, 0.94);
+}
+.auth-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.auth-lead {
+  margin: -8px 0 4px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.auth-hint {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.auth-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.auth-switch {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+.ng-start:disabled {
+  filter: saturate(0.4);
+  cursor: wait;
+  transform: none;
+}
+
+/* ---------- Save status (top bar) ---------- */
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: -4px 0;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.save-status:hover:not(:disabled) {
+  background: var(--bg-panel-hover);
+  color: var(--text);
+}
+.save-status.is-saving {
+  cursor: default;
+}
+.save-status.is-saving svg {
+  animation: save-pulse 900ms ease-in-out infinite alternate;
+}
+.save-status.is-error {
+  color: var(--danger);
+}
+@keyframes save-pulse {
+  to {
+    opacity: 0.35;
+  }
+}

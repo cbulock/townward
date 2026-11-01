@@ -6,7 +6,10 @@ import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../../shared/constants';
 import { generateTerrain } from '../../sim/terrain/generate';
 import { PRESET_IDS, PRESETS, presetSettings, type PresetId, type TerrainSettings } from '../../sim/terrain/presets';
 import type { World } from '../../sim/World';
+import type { CityRef } from '../../save/SaveStore';
+import { AccountButton } from '../account/AccountButton';
 import { DEFAULT_SEED, randomSeed } from '../options';
+import { CityList } from './CityList';
 
 /** Settings changes repaint the preview after this pause (ms). Generation itself takes < 50 ms. */
 const PREVIEW_DEBOUNCE = 120;
@@ -70,8 +73,19 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** Pick a preset, tune it, preview it live, then start. See docs/04-ui-ux.md, "New Game Screen". */
-export function NewGameScreen({ onStart }: { onStart: (o: GameOptions) => void }) {
+interface NewGameScreenProps {
+  onStart: (o: GameOptions) => void;
+  /** Continue a saved city. */
+  onOpen: (ref: CityRef) => void;
+  /** Shown above the cards (e.g. a city that couldn't be opened). */
+  notice?: string;
+}
+
+/**
+ * The start screen: your saved cities, then found a new one (pick a preset, tune it, preview
+ * it live). See docs/04-ui-ux.md, "New Game Screen", and docs/specs/saving.md.
+ */
+export function NewGameScreen({ onStart, onOpen, notice }: NewGameScreenProps) {
   const [name, setName] = useState('');
   const [terrain, setTerrain] = useState<TerrainSettings>(() => presetSettings('riverValley', DEFAULT_SEED, DEFAULT_MAP_SIZE));
   const [seedText, setSeedText] = useState(String(DEFAULT_SEED));
@@ -106,6 +120,16 @@ export function NewGameScreen({ onStart }: { onStart: (o: GameOptions) => void }
   return (
     <div className="new-game">
       <canvas ref={backdropRef} className="ng-backdrop" style={{ width: BACKDROP.w, height: BACKDROP.h }} aria-hidden="true" />
+      <div className="ng-account">
+        <AccountButton />
+      </div>
+      <div className="ng-stack">
+      {notice && (
+        <p className="panel ng-notice" role="alert">
+          {notice}
+        </p>
+      )}
+      <CityList onOpen={onOpen} />
       <form
         className="panel ng-card"
         onSubmit={(e) => {
@@ -236,6 +260,7 @@ export function NewGameScreen({ onStart }: { onStart: (o: GameOptions) => void }
           </div>
         </div>
       </form>
+      </div>
     </div>
   );
 }

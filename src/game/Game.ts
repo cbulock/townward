@@ -24,6 +24,7 @@ import { happinessColor, type OverlayTile } from '../render/Renderer';
 import { rectTiles, roadMask, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
 import { generateTerrain } from '../sim/terrain/generate';
+import { deserialize, serialize, type SaveData } from '../sim/save';
 import type { TerrainSettings } from '../sim/terrain/presets';
 import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
@@ -42,6 +43,14 @@ export interface GameOptions {
   funds?: number;
   /** Build the planned demo city on the map before the first frame (the /demo route). */
   demo?: boolean;
+  /** Continue a saved city (its terrain settings and name match `terrain` and `name`). */
+  save?: SaveData;
+}
+
+/** What has changed since a save: player edits and in-game days (src/save/CitySaver.ts). */
+export interface ChangeStamp {
+  readonly edits: number;
+  readonly day: number;
 }
 
 /** How often stats are pushed to the UI (they don't need 60 Hz React renders). */
@@ -108,9 +117,13 @@ export class Game {
   private statsTimer = 0;
   private statsFrames = 0;
   private statsTime = 0;
+  /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
+  private edits = 0;
+  private readonly options: GameOptions;
 
-  private constructor(city: City, renderer: Renderer) {
+  private constructor(city: City, renderer: Renderer, options: GameOptions) {
     this.city = city;
+    this.options = options;
     this.renderer = renderer;
     this.input = new InputController(renderer.app.canvas, renderer.camera, {
       onPointer: (p) => this.updateHover(p),
@@ -136,15 +149,16 @@ export class Game {
   }
 
   static async create(host: HTMLElement, opts: GameOptions): Promise<Game> {
-    const world = generateTerrain(opts.terrain);
-    const city = new City(world, opts.funds);
+    const city = opts.save ? deserialize(opts.save) : new City(generateTerrain(opts.terrain), opts.funds);
+    const world = city.world;
     const demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
     const renderer = await Renderer.create(host, world);
-    const game = new Game(city, renderer);
-    if (demo) {
+    const game = new Game(city, renderer, opts);
+    // Start over downtown (a little zoomed out), or over the middle of a saved city.
+    const centre = demo?.centre ?? (opts.save ? buildingsCentre(world) : null);
+    if (centre) {
       game.afterWorldChange(true);
-      // Start over downtown, a little zoomed out.
-      const p = tileToWorld(demo.centre.x, demo.centre.y);
+      const p = tileToWorld(centre.x, centre.y);
       renderer.camera.jumpTo(p.x, p.y, 0.8);
     }
     game.loop.speed = GAME_SPEEDS[game.speedIndex];
@@ -154,6 +168,15 @@ export class Game {
 
   get world(): World {
     return this.city.world;
+  }
+
+  /** The city as a save (docs/specs/saving.md). A few ms even for a big city. */
+  snapshot(): SaveData {
+    return serialize(this.city, this.options.terrain, this.options.name);
+  }
+
+  get changeStamp(): ChangeStamp {
+    return { edits: this.edits, day: this.city.day };
   }
 
   get traffic(): Traffic {
@@ -265,6 +288,7 @@ export class Game {
       this.sound.play('error');
       this.notify('error', "Can't build there: needs clear land, no roads or water");
     } else if (result.ok && result.changed) {
+      this.edits++;
       const c = result.changed;
       // Roads change which zoned lots can grow up to roadAccessRange tiles away; refresh that far.
       const g = p.kind === 'road' || p.kind === 'clear' ? BALANCE.roadAccessRange : 0;
@@ -542,6 +566,7 @@ export class Game {
 
   setTaxRate(rate: number) {
     this.city.taxRate = Math.max(0, Math.min(BALANCE.maxTaxRate, Math.round(rate)));
+    this.edits++;
     this.emitBudget();
     this.emitCity();
   }
@@ -891,4 +916,16 @@ export class Game {
     this.sound.destroy();
     this.renderer.destroy();
   }
+}
+
+/** The centre of a city's buildings (or of the map, if it has none). */
+function buildingsCentre(world: World): TilePos {
+  let x = 0;
+  let y = 0;
+  for (const b of world.buildings.values()) {
+    x += b.x;
+    y += b.y;
+  }
+  const n = world.buildings.size;
+  return n === 0 ? { x: world.width / 2, y: world.height / 2 } : { x: Math.round(x / n), y: Math.round(y / n) };
 }

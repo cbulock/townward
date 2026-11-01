@@ -1,9 +1,11 @@
 import type { GameOptions } from '../game/Game';
+import { formatCityRef, parseCityRef, type CityRef } from '../save/SaveStore';
 import { DEFAULT_MAP_SIZE, MAP_SIZES } from '../shared/constants';
 import { PRESET_IDS, PRESETS, presetSettings, type PresetId } from '../sim/terrain/presets';
 
 /**
- * Game options live in the URL, so a reload reopens the same city:
+ * A new city's options live in the URL until its first save (then `?city=` takes over), so a
+ * reload reopens the same city:
  * `?preset=coastal&seed=42&size=128&water=0.5&trees=0.4&rivers=1&coast=1&name=Bayport&funds=100000`.
  * Without a seed the New Game screen opens instead.
  */
@@ -62,6 +64,15 @@ export function writeUrlOptions(o: GameOptions) {
 export function clearUrlOptions() {
   const funds = new URLSearchParams(location.search).get('funds');
   history.replaceState(null, '', funds ? `${location.pathname}?funds=${funds}` : location.pathname);
+}
+
+/** A saved city in the URL (`?city=cloud:12`): a reload reopens it from its store. */
+export function readCityRef(): CityRef | null {
+  return parseCityRef(new URLSearchParams(location.search).get('city'));
+}
+
+export function writeCityUrl(ref: CityRef) {
+  history.replaceState(null, '', `${location.pathname}?city=${formatCityRef(ref)}`);
 }
 
 /** The /demo route: a planned, fully grown city on River Valley (`/demo?seed=N` for another). */

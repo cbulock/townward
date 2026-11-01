@@ -1,0 +1,20 @@
+# Local Postgres for the save server (docs/specs/saving.md). Start: docker compose up -d
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: citybuilder
+      POSTGRES_PASSWORD: citybuilder
+      POSTGRES_DB: citybuilder
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U citybuilder']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

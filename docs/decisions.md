@@ -95,3 +95,9 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
   - Happiness sets occupancy (55–100%), replacing the per-service bonus so services aren't counted twice, and gates level-ups.
   - Abandonment is on (user decision): 30 days below 0.3, recovering after 15 days at 0.45 or more.
   - Complaints name each unhappy building's worst need, shown as a few rotating speech bubbles plus the "Citizens say…" panel.
+- **D-062 — Saves go to Postgres (Docker), and the server is built in modules with layers.** 2026-11-01. User decision; this replaces the SQLite part of D-034.
+  - Postgres runs in Docker for development (`docker-compose.yml`) and is what a hosted game will use for many players. The driver is `pg`, which is pure JS. Tests use PGlite (Postgres compiled to WASM, running in-process), so `pnpm test` needs no Docker.
+  - Repositories depend only on a small `Db` interface (`query`, `exec`, `transaction`). Columns stay int4, float8, text and timestamptz, so both drivers return plain JS values. Save data is JSON text that the server passes through without parsing it again.
+  - Layout (user request: clean, structured backend): `config` → `db/` (driver and migrations) → `http/` (errors, validation, middleware) → `modules/<feature>/` (`*.schemas` → `*.routes` → `*.service` → `*.repository`). Routes stay thin. Services hold the rules and throw `HttpError`, and one error middleware formats the responses.
+  - The server runs on Node's built-in TypeScript support (erasable syntax only: no enums or parameter properties), so it has no build step.
+  - Guests save to IndexedDB. A guest city moves to the account on its first save after the player logs in.

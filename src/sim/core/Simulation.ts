@@ -43,8 +43,10 @@ export class Simulation {
     this.access = new AccessSystem(world);
     this.utilities = new UtilitiesSystem(world);
     this.coverage = new CoverageSystem(world);
-    this.growth = new GrowthSystem(city, mulberry32(subSeed(world.seed, SALT.growth)));
-    this.fire = new FireSystem(world, mulberry32(subSeed(world.seed, SALT.fire)));
+    // Mixing in the day means a loaded city doesn't replay the events of day 0 (identical for new cities).
+    const seed = world.seed ^ city.day;
+    this.growth = new GrowthSystem(city, mulberry32(subSeed(seed, SALT.growth)));
+    this.fire = new FireSystem(world, mulberry32(subSeed(seed, SALT.fire)));
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
     this.commute = new CommuteSystem(world);

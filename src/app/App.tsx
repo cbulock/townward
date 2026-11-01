@@ -1,32 +1,93 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { GameOptions } from '../game/Game';
-import { clearUrlOptions, demoOptions, isDemoRoute, readUrlOptions, writeDemoUrl, writeUrlOptions } from './options';
+import { storeFor } from '../save/CitySaver';
+import type { CityRef } from '../save/SaveStore';
+import { AuthDialog } from './account/AuthDialog';
+import { useAuthBootstrap } from './auth';
+import { clearUrlOptions, demoOptions, isDemoRoute, readCityRef, readUrlOptions, writeCityUrl, writeDemoUrl, writeUrlOptions } from './options';
 import { GameScreen } from './screens/GameScreen';
 import { NewGameScreen } from './screens/NewGameScreen';
 
+/** What's on screen. A playing city knows its save (null for a new or demo city). */
+type Screen =
+  | { readonly kind: 'menu'; readonly notice?: string }
+  | { readonly kind: 'loading'; readonly ref: CityRef }
+  | { readonly kind: 'play'; readonly options: GameOptions; readonly ref: CityRef | null };
+
+function initialScreen(): Screen {
+  if (isDemoRoute()) return { kind: 'play', options: demoOptions(), ref: null };
+  const ref = readCityRef();
+  if (ref) return { kind: 'loading', ref };
+  const options = readUrlOptions();
+  return options ? { kind: 'play', options, ref: null } : { kind: 'menu' };
+}
+
 /**
- * New Game screen until a city is chosen (or the URL already names one), then the game.
- * `/demo` opens a planned, fully grown city straight away.
+ * The start screen (your cities, or found a new one) until a city is chosen or the URL names
+ * one, then the game. `/demo` opens a planned, fully grown city straight away.
  */
 export function App() {
-  const [options, setOptions] = useState<GameOptions | null>(() => (isDemoRoute() ? demoOptions() : readUrlOptions()));
+  useAuthBootstrap();
+  const [screen, setScreen] = useState<Screen>(initialScreen);
+
+  // Load a saved city, then play it; on failure, back to the menu with the reason.
+  const loadingRef = screen.kind === 'loading' ? screen.ref : null;
+  useEffect(() => {
+    if (!loadingRef) return;
+    let cancelled = false;
+    storeFor(loadingRef.store)
+      .load(loadingRef.id)
+      .then(
+        ({ data }): Screen => ({ kind: 'play', options: { terrain: data.terrain, name: data.name, save: data }, ref: loadingRef }),
+        (err: unknown): Screen => {
+          clearUrlOptions();
+          const reason = err instanceof Error ? err.message : 'unknown error';
+          return { kind: 'menu', notice: `Couldn't open that city: ${reason}` };
+        },
+      )
+      .then((next) => {
+        if (!cancelled) setScreen(next);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadingRef]);
 
   const start = (o: GameOptions) => {
     if (o.demo) writeDemoUrl(o.terrain.seed);
     else writeUrlOptions(o);
-    setOptions(o);
+    setScreen({ kind: 'play', options: o, ref: null });
   };
 
-  if (!options) return <NewGameScreen onStart={start} />;
+  const open = (ref: CityRef) => {
+    writeCityUrl(ref);
+    setScreen({ kind: 'loading', ref });
+  };
+
+  const toMenu = useCallback(() => {
+    if (isDemoRoute()) history.replaceState(null, '', '/');
+    else clearUrlOptions();
+    setScreen({ kind: 'menu' });
+  }, []);
+
   return (
-    <GameScreen
-      options={options}
-      onReroll={(o) => start(o.demo ? demoOptions(o.terrain.seed) : o)}
-      onNewCity={() => {
-        if (isDemoRoute()) history.replaceState(null, '', '/');
-        else clearUrlOptions();
-        setOptions(null);
-      }}
-    />
+    <>
+      {screen.kind === 'menu' && <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />}
+      {screen.kind === 'loading' && (
+        <div className="loading-screen" role="status">
+          <div className="panel loading-card">Loading your city…</div>
+        </div>
+      )}
+      {screen.kind === 'play' && (
+        <GameScreen
+          options={screen.options}
+          cityRef={screen.ref}
+          onSaved={writeCityUrl}
+          onReroll={(o) => start(o.demo ? demoOptions(o.terrain.seed) : o)}
+          onNewCity={toMenu}
+        />
+      )}
+      <AuthDialog />
+    </>
   );
 }
