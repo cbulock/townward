@@ -1,5 +1,5 @@
-import { IsoFrame, type Orient, type Rng } from '../isoPaint';
-import { at, type CivicArt } from '../lot';
+import { IsoFrame, type Orient, type Rng } from '../core';
+import { at, type CivicArt } from '../civic/lot';
 import { ROTOR_RADIUS, type RotorSource } from './rotor';
 import { TONE } from './tones';
 

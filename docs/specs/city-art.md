@@ -37,7 +37,7 @@ All art stays procedural (D-011) and original. Nothing here changes the simulati
 ## Smoke and steam
 
 - `render/fx/Smoke.ts`: pooled puffs (cap 900) using the shared puff texture, in a layer above the objects.
-- Sources come from the art itself (`smokeSources(id, variant, rotation)` in `buildingArt.ts`), so plumes leave the painted stack tops in every rotation:
+- Sources come from the art itself (`smokeSources(id, variant, rotation)` in `render/atlas/buildings/index.ts`), so plumes leave the painted stack tops in every rotation:
   - factory smokestacks: grey smoke;
   - power-plant chimneys and gas-plant exhaust stacks: grey smoke;
   - cooling towers: white steam (bigger and softer).
@@ -57,3 +57,37 @@ All art stays procedural (D-011) and original. Nothing here changes the simulati
 ## Budget
 
 The extra frames add about one atlas page (from 2 to about 3–4). 60 FPS on 128×128 still holds, because furniture sprites live in the static per-chunk render groups.
+
+## Art pass 2: near-3D look and ambient life (D-072)
+
+Implemented 2026-11-01. User request: buildings, parks and trees looked dated and static; make every tile read as close to 3D, with variation everywhere and constant gentle motion.
+
+### Where the art lives
+
+| Folder (`src/render/atlas/`) | Holds |
+|---|---|
+| `theme/` | `palette.ts` (ground, zone tints) and `tokens.ts`: light, glass, foliage, materials as one `ArtTheme` |
+| `core/` | projection (`IsoFrame`, frame marks), `Orient`, faces, colour maths, the light model |
+| `nature/trees/`, `nature/decor/` | tree species, lit canopy, forest tiles; rocks, flowers, grass |
+| `buildings/` | `recipes/` (by category), `massing`, `facades/`, `roofs/`, `rooftop/`, `attachments/`, `lot/`, entry `index.ts` |
+| `civic/` | `parks/` (one file per park layout), `commerce/`, `townHall`, `utilities/`, the `CivicArt` contract (`lot.ts`) |
+| `energy/`, `roads/` | unchanged; they use `core/` |
+| `ambient/` | frames for animated details: window glow, beacon, droplet, bird, cloud |
+
+Runtime motion is in `src/render/ambient/`.
+
+### Light model
+
+- Sun from the front-left: SW walls lit and warm, SE walls in cool shade; walls graded top to bottom; occlusion at every wall foot; a rim of light on the near edges; soft cast shadows clipped to the lot.
+- Glass reflects the sky (light at the top, deep at the bottom), with a shadowed reveal and a sill; some windows show blinds. No window is lit by day.
+- Roofs: flat roofs have a graded membrane, parapets with inner faces and the shadow they cast; pitched roofs have gradients, tile courses, a ridge cap and an eave shadow on the walls.
+
+### Ambient life
+
+- **Trees sway:** tree and tall-plant sprites pivot on their ground point and skew with a gust front rolling across the map. Visible chunks only, 30 Hz, zoom ≥ 0.75.
+- **Night windows:** painters record every window as a mark. At night, a stable share of windows lights up (warm, some cool), more as the evening deepens, with occasional flicker. Lights sit straight after their building in the chunk, so nearer buildings hide them. Unpowered, abandoned and unfinished buildings stay dark. Objects take the night colour as a per-sprite tint (quantised), and the multiply layer covers only ground and traffic, so the lights stay bright.
+- **Beacons** on masts and spires blink red, brighter at night. **Fountains** spray droplets from the jet in the art. **Birds** cross by day in loose flocks with ground shadows. **Cloud shadows** drift with the wind and fade at night.
+
+### Review pages (dev only)
+
+`/src/dev/art.html` shows every tile family (`?rot=1` for all rotations, `?only=<id>`); `/src/dev/night.html` opens the demo at night; `/src/dev/atlas.html` reports atlas pages and paint time.

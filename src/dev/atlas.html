@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Atlas Stats</title>
+  </head>
+  <body style="font: 16px monospace; background: #fff">
+    <!-- Dev only: builds the full atlas and reports its cost (pages, ms). -->
+    <pre id="out">building…</pre>
+    <script type="module">
+      import { buildTerrainTextures } from '/src/render/atlas/tiles.ts';
+      const t0 = performance.now();
+      const tex = buildTerrainTextures();
+      const ms = performance.now() - t0;
+      const px = tex.sources.reduce((s, x) => s + x.pixelWidth * x.pixelHeight, 0);
+      document.getElementById('out').textContent = `atlas ${ms.toFixed(0)} ms, ${tex.sources.length} pages, ${(px * 4 / 1048576).toFixed(0)} MB`;
+    </script>
+  </body>
+</html>

@@ -24,6 +24,7 @@ import { Rotors } from './fx/Rotors';
 import { Smoke } from './fx/Smoke';
 import { AgentRenderer } from './agents/AgentRenderer';
 import { Indicators } from './overlays/Indicators';
+import { Ambient } from './ambient/Ambient';
 
 /** Mutable handle to the current view, shared with overlays, effects and agents. */
 export interface ViewRef {
@@ -63,8 +64,10 @@ const ZONE_ALPHA = 0.45;
  *   └─ worldRoot (camera transform)
  *      ├─ terrain  (slab, dual-grid ground masked to the map, roads, grid; rebuilt on rotation)
  *      ├─ agents   (cars, pedestrians; under objects so buildings in front cover them)
- *      ├─ objects  (trees, decorations, buildings)
- *      ├─ fx       (build pops, particles)
+ *      ├─ daylight (multiply: night darkens the ground and traffic)
+ *      ├─ objects  (trees, decorations, buildings, lit windows; night is a per-sprite tint here)
+ *      ├─ ambient lower, rotors, smoke, fx (tinted for night)
+ *      ├─ ambient upper (beacons, birds)
  *      └─ overlay  (tool ghosts, hover, warning badges)
  *
  * Everything below worldRoot is drawn in *view* space (the map after the current
@@ -92,6 +95,9 @@ export class Renderer {
   private rotorSpin: () => number = () => 0;
   agents!: AgentRenderer;
   indicators!: Indicators;
+  /** Clouds, fountains, beacons and birds (render/ambient). */
+  ambient!: Ambient;
+  private daylightColor = 0xffffff;
   private viewWorld!: ViewWorld;
   /** Borderlands: decorative land round the map (render-only), regenerated if the map edge changes. */
   private ext!: World;
@@ -207,6 +213,7 @@ export class Renderer {
     this.effects = new Effects(tex.fx, this.viewRef);
     this.smoke = new Smoke(tex.fx.puff, this.viewRef);
     this.rotors = new Rotors(this.viewRef);
+    this.ambient = new Ambient(tex.ambient, this.viewRef);
     this.agents = new AgentRenderer(tex, this.viewRef);
     this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater }, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
@@ -219,7 +226,19 @@ export class Renderer {
 
     this.daylight.blendMode = 'multiply';
     this.daylight.visible = false;
-    this.worldRoot.addChild(this.terrain, this.agents.container, this.objects, this.rotors.container, this.smoke.container, this.effects.container, this.daylight, this.overlay);
+    // The multiply layer darkens ground and traffic only; objects take the night as a tint so lit windows can shine.
+    this.worldRoot.addChild(
+      this.terrain,
+      this.agents.container,
+      this.daylight,
+      this.objects,
+      this.ambient.lower,
+      this.rotors.container,
+      this.smoke.container,
+      this.effects.container,
+      this.ambient.upper,
+      this.overlay,
+    );
     this.app.stage.addChild(this.worldRoot);
 
     this.camera.setScreenSize(this.app.screen.width, this.app.screen.height);
@@ -239,7 +258,9 @@ export class Renderer {
     this.viewRef.ground = this.viewWorld;
     this.smoke?.invalidate();
     this.rotors?.invalidate();
-    this.ground = new ChunkRenderer(this.viewWorld, this.textures);
+    this.ambient?.invalidate();
+    this.ground = new ChunkRenderer(this.viewWorld, this.textures, (id) => this.world.buildings.get(id));
+    this.ground.setNight(this.daylightColor);
     this.border = new BorderRenderer(this.ext, this.ring, this.viewWorld, this.view.r, this.textures);
     this.terrain.addChild(
       this.border.ground,
@@ -255,6 +276,8 @@ export class Renderer {
     this.ground.zonesRoot.alpha = this.zoneView ? 1 : ZONE_ALPHA;
     // Ring trees behind the map draw before its objects, the ones in front after.
     this.objects.addChild(this.border.backObjects, this.ground.objectsRoot, this.border.frontObjects);
+    this.border.backObjects.tint = this.daylightColor;
+    this.border.frontObjects.tint = this.daylightColor;
     this.ground.setGrid(grid);
     // Allow panning a quarter of the way into the borderlands.
     const b = mapWorldBounds(this.view.viewW, this.view.viewH);
@@ -298,6 +321,10 @@ export class Renderer {
   setDaylight(color: number) {
     this.daylight.tint = color;
     this.daylight.visible = color !== 0xffffff;
+    if (color === this.daylightColor) return;
+    this.daylightColor = color;
+    this.ground.setNight(color);
+    for (const c of [this.border.backObjects, this.border.frontObjects, this.ambient.lower, this.rotors.container, this.smoke.container, this.effects.container]) c.tint = color;
   }
 
   /** Corners of the screen as continuous *view* tile coordinates (for the minimap). */
@@ -387,6 +414,7 @@ export class Renderer {
       this.daylight.height = viewRect.maxY - viewRect.minY;
     }
     this.ground.cull(viewRect);
+    this.ground.animate(dt, cam.zoom);
     this.border.cull(viewRect);
     this.border.update(dt);
     this.agents.update(this.world, this.agentSource(), this.stopSource(), this.lightSource(), viewRect, cam.zoom);
@@ -396,6 +424,7 @@ export class Renderer {
     this.effects.update(dt);
     this.smoke.update(dt, viewRect, cam.zoom);
     this.rotors.update(dt, viewRect, this.rotorSpin());
+    this.ambient.update(dt, viewRect, cam.zoom, this.daylightColor);
     this.indicators.update(dt);
     this.bubbles.update(dt, this.world, this.needsSource(), viewRect, cam.zoom);
 

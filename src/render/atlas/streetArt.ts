@@ -1,6 +1,7 @@
 import { HALF_W } from '../../shared/constants';
 import { GROUND_FRAME_H, GROUND_FRAME_W, GROUND_PAD } from './geometry';
-import { IsoFrame, paintRoundTree, shade, type Box } from './isoPaint';
+import { IsoFrame, shade, type Box } from './core';
+import { paintRoundTree } from './nature/trees';
 import { paintAvenueFurniture } from './roads/avenueFurniture';
 import { paintPedestrianFurniture } from './roads/pedestrianFurniture';
 import { paintBoulevardFurniture, paintExpresswayFurniture } from './roads/wideFurniture';

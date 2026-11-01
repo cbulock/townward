@@ -9,9 +9,10 @@ import { cellQuadPoints, tileLift, tileQuadPoints } from './view/lift';
 import { Decor, Terrain, type TerrainId } from '../sim/terrain/types';
 import type { ViewWorld } from './view/ViewWorld';
 import type { Rect } from './Camera';
-import { DECOR_VARIANTS } from './atlas/decorArt';
-import { buildingHeadroom } from './atlas/buildingArt';
-import { BUILDINGS } from '../sim/buildings/catalog';
+import { DECOR_VARIANTS } from './atlas/nature/decor';
+import { buildingHeadroom, buildingMarks } from './atlas/buildings';
+import type { BuildingRotation } from './atlas/core';
+import { BUILDINGS, type BuildingInstance } from '../sim/buildings/catalog';
 import { constructionStage } from '../sim/systems/growth';
 import { isZoned } from '../sim/zones';
 import { siteHeadroom } from './atlas/constructionArt';
@@ -22,9 +23,11 @@ import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/theme/palette';
 import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from './atlas/tiles';
 import { roadVariant } from './atlas/roads';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
-import { TREE_VARIANTS } from './atlas/treeArt';
+import { TREE_VARIANTS } from './atlas/nature/trees';
 import { tileToWorld } from './iso';
 import { computeDualCell, isWaterTerrain } from './transitions';
+import { buildingLights, eveningLevel, lightOn, mulColor, type WindowLight } from './ambient/nightLights';
+import { SWAY_MIN_ZOOM, SWAY_PIVOT_X, SWAY_PIVOT_Y, swaySkew } from './ambient/sway';
 
 /** Ground cells over-draw their neighbours by this much (px), so the sloped meshes never seam. */
 const CELL_GROW = 1.5;
@@ -34,6 +37,28 @@ const ABANDONED_TINT = 0x6f665c;
 const STRANDED_TINT = 0x9aa6b8;
 /** Seconds per water animation frame. */
 const WATER_FRAME_TIME = 0.16;
+/** Seconds between re-checking which windows are lit (lights change slowly). */
+const LIGHTS_INTERVAL = 0.5;
+/** Night tint steps: a colour channel must move this much before objects are re-tinted. */
+const TINT_STEP = 6;
+
+/** An object sprite and its own tint, re-multiplied by the night tint as evening falls. */
+interface Tinted {
+  sprite: Sprite;
+  base: number;
+}
+
+/** A building whose window lights are made the first time its chunk is seen at night. */
+interface LightSeed {
+  sprite: Sprite;
+  building: BuildingInstance;
+}
+
+/** Seconds between sway updates (30 Hz is smooth for a gentle motion and halves the cost). */
+const SWAY_INTERVAL = 1 / 30;
+
+/** Live state of a building, from the real world (the view copy is only refreshed on edits). */
+export type LiveBuilding = (id: number) => Pick<BuildingInstance, 'powered' | 'abandoned' | 'construction'> | undefined;
 
 interface WaterTile {
   slot: QuadSlot;
@@ -56,6 +81,17 @@ interface Chunk {
   water: WaterTile[];
   bounds: Rect;
   visible: boolean;
+  /** Every object sprite (night tint is per sprite so window lights can stay bright). */
+  tinted: Tinted[];
+  /** Trees and tall plants that sway in the wind, pivoted on their ground point. */
+  swaying: Sprite[];
+  lights: WindowLight[];
+  /** Buildings whose lights haven't been made yet (null once they have). */
+  seeds: LightSeed[] | null;
+  /** Night tint last applied to this chunk's objects. */
+  tint: number;
+  /** Whether trees were left skewed (so they can be straightened once when motion stops). */
+  swayed: boolean;
 }
 
 /** Cheap deterministic per-cell hash for picking art variants. */
@@ -88,6 +124,12 @@ export class ChunkRenderer {
   private gridOnState = false;
   private waterTimer = 0;
   private waterPhase = 0;
+  /** Quantised night tint for objects (white by day) and how lit the city is. */
+  private nightTint = 0xffffff;
+  private level = 0;
+  private time = 0;
+  private lightsTimer = 0;
+  private swayTimer = 0;
   visibleChunks = 0;
   visibleSprites = 0;
 
@@ -95,6 +137,7 @@ export class ChunkRenderer {
     /** The world as seen from the current rotation; everything here is in view space. */
     private readonly world: ViewWorld,
     private readonly tex: TerrainTextures,
+    private readonly live: LiveBuilding = () => undefined,
   ) {
     const cw = Math.ceil(world.width / CHUNK_SIZE);
     const ch = Math.ceil(world.height / CHUNK_SIZE);
@@ -141,7 +184,7 @@ export class ChunkRenderer {
     this.zonesRoot.addChild(zones);
     this.roadsRoot.addChild(roads);
     this.objectsRoot.addChild(objects);
-    const chunk: Chunk = { x0, y0, x1, y1, base, overlay, zones, roads, objects, grid: null, water, bounds, visible: true };
+    const chunk: Chunk = { x0, y0, x1, y1, base, overlay, zones, roads, objects, grid: null, water, bounds, visible: true, tinted: [], swaying: [], lights: [], seeds: [], tint: 0xffffff, swayed: false };
     this.fillGround(chunk);
     this.fillRoadsAndObjects(chunk);
     this.chunks.push(chunk);
@@ -164,6 +207,11 @@ export class ChunkRenderer {
   /** Zones, roads and objects change with play (building, clearing); terrain doesn't, so only these get rebuilt. */
   private fillRoadsAndObjects(c: Chunk) {
     const w = this.world;
+    c.tinted.length = 0;
+    c.swaying.length = 0;
+    c.lights.length = 0;
+    c.seeds = [];
+    c.tint = 0xffffff;
     const zones = new QuadBatch();
     const roads = new QuadBatch();
     for (let y = c.y0; y < c.y1; y++) {
@@ -204,7 +252,7 @@ export class ChunkRenderer {
     for (let d = c.x0 + c.y0; d <= c.x1 - 1 + (c.y1 - 1); d++) {
       for (let x = c.x0; x < c.x1; x++) {
         const y = d - x;
-        if (y >= c.y0 && y < c.y1) this.buildObjects(x, y, c.objects);
+        if (y >= c.y0 && y < c.y1) this.buildObjects(x, y, c);
       }
     }
   }
@@ -275,12 +323,19 @@ export class ChunkRenderer {
     }
   }
 
-  private buildObjects(x: number, y: number, objects: Container) {
+  /** Add an object sprite to a chunk, remembering its own tint for the night re-tint. */
+  private addObject(c: Chunk, s: Sprite, base = 0xffffff) {
+    s.tint = base;
+    c.tinted.push({ sprite: s, base });
+    c.objects.addChild(s);
+  }
+
+  private buildObjects(x: number, y: number, c: Chunk) {
     const w = this.world;
     const i = w.index(x, y);
     const bid = w.building[i];
     if (bid !== -1) {
-      this.buildBuilding(x, y, bid, objects);
+      this.buildBuilding(x, y, bid, c);
       return;
     }
     if (w.road[i] !== RoadType.None) {
@@ -290,7 +345,7 @@ export class ChunkRenderer {
         const s = new Sprite(furniture);
         s.x = p.x - HALF_W - GROUND_PAD;
         s.y = p.y - GROUND_PAD - FURNITURE_HEADROOM - tileLift(w, x, y);
-        objects.addChild(s);
+        this.addObject(c, s);
       }
       return;
     }
@@ -305,9 +360,12 @@ export class ChunkRenderer {
 
     const p = tileToWorld(x, y);
     const s = new Sprite(texture);
-    s.x = p.x - HALF_W - GROUND_PAD;
-    s.y = p.y - GROUND_PAD - TREE_HEADROOM - tileLift(w, x, y);
-    objects.addChild(s);
+    // Pivot on the ground point so swaying trees keep their roots planted.
+    s.pivot.set(SWAY_PIVOT_X, SWAY_PIVOT_Y);
+    s.x = p.x - HALF_W - GROUND_PAD + SWAY_PIVOT_X;
+    s.y = p.y - GROUND_PAD - TREE_HEADROOM - tileLift(w, x, y) + SWAY_PIVOT_Y;
+    this.addObject(c, s);
+    if (density > 0 || decor === Decor.TallGrass || decor === Decor.FlowersWhite || decor === Decor.FlowersYellow) c.swaying.push(s);
   }
 
   /**
@@ -357,7 +415,7 @@ export class ChunkRenderer {
   }
 
   /** A building is one sprite, added when we reach its front (south) tile so it sorts with trees. */
-  private buildBuilding(x: number, y: number, id: number, objects: Container) {
+  private buildBuilding(x: number, y: number, id: number, c: Chunk) {
     const b = this.world.buildings.get(id);
     if (!b) return;
     const r = this.world.view.r;
@@ -374,8 +432,24 @@ export class ChunkRenderer {
     // Footprints are flat (docs/specs/elevation.md), so the origin tile's level lifts the whole building.
     s.y = p.y - GROUND_PAD - (site ? siteHeadroom(site) : buildingHeadroom(b.def, b.variant)) - tileLift(this.world, b.x, b.y);
     // Abandoned buildings look run-down: dark and drab (docs/specs/needs.md).
-    if (b.abandoned) s.tint = ABANDONED_TINT;
-    objects.addChild(s);
+    this.addObject(c, s, b.abandoned ? ABANDONED_TINT : 0xffffff);
+    // Windows that light up at night, right after the building so buildings in front cover them.
+    if (!site && !b.abandoned) c.seeds?.push({ sprite: s, building: b });
+  }
+
+  /** Make a chunk's window lights, each right after its building so buildings in front cover it. */
+  private plantLights(c: Chunk) {
+    const r = this.world.view.r as BuildingRotation;
+    for (const seed of c.seeds ?? []) {
+      const b = seed.building;
+      const lights = buildingLights(buildingMarks(b.def, b.variant, r), seed.sprite.x, seed.sprite.y, b.id, this.tex.ambient);
+      if (lights.length === 0) continue;
+      const at = c.objects.getChildIndex(seed.sprite) + 1;
+      c.objects.addChildAt(lights[0].sprite, at);
+      for (let k = 1; k < lights.length; k++) c.objects.addChildAt(lights[k].sprite, at + k);
+      c.lights.push(...lights);
+    }
+    c.seeds = null;
   }
 
   /**
@@ -462,6 +536,57 @@ export class ChunkRenderer {
       for (const wt of c.water) setQuadTexture(wt.slot, wt.frames[(this.waterPhase + wt.offset) % WATER_PHASES]);
       // All of a chunk's water shares one mesh (one atlas page).
       flushUVs(c.water[0].slot.mesh);
+    }
+  }
+
+  /**
+   * Evening and night: object sprites take the daylight colour as their own tint (quantised, so
+   * dusk re-tints in a few dozen steps, not every frame), and window lights follow the level.
+   */
+  setNight(daylight: number) {
+    const q = (s: number) => Math.min(255, Math.round(((daylight >> s) & 255) / TINT_STEP) * TINT_STEP) << s;
+    this.nightTint = q(16) | q(8) | q(0);
+    this.level = eveningLevel(daylight);
+  }
+
+  /** Per-frame life on visible chunks: night tint and lights, and trees swaying in the wind. */
+  animate(dt: number, zoom: number) {
+    this.time += dt;
+    this.lightsTimer -= dt;
+    const lightsDue = this.lightsTimer <= 0;
+    if (lightsDue) this.lightsTimer = LIGHTS_INTERVAL;
+    this.swayTimer -= dt;
+    const swayDue = this.swayTimer <= 0;
+    if (swayDue) this.swayTimer = SWAY_INTERVAL;
+    const sway = zoom >= SWAY_MIN_ZOOM;
+    for (const c of this.chunks) {
+      if (!c.visible) continue;
+      if (c.tint !== this.nightTint) {
+        for (const t of c.tinted) t.sprite.tint = t.base === 0xffffff ? this.nightTint : mulColor(t.base, this.nightTint);
+        c.tint = this.nightTint;
+        this.updateLights(c);
+      } else if (lightsDue && this.level > 0) {
+        this.updateLights(c);
+      }
+      if (sway) {
+        if (!swayDue) continue;
+        for (const s of c.swaying) s.skew.x = swaySkew(s.x, s.y, this.time);
+        c.swayed = true;
+      } else if (c.swayed) {
+        for (const s of c.swaying) s.skew.x = 0;
+        c.swayed = false;
+      }
+    }
+  }
+
+  private updateLights(c: Chunk) {
+    const on = this.level > 0.02;
+    if (on && c.seeds) this.plantLights(c);
+    for (const l of c.lights) {
+      const b = on ? this.live(l.building) : undefined;
+      const lit = !!b && b.powered && !b.abandoned && b.construction === 0 && lightOn(l, this.level, this.time);
+      if (l.sprite.visible !== lit) l.sprite.visible = lit;
+      if (lit) l.sprite.alpha = Math.min(1, 0.35 + this.level * 0.75);
     }
   }
 

@@ -9,7 +9,7 @@ import { Fountains } from './Fountains';
 import { eveningLevel } from './nightLights';
 
 /**
- * The city's ambient life (D-071), on top of the static chunks:
+ * The city's ambient life (D-072), on top of the static chunks:
  *   lower (under the night tint, like the objects): cloud shadows and fountain spray;
  *   upper (above it): blinking mast beacons and birds.
  * Window lights and swaying trees live in the chunks themselves (ChunkRenderer.animate), because

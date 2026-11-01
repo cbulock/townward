@@ -3,7 +3,7 @@ import type { FrameMark } from '../atlas/core';
 import type { AmbientTextures } from '../atlas/tiles';
 
 /**
- * Lit windows at night (D-071). Each window the art recorded can light up; a stable hash decides
+ * Lit windows at night (D-072). Each window the art recorded can light up; a stable hash decides
  * which ones and how early, so a city fills with light gradually through the evening and lights
  * flick on and off now and then. Unpowered and abandoned buildings stay dark.
  *

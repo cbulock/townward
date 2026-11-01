@@ -1,5 +1,5 @@
-import { faceRef, wallOn, type IsoFrame, type Orient, type Rng } from '../isoPaint';
-import { drawItems, type CivicArt, type Item } from '../lot';
+import { faceRef, wallOn, type IsoFrame, type Orient, type Rng } from '../core';
+import { drawItems, type CivicArt, type Item } from '../civic/lot';
 import { TONE } from './tones';
 
 /** Battery bank (1×1): white storage containers on a concrete pad, with charge lights and roof vents. */

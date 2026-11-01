@@ -1,4 +1,5 @@
-import { paintRoundTree, type IsoFrame } from '../isoPaint';
+import type { IsoFrame } from '../core';
+import { paintRoundTree } from '../nature/trees';
 import { LAMP, onRoad, pole, POLE, type RoadAxis } from '../streetArt';
 
 /**

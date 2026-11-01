@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
-import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildingArt';
+import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildings';
 import { BUILDINGS, PLACEABLE_IDS, type BuildingDef, type BuildingId, type CivicGroup } from '../../sim/buildings/catalog';
 import type { ZoneToolId } from '../../game/tools';
 import { activeToolAtom, buildingChoiceAtom, fundsAtom, gameAtom } from '../atoms';

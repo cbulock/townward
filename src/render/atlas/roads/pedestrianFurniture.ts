@@ -1,4 +1,4 @@
-import { type IsoFrame } from '../isoPaint';
+import { type IsoFrame } from '../core';
 import { LAMP, onRoad, pole, type RoadAxis } from '../streetArt';
 import { gratedTree } from './avenueFurniture';
 

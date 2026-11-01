@@ -7,7 +7,7 @@ import { GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { WATER_PHASES } from './atlas/groundArt';
 import type { TerrainTextures } from './atlas/tiles';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
-import { TREE_VARIANTS } from './atlas/treeArt';
+import { TREE_VARIANTS } from './atlas/nature/trees';
 import type { Rect } from './Camera';
 import { flushUVs, QuadBatch, setQuadTexture, type QuadSlot, type Rgba, type Vec } from './ground/TileMesh';
 import { tileToWorld } from './iso';

@@ -1,5 +1,5 @@
-import type { RotorSource } from './energy/rotor';
-import type { IsoFrame, Orient, Rng } from './isoPaint';
+import type { RotorSource } from '../energy/rotor';
+import type { IsoFrame, Orient, Rng } from '../core';
 
 /**
  * The shared kit for buildings with their own painters (parks, civic buildings, utilities):

@@ -1,5 +1,5 @@
 import type { PreviewTile } from '../render/overlays/ToolPreview';
-import { buildingHeadroom } from '../render/atlas/buildingArt';
+import { buildingHeadroom } from '../render/atlas/buildings';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from '../render/atlas/tiles';
 import { roadVariant } from '../render/atlas/roads';

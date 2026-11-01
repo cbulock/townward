@@ -1,6 +1,6 @@
 import { HALF_H, HALF_W } from '../../shared/constants';
 import { GROUND_PAD } from './geometry';
-import { IsoFrame, shade } from './isoPaint';
+import { IsoFrame, shade } from './core';
 
 /**
  * Construction sites for grown buildings (docs/specs/buildings.md, "Growth").

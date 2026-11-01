@@ -3,7 +3,7 @@ import { BridgeAxis, type BuildableRoad } from '../../sim/roads';
 import { Decor, DECOR_KINDS, GROUND_VARIANTS, Terrain, type DecorId, type TerrainId } from '../../sim/terrain/types';
 import { OVERLAY_TERRAINS } from '../transitions';
 import { AtlasBuilder, type FramePainter } from './AtlasBuilder';
-import { DECOR_VARIANTS, paintDecor } from './decorArt';
+import { DECOR_VARIANTS, paintDecor } from './nature/decor';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
@@ -12,7 +12,7 @@ import { BUILDABLE_ROADS } from '../../sim/roadTypes';
 import { AVENUE_STYLES } from './roads/avenueFurniture';
 import { PEDESTRIAN_STYLES } from './roads/pedestrianFurniture';
 import { WIDE_STYLES } from './roads/wideFurniture';
-import { BUILDING_ROTATIONS, buildingFrameSize, buildingVariantCount, paintBuilding } from './buildingArt';
+import { BUILDING_ROTATIONS, buildingFrameSize, buildingVariantCount, paintBuilding } from './buildings';
 import {
   paintPerson,
   paintVehicle,
@@ -27,6 +27,7 @@ import type { AgentKind } from '../../sim/systems/traffic';
 import { BUILDING_IDS, type BuildingId } from '../../sim/buildings/catalog';
 import { CHIP_SIZE, LEAF_SIZE, paintChip, paintLeaf, paintPuff, PUFF_SIZE } from './fxArt';
 import type { FxTextures } from '../fx/Effects';
+import { BEACON_SIZE, BIRD_H, BIRD_W, CLOUD_H, CLOUD_W, DROP_SIZE, GLOW_H, GLOW_W, paintBeacon, paintBird, paintCloudShadow, paintDroplet, paintWindowGlow } from './ambient';
 import {
   foamOverlay,
   GRASS_SHAPE,
@@ -36,7 +37,7 @@ import {
   WOBBLE_VARIANTS,
   type MaskShape,
 } from './transitionArt';
-import { paintTreeCluster, TREE_VARIANTS } from './treeArt';
+import { paintTreeCluster, TREE_VARIANTS } from './nature/trees';
 import { paintBusStop, STOP_FRAME_H, STOP_FRAME_W } from './stopArt';
 import {
   FURNITURE_FRAME_H,
@@ -93,6 +94,8 @@ export interface TerrainTextures {
    */
   buildings: Readonly<Record<BuildingId, Texture[][]>>;
   fx: FxTextures;
+  /** Animated details (render/ambient): window glows per wall face, beacons, spray, birds, cloud shadows. */
+  ambient: AmbientTextures;
   /** Vehicles, indexed by kind, then variant, then direction (0 NE, 1 SE, 2 SW, 3 NW). */
   vehicles: Readonly<Record<Exclude<AgentKind, 'person'>, Texture[][]>>;
   /** Pedestrians, indexed by variant then walk frame (0/1). */
@@ -372,7 +375,7 @@ export function buildTerrainTextures(): TerrainTextures {
   for (const id of BUILDING_IDS) {
     for (let v = 0; v < buildingVariantCount(id); v++) {
       const f = buildingFrameSize(id, v);
-      for (const r of BUILDING_ROTATIONS) b.add(`bld_${id}_${v}_${r}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v, r));
+      for (const r of BUILDING_ROTATIONS) b.add(`bld_${id}_${v}_${r}`, f.w, f.h, (ctx) => paintBuilding(ctx, id, v, r, { record: true }));
     }
   }
   for (const k of VEHICLE_KINDS) {
@@ -392,6 +395,13 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
   b.add('fx_chip', CHIP_SIZE, CHIP_SIZE, paintChip);
   b.add('fx_leaf', LEAF_SIZE, LEAF_SIZE, paintLeaf);
+  b.add('amb_glow_sw', GLOW_W, GLOW_H, (ctx) => paintWindowGlow(ctx, 'sw'));
+  b.add('amb_glow_se', GLOW_W, GLOW_H, (ctx) => paintWindowGlow(ctx, 'se'));
+  b.add('amb_beacon', BEACON_SIZE, BEACON_SIZE, paintBeacon);
+  b.add('amb_drop', DROP_SIZE, DROP_SIZE, paintDroplet);
+  b.add('amb_bird_0', BIRD_W, BIRD_H, (ctx) => paintBird(ctx, 0));
+  b.add('amb_bird_1', BIRD_W, BIRD_H, (ctx) => paintBird(ctx, 1));
+  b.add('amb_cloud', CLOUD_W, CLOUD_H, paintCloudShadow);
   b.add('hover', W, H, paintHover);
   b.add('grid', W, H, paintGridLine);
 
@@ -457,6 +467,13 @@ export function buildTerrainTextures(): TerrainTextures {
     lamp: get('lamp'),
     bubbles: Object.fromEntries(BUBBLE_KINDS.map((k) => [k, get(`bubble_${k}`)])) as Record<ComplaintKind, Texture>,
     fx: { puff: get('fx_puff'), chip: get('fx_chip'), leaf: get('fx_leaf') },
+    ambient: {
+      glow: { sw: get('amb_glow_sw'), se: get('amb_glow_se') },
+      beacon: get('amb_beacon'),
+      drop: get('amb_drop'),
+      bird: [get('amb_bird_0'), get('amb_bird_1')],
+      cloud: get('amb_cloud'),
+    },
     hover: get('hover'),
     gridLine: get('grid'),
     sources: b.sources,
@@ -470,4 +487,14 @@ export function roadTexture(tex: TerrainTextures, type: BuildableRoad, mask: num
 
 export function bridgeTexture(tex: TerrainTextures, type: BuildableRoad, axis: number, variant: number): Texture {
   return tex.bridges[type][variant * 3 + axis] ?? tex.bridges[type][axis];
+}
+
+export interface AmbientTextures {
+  /** Window glow sheared to match a wall face. */
+  glow: Readonly<Record<'sw' | 'se', Texture>>;
+  beacon: Texture;
+  drop: Texture;
+  /** Bird wings up, wings down. */
+  bird: readonly [Texture, Texture];
+  cloud: Texture;
 }

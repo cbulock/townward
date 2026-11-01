@@ -2,6 +2,15 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Art pass, near-3D tiles and a living city (D-072)
+- Split all building, park and nature art into folders per family (`render/atlas/theme`, `core`, `nature`, `buildings`, `civic`, `ambient`) and restyled them with one light model: graded lit and shaded walls, occlusion, rim light, cast shadows, sky-reflecting glass, layered roofs with eave shadows, detailed rooftops.
+- New trees: five species with lit leaf clumps, mixed woods with autumn and blossom accents; 10 forest looks per density. New rocks, flowers and grass. Parks rebuilt: lawns, rounded hedges, benches, lamps, raised flower beds, fountains; each of the six park layouts is its own file.
+- Living city: swaying trees, lit windows at night (correctly hidden behind nearer buildings, dark when unpowered), blinking beacons, fountain spray, bird flocks, drifting cloud shadows.
+- Dev review pages: `/src/dev/art.html`, `/src/dev/night.html`, `/src/dev/atlas.html`.
+- Checks: typecheck, lint and build pass. Tests 160/161: the failing one is the pre-existing `transport.test.ts` avenue corridor (fails on the untouched baseline too). Verified by headless screenshots of the demo by day and night, and the gallery in all four rotations.
+- **Open:** 60 FPS check on real hardware at 128×128 with sway and night lights on (headless Chrome can't measure it). Roads and ground weren't restyled in this pass.
+- **Next:** simulation upgrade (user direction): an evolving population that asks for better parks, big hospitals, universities, sewage plants and sewage dumps.
+
 ## 2026-11-01: Strict saving (D-071)
 - Fixed the progress-loss bug: a city with a charged battery bank couldn't be opened ("bad building tile"). Fractional counters are rounded on parse; the tile map is a non-fatal cross-check.
 - `verifySave` checks every snapshot before it's stored; a bad one never overwrites a good save.

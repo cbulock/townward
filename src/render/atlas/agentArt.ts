@@ -1,5 +1,5 @@
 import type { AgentKind } from '../../sim/systems/traffic';
-import { IsoFrame, shade } from './isoPaint';
+import { IsoFrame, shade } from './core';
 import { GROUND_PAD, GROUND_FRAME_H } from './geometry';
 import { HALF_H, HALF_W } from '../../shared/constants';
 

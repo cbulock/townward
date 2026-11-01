@@ -15,7 +15,7 @@ interface Beacon {
 }
 
 /**
- * Aircraft warning lights on masts and spires (D-071): a red blink, small by day and a soft
+ * Aircraft warning lights on masts and spires (D-072): a red blink, small by day and a soft
  * glow at night. Drawn above the night layer so they shine.
  */
 export class Beacons {

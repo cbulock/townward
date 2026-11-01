@@ -1,8 +1,8 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import type { BuildingInstance } from '../../sim/buildings/catalog';
-import { rotorSources } from '../atlas/buildingArt';
+import { rotorSources } from '../atlas/buildings';
 import { drawRotor, ROTOR_RADIUS, ROTOR_SQUASH } from '../atlas/energy/rotor';
-import type { BuildingRotation } from '../atlas/isoPaint';
+import type { BuildingRotation } from '../atlas/core';
 import type { Rect } from '../Camera';
 import { tileToWorld } from '../iso';
 import { tileLift } from '../view/lift';

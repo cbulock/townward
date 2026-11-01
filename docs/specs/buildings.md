@@ -23,7 +23,7 @@ stable variant keeps its facade deterministic across reloads and rotations.
 
 ## Catalog (`src/sim/buildings/catalog.ts`)
 
-All art is original and generated in code (`src/render/atlas/buildingArt.ts`), with 3 colour variants each.
+All art is original and generated in code (`src/render/atlas/buildings/`), with several variants each (see specs/city-art.md).
 
 ### Residential
 
@@ -83,7 +83,7 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
 
 - A building is **one sprite**, in a frame tall enough for its floors and roof.
 - It's drawn in the chunk that owns its **front tile** `(x + w − 1, y + h − 1)` and sorted with trees by that tile's diagonal, so buildings and trees overlap correctly.
-- Painter (`buildingArt.ts`) reads recipes from `buildingRecipes.ts`. Each building is a stack of iso boxes, with a lit south-west face and a shaded south-east face. Parks, the town hall and utilities have their own painters (`civicArt.ts`).
+- Painter (`buildings/index.ts`) reads recipes from `buildings/recipes/`. Each building is a stack of lit iso boxes (warm SW face, cool shaded SE face; D-072). Parks, the town hall and utilities have their own painters (`civic/`).
 - Each zoned building has 6 variants that change form, not only colour. See [city-art.md](city-art.md) for massing, facades, roofs, rooftop and lot details.
 
 ## Zoning (Phase 4b)

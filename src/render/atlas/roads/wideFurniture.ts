@@ -1,5 +1,5 @@
 import { DIRS } from '../../../sim/roads';
-import { type IsoFrame } from '../isoPaint';
+import { type IsoFrame } from '../core';
 import { LAMP, pole, POLE } from '../streetArt';
 import { gratedTree } from './avenueFurniture';
 

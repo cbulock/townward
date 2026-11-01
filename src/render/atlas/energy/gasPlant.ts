@@ -1,5 +1,5 @@
-import { faceRef, IsoFrame, shade, wallOn, type Orient, type Rng } from '../isoPaint';
-import { at, drawItems, plume, type CivicArt, type Item, type SmokeSource } from '../lot';
+import { faceRef, IsoFrame, shade, wallOn, type Orient, type Rng } from '../core';
+import { at, drawItems, plume, type CivicArt, type Item, type SmokeSource } from '../civic/lot';
 import { TONE } from './tones';
 
 /**

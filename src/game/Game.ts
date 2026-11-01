@@ -1,5 +1,5 @@
 import { turn, type Rotation } from '../render/view/ViewTransform';
-import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildingArt';
+import { buildingFrameSize, buildingHeadroom, BUILDING_VARIANTS } from '../render/atlas/buildings';
 import { bridgeTexture, buildingTexture, roadTexture } from '../render/atlas/tiles';
 import { roadVariant } from '../render/atlas/roads';
 import { BRIDGE_ANCHOR_Y, GROUND_PAD } from '../render/atlas/geometry';

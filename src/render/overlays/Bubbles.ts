@@ -2,7 +2,7 @@ import { Container, Sprite, type Texture } from 'pixi.js';
 import { BUILDINGS, type BuildingInstance } from '../../sim/buildings/catalog';
 import type { BuildingNeeds, ComplaintKind } from '../../sim/systems/needs';
 import type { World } from '../../sim/World';
-import { buildingHeadroom } from '../atlas/buildingArt';
+import { buildingHeadroom } from '../atlas/buildings';
 import type { Rect } from '../Camera';
 import { liftWorld } from '../view/lift';
 import type { ViewRef } from '../Renderer';

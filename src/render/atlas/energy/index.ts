@@ -1,4 +1,4 @@
-import type { CivicArt } from '../lot';
+import type { CivicArt } from '../civic/lot';
 import { batteryBankArt } from './batteryBank';
 import { gasPlantArt } from './gasPlant';
 import { solarFarmArt } from './solarFarm';

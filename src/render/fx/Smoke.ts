@@ -1,8 +1,8 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
 import { BUILDINGS } from '../../sim/buildings/catalog';
 import type { BuildingInstance } from '../../sim/buildings/catalog';
-import { smokeSources, type SmokeSource } from '../atlas/buildingArt';
-import type { BuildingRotation } from '../atlas/isoPaint';
+import { smokeSources, type SmokeSource } from '../atlas/buildings';
+import type { BuildingRotation } from '../atlas/core';
 import type { Rect } from '../Camera';
 import { tileToWorld } from '../iso';
 import { tileLift } from '../view/lift';

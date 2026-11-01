@@ -1,5 +1,5 @@
-import type { IsoFrame, Orient, Rng } from '../isoPaint';
-import { at, drawItems, pole, type CivicArt, type Item } from '../lot';
+import type { IsoFrame, Orient, Rng } from '../core';
+import { at, drawItems, pole, type CivicArt, type Item } from '../civic/lot';
 import { TONE } from './tones';
 
 /** Solar farm (2×2): rows of tilted panels on gravel, an inverter cabin and corner posts. */

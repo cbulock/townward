@@ -9,7 +9,7 @@ const SHADE = 0x1a2740;
 const STRENGTH = 0.15;
 
 /**
- * Shadows of passing clouds (D-071): a few large soft shapes drifting with the wind across the
+ * Shadows of passing clouds (D-072): a few large soft shapes drifting with the wind across the
  * view, darkening ground, roofs and trees as they pass. Clouds that drift out of view re-enter
  * upwind. They fade out at night, when there's no sun to cast them.
  */

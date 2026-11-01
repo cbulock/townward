@@ -2,7 +2,7 @@ import { GROUND_PAD, TREE_HEADROOM } from '../atlas/geometry';
 import { HALF_H, HALF_W } from '../../shared/constants';
 
 /**
- * Wind in the trees (D-071): every tree sprite skews about the ground point under it, so trunks
+ * Wind in the trees (D-072): every tree sprite skews about the ground point under it, so trunks
  * stay planted and crowns move. A slow gust front rolls across the map, so a forest ripples
  * instead of nodding in lockstep. Only visible chunks at readable zoom levels animate.
  */
