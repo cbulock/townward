@@ -15,6 +15,8 @@ export interface TestResponse {
 export type TestClient = (method: string, path: string, body?: unknown) => Promise<TestResponse>;
 
 export interface TestServer {
+  /** The server's database, for checking what was stored. */
+  readonly db: Db;
   /** A new client with no session. */
   client(): TestClient;
   /** A new client already signed up and logged in. */
@@ -49,6 +51,7 @@ export async function startTestServer(opts: Partial<AppOptions> = {}): Promise<T
   };
 
   return {
+    db,
     client,
     async signedUp(email) {
       const c = client();

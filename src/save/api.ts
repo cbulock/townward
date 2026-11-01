@@ -8,6 +8,7 @@ import type {
   SaveMeta,
   SaveWriteRequest,
   SaveWriteResponse,
+  TrackRequest,
 } from '../shared/api';
 
 /** Typed client for the save server (docs/specs/saving.md, "Server"). */
@@ -78,4 +79,6 @@ export const api = {
   updateSave: (id: number, body: SaveWriteRequest): Promise<SaveMeta> =>
     request<SaveWriteResponse>('PUT', `/saves/${id}`, body).then((r) => r.meta),
   deleteSave: (id: number) => request<void>('DELETE', `/saves/${id}`),
+
+  track: (body: TrackRequest) => request<void>('POST', '/events', body),
 };

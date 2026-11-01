@@ -7,6 +7,9 @@ import { errorHandler, notFoundHandler } from './http/errors.ts';
 import { loadUser, securityHeaders } from './http/middleware.ts';
 import type { TrustProxy } from './config.ts';
 import { authRoutes } from './modules/auth/auth.routes.ts';
+import { AnalyticsRepository } from './modules/analytics/analytics.repository.ts';
+import { analyticsRoutes } from './modules/analytics/analytics.routes.ts';
+import { AnalyticsService } from './modules/analytics/analytics.service.ts';
 import { AuthLimiter } from './modules/auth/auth.limits.ts';
 import { AuthService } from './modules/auth/auth.service.ts';
 import { healthRoutes } from './modules/health/health.routes.ts';
@@ -30,6 +33,7 @@ export interface AppOptions {
 export function createApp(db: Db, opts: AppOptions): express.Express & { auth: AuthService } {
   const auth = new AuthService(db);
   const saves = new SavesService(new SavesRepository(db));
+  const analytics = new AnalyticsService(new AnalyticsRepository(db));
 
   const app = express();
   app.disable('x-powered-by');
@@ -46,6 +50,7 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   api.use(loadUser((token) => auth.userForToken(token)));
   api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits));
   api.use('/saves', savesRoutes(saves));
+  api.use('/events', analyticsRoutes(analytics));
   api.use(notFoundHandler);
   api.use(errorHandler);
   app.use('/api', api);

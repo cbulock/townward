@@ -81,3 +81,37 @@ Bun 1.4 (it runs the server's TypeScript directly).
 - Run **one instance** (login-limit counters are in memory), or move them to Postgres/Redis before scaling out.
 - Point uptime checks at `GET /api/health` (200 = up, 503 = no database).
 - Back up the Postgres volume: it holds accounts and cloud saves.
+
+## Usage numbers
+
+Anonymous usage events (visits and cities started, guests included) are in the `events` table
+([specs/analytics.md](specs/analytics.md)). On the VPS, from the project folder, open the database
+with `docker compose exec postgres psql -U citybuilder citybuilder`, then:
+
+```sql
+-- Visitors and players per day (bots excluded)
+SELECT date(created_at AT TIME ZONE 'Asia/Kolkata') AS day,
+       count(DISTINCT visitor) FILTER (WHERE kind = 'visit')      AS visitors,
+       count(DISTINCT visitor) FILTER (WHERE kind = 'city_start') AS players
+FROM events WHERE device <> 'bot' GROUP BY day ORDER BY day DESC;
+
+-- Where visitors come from
+SELECT coalesce(utm_source, referrer, 'direct') AS source, count(DISTINCT visitor) AS visitors
+FROM events WHERE kind = 'visit' AND device <> 'bot' GROUP BY source ORDER BY visitors DESC;
+
+-- Countries (by timezone) and languages
+SELECT timezone, count(DISTINCT visitor) AS visitors FROM events WHERE device <> 'bot'
+GROUP BY timezone ORDER BY visitors DESC LIMIT 20;
+
+-- Browsers, systems and devices
+SELECT browser, os, device, count(DISTINCT visitor) AS visitors FROM events WHERE device <> 'bot'
+GROUP BY browser, os, device ORDER BY visitors DESC;
+
+-- What people start: new cities, saved ones, the demo, and "unlimited money" games
+SELECT props::json->>'kind' AS kind, (props::json->>'customFunds')::boolean AS custom_funds, count(*)
+FROM events WHERE kind = 'city_start' GROUP BY 1, 2 ORDER BY count DESC;
+```
+
+Tip: share links with tags to see which post worked, e.g.
+`https://openpolis.space/?utm_source=reddit&utm_campaign=webgames`.
+

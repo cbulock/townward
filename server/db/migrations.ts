@@ -35,6 +35,30 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX saves_by_user ON saves(user_id, updated_at DESC);
   `,
+  // 2: anonymous usage events (docs/specs/analytics.md)
+  `
+  CREATE TABLE events (
+    id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    kind         text NOT NULL,
+    visitor      text NOT NULL,
+    user_id      integer REFERENCES users(id) ON DELETE SET NULL,
+    path         text NOT NULL,
+    referrer     text,
+    utm_source   text,
+    utm_medium   text,
+    utm_campaign text,
+    browser      text NOT NULL,
+    os           text NOT NULL,
+    device       text NOT NULL,
+    timezone     text,
+    language     text,
+    screen       text,
+    props        text,
+    created_at   timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX events_by_time ON events(created_at DESC);
+  CREATE INDEX events_by_kind ON events(kind, created_at DESC);
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

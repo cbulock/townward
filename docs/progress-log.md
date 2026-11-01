@@ -2,6 +2,11 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-02: Usage analytics (D-076)
+- `events` table (migration 2) and `server/modules/analytics/` (schemas → routes → service → repository, plus a small User-Agent reader). The client (`src/app/analytics.ts`) sends a `visit` per page load and a `city_start` when a city goes into play (new, opened, demo; with preset, size and whether custom funds were used).
+- Anonymous: random visitor ID in localStorage, no IPs, no raw User-Agents, Do Not Track respected. Rate-limited to 120 events per address per 10 minutes.
+- Tests: `server/modules/analytics/analytics.test.ts` (stored fields, account link, validation, the rate limit, User-Agent parsing). Queries for the VPS in [deploy.md](deploy.md), "Usage numbers".
+
 ## 2026-11-01: The game is called Openpolis (D-001)
 - Name chosen and domain registered: **Openpolis**, openpolis.space. Browser title, landing wordmark and footer, sign-up heading, package name, Docker image and docs use it. Added a favicon, page description, canonical URL and Open Graph tags.
 - Internal identifiers keep the old `citybuilder` names (browser storage keys, IndexedDB, Postgres) so existing cities and accounts keep working.

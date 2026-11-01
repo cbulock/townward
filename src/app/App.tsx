@@ -5,6 +5,7 @@ import { hasJournal } from '../save/journal';
 import { loadCity, recoverNewCity } from '../save/loadCity';
 import type { CityRef } from '../save/SaveStore';
 import { AuthDialog } from './account/AuthDialog';
+import { track, trackVisit } from './analytics';
 import { authAtom } from './atoms';
 import { useAuthBootstrap } from './auth';
 import { clearUrlOptions, demoOptions, isDemoRoute, readCityRef, readUrlOptions, writeCityUrl, writeDemoUrl, writeUrlOptions } from './options';
@@ -39,6 +40,19 @@ export function App() {
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const auth = useAtomValue(authAtom);
   const [guest, setGuest] = useAtom(guestAtom);
+
+  useEffect(() => trackVisit(), []);
+  // Every city that goes into play (new, opened, demo, or straight from a URL) counts once.
+  const playing = screen.kind === 'play' ? screen.options : null;
+  useEffect(() => {
+    if (!playing) return;
+    track('city_start', {
+      kind: playing.save ? 'open' : playing.demo ? 'demo' : 'new',
+      preset: playing.terrain.preset,
+      size: playing.terrain.size,
+      customFunds: playing.funds !== undefined,
+    });
+  }, [playing]);
 
   // Load a saved city, then play it; on failure, back to the menu with the reason.
   const loadingRef = screen.kind === 'loading' ? screen.ref : null;

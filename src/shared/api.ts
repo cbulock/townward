@@ -59,3 +59,29 @@ export interface ApiErrorBody {
   /** 429 only: seconds until the client may try again. */
   readonly retryAfter?: number;
 }
+
+/** Usage events (docs/specs/analytics.md). */
+export const EVENT_KINDS = ['visit', 'city_start'] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
+
+/** Small event details: flat strings, numbers and booleans only. */
+export type EventProps = Readonly<Record<string, string | number | boolean>>;
+
+export interface TrackRequest {
+  readonly kind: EventKind;
+  /** Random ID kept in the browser, for unique visitors. */
+  readonly visitor: string;
+  readonly path: string;
+  /** Host of the referring page, e.g. "t.co". */
+  readonly referrer?: string;
+  readonly utmSource?: string;
+  readonly utmMedium?: string;
+  readonly utmCampaign?: string;
+  /** IANA timezone, e.g. "Asia/Kolkata". */
+  readonly timezone?: string;
+  /** Browser language, e.g. "en-IN". */
+  readonly language?: string;
+  /** "1440x900". */
+  readonly screen?: string;
+  readonly props?: EventProps;
+}
