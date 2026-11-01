@@ -25,6 +25,8 @@ itself (`127.0.0.1:8787` for the app). HTTPS comes from your own reverse proxy o
    cp .env.example .env
    nano .env   # POSTGRES_PASSWORD=<output of: openssl rand -hex 24>
    ```
+   If ports 5432 or 8787 are already in use on the server (`ss -ltn`), set `POSTGRES_PORT` and
+   `APP_PORT` in `.env` to free ones, and point your proxy at `127.0.0.1:$APP_PORT`.
 5. **Start the app:**
    ```bash
    docker compose --profile app up -d --build
