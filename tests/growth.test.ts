@@ -4,7 +4,7 @@ import { mulberry32 } from '../src/shared/rng';
 import { BUILDINGS, chooseBuilding, type BuildingDef } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { applyClear, applyPlace, applyRoad, applyZone, planClear, planPlace, planRoad, planZone } from '../src/sim/commands';
-import { growDay, zoneDemand } from '../src/sim/systems/growth';
+import { explainDemand, growDay, zoneDemand } from '../src/sim/systems/growth';
 import { findEntrance } from '../src/sim/systems/access';
 import { cityStats, simulateDay } from '../src/sim/systems/population';
 import { rectTiles, roadPath, RoadType } from '../src/sim/roads';
@@ -203,5 +203,27 @@ describe('growth', () => {
     expect(chooseBuilding('I', 'low', 2, 2, rng)).toBe('warehouse');
     expect(chooseBuilding('R', 'high', 2, 1, rng)).toBe('walkup');
     expect(chooseBuilding('C', 'high', 2, 1, rng)).toBe('small_office');
+  });
+});
+
+describe('demand explanations (master plan §6.4)', () => {
+  it('offices and industry wait while jobs outnumber workers, and say homes fix it', () => {
+    // A few homes and already plenty of offices: commercial demand is negative.
+    const w = new World(24, 12, 3);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 5 }, { x: 23, y: 5 }, true), RoadType.Road), RoadType.Road);
+    for (let x = 0; x < 4; x++) applyPlace(city, planPlace(w, 'cottage', x, 4), 0);
+    for (let x = 6; x < 10; x++) applyPlace(city, planPlace(w, 'small_office', x, 4), 0);
+    applyZone(city, planZone(w, rectTiles({ x: 12, y: 6 }, { x: 15, y: 6 }), ZoneType.CommercialHigh), ZoneType.CommercialHigh);
+    refreshCity(w);
+    // Four offices (160 jobs) for four cottages (12 residents): far more jobs than workers.
+    expect(zoneDemand(w).o).toBeLessThan(0);
+    expect(zoneDemand(w).i).toBeLessThan(0); // industry doesn't build jobs nobody can staff either
+    expect(explainDemand(w).o).toMatch(/more jobs than workers\. Homes bring workers/);
+    expect(zoneDemand(w).r).toBeGreaterThan(0); // and homes are wanted
+    const g = growDay(w, mulberry32(1));
+    expect(g.waiting.o).toBe(4); // the four office lots wait, and growth says so
+    expect(g.started).toHaveLength(0);
   });
 });

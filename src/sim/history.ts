@@ -23,6 +23,7 @@ export interface CitySample {
   /** R/C/I demand, each −1..1. */
   readonly demandR: number;
   readonly demandC: number;
+  readonly demandO: number;
   readonly demandI: number;
   readonly powerShort: number;
   readonly waterShort: number;
@@ -50,6 +51,7 @@ export function sampleCity(sim: Simulation): CitySample {
     jammedTiles: traffic.jammedTiles,
     demandR: demand.r,
     demandC: demand.c,
+    demandO: demand.o,
     demandI: demand.i,
     powerShort: utilities.power.short,
     waterShort: utilities.water.short,
@@ -73,6 +75,7 @@ export const SAMPLE_COLUMNS: readonly (keyof CitySample)[] = [
   'jammedTiles',
   'demandR',
   'demandC',
+  'demandO',
   'demandI',
   'powerShort',
   'waterShort',

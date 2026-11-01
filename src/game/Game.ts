@@ -17,6 +17,7 @@ import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
 import { serviceBit } from '../sim/systems/coverage';
 import { windFactor } from '../sim/systems/energy';
+import { demandFor } from '../sim/systems/growth';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
 import { needsUtilities } from '../sim/systems/utilities';
@@ -60,6 +61,8 @@ const STATS_INTERVAL = 0.25;
 const MAX_RIPPLE_TIME = 0.5;
 /** Particle budget shared across all tiles of one action. */
 const PARTICLE_BUDGET = 900;
+/** Days zoned lots wait on demand before the game explains why. */
+const WAIT_NOTICE_DAYS = 10;
 /** Turbine blade speed at full wind and 1× (radians per second, about 17 rpm), and its cap at high game speeds. */
 const ROTOR_SPIN = 1.8;
 const ROTOR_SPIN_MAX = 4;
@@ -120,6 +123,9 @@ export class Game {
   private statsTimer = 0;
   private statsFrames = 0;
   private statsTime = 0;
+  /** Consecutive days each zone kind had lots held back by low demand, and when we last said so. */
+  private readonly waitingDays = { r: 0, c: 0, o: 0, i: 0 };
+  private readonly waitNoticeDay = { r: -Infinity, c: -Infinity, o: -Infinity, i: -Infinity };
   /** The clock day of the last brownout notice (one per clock day). */
   private brownoutDay = -1;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
@@ -377,6 +383,7 @@ export class Game {
 
   private newDay(out: DayOutcome) {
     this.showDay(out);
+    this.explainWaitingZones();
     // Congestion changes every day, even when no buildings did.
     if (out.changed.length === 0) this.refreshDataView();
     const r = out.budget;
@@ -602,6 +609,21 @@ export class Game {
   }
 
   /**
+   * Zoned lots that sit empty because nobody wants them yet look broken. After WAIT_NOTICE_DAYS
+   * of that, say why and what raises the demand, at most once a month per zone kind.
+   */
+  private explainWaitingZones() {
+    const waiting = this.sim.growth.waiting;
+    for (const k of ['r', 'c', 'o', 'i'] as const) {
+      this.waitingDays[k] = waiting[k] > 0 ? this.waitingDays[k] + 1 : 0;
+      if (this.waitingDays[k] < WAIT_NOTICE_DAYS || this.city.day - this.waitNoticeDay[k] < BALANCE.daysPerMonth) continue;
+      this.waitNoticeDay[k] = this.city.day;
+      const what = { r: 'home', c: 'shop', o: 'office', i: 'industry' }[k];
+      this.notify('info', `${waiting[k]} empty ${what} lots aren't growing: ${this.sim.growth.explain()[k]}`);
+    }
+  }
+
+  /**
    * A new clock hour: the grid was re-balanced, so refresh the budget panel, and explain the
    * first brownout of each clock day (docs/specs/energy.md).
    */
@@ -628,6 +650,7 @@ export class Game {
     this.events.emit('city', {
       ...s,
       demand: this.sim.growth.demand(),
+      demandWhy: this.sim.growth.explain(),
       traffic: this.sim.commute.report,
       needs: this.sim.needs.report,
       power: this.sim.utilities.report.power,
@@ -831,8 +854,10 @@ export class Game {
 
   private previewNote(p: ToolPlan): string | null {
     const stranded = strandedZoneTiles(this.world, p);
-    if (stranded === 0) return null;
-    return stranded === p.plan.count ? 'needs a road nearby to grow' : `${stranded} tile${stranded === 1 ? '' : 's'} need a road nearby`;
+    if (stranded > 0) return stranded === p.plan.count ? 'needs a road nearby to grow' : `${stranded} tile${stranded === 1 ? '' : 's'} need a road nearby`;
+    // Zoning where nobody wants to build yet is fine, but say so, or the empty lots look broken.
+    if (p.kind === 'zone' && demandFor(this.sim.growth.demand(), p.zone) <= 0) return 'no demand yet: grows once its bar rises';
+    return null;
   }
 
   private notify(kind: 'error' | 'info', message: string) {

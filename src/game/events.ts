@@ -1,6 +1,6 @@
 import type { SystemTiming } from '../sim/core/timings';
 import type { BuildingId } from '../sim/buildings/catalog';
-import type { ZoneDemand } from '../sim/systems/growth';
+import type { DemandWhy, ZoneDemand } from '../sim/systems/growth';
 import type { BudgetReport } from '../sim/systems/budget';
 import type { PowerReport } from '../sim/systems/energy';
 import type { UtilityTotals } from '../sim/systems/utilities';
@@ -52,6 +52,8 @@ export interface CityInfo {
   people: number;
   /** R/C/I demand, each in [−1, 1]. */
   demand: ZoneDemand;
+  /** Why each bar is where it is, in a sentence. */
+  demandWhy: DemandWhy;
   power: UtilityTotals;
   water: UtilityTotals;
   /** Commuters, average commute and jammed road tiles (docs/specs/traffic.md). */

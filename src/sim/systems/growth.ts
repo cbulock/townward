@@ -28,9 +28,13 @@ import type { DayOutcome, SimSystem } from '../core/System';
 type Rng = () => number;
 
 /** Demand per zone in [−1, 1]. Positive means the city wants more of it. */
+/** Demand per bar, each −1..1: homes, shops, offices, industry. */
 export interface ZoneDemand {
   readonly r: number;
+  /** Shops (low-density commercial). */
   readonly c: number;
+  /** Offices (high-density commercial). */
+  readonly o: number;
   readonly i: number;
 }
 
@@ -49,9 +53,11 @@ export interface GrowthResult {
   readonly started: readonly number[];
   /** Ids of buildings that finished construction today. */
   readonly completed: readonly number[];
+  /** Empty zoned tiles with road access that didn't grow because their demand is ≤ 0. */
+  readonly waiting: ZoneDemand;
 }
 
-const DEMAND_FLOOR = { r: 50, c: 20, i: 20 } as const;
+const DEMAND_FLOOR = { r: 50, c: 20, o: 40, i: 20 } as const;
 
 function ratio(want: number, have: number, floor: number): number {
   return Math.max(-1, Math.min(1, (want - have) / Math.max(want, floor)));
@@ -62,35 +68,96 @@ function ratio(want: number, have: number, floor: number): number {
  * under construction, so demand drops as soon as a lot starts and growth doesn't overshoot.
  */
 /** Higher taxes than the base rate cool demand, lower ones warm it (docs/specs/core.md). */
-export function zoneDemand(world: World, taxRate: number = BALANCE.baseTaxRate): ZoneDemand {
+/** What demand is made of: capacities built, capacities wanted, and the tax effect. */
+interface DemandInputs {
+  housing: number;
+  shops: number;
+  offices: number;
+  industrial: number;
+  /** Jobs the workforce could still fill beyond every job that exists (negative: too many jobs). */
+  openJobs: number;
+  wantR: number;
+  wantShops: number;
+  wantOffices: number;
+  wantI: number;
+  /** Demand points taken off every bar by taxes above the base rate (negative: added). */
+  tax: number;
+}
+
+function demandInputs(world: World, taxRate: number): DemandInputs {
   let housing = 0;
-  let commercial = 0;
+  let shops = 0;
+  let offices = 0;
   let industrial = 0;
   let civic = 0;
   for (const b of world.buildings.values()) {
-    const d = BUILDINGS[b.def];
+    const d: BuildingDef = BUILDINGS[b.def];
     if (d.category === 'residential') housing += d.capacity;
-    else if (d.category === 'commercial') commercial += d.capacity;
-    else if (d.category === 'industrial') industrial += d.capacity;
+    else if (d.category === 'commercial') {
+      if (d.density === 'high') offices += d.capacity;
+      else shops += d.capacity;
+    } else if (d.category === 'industrial') industrial += d.capacity;
     else civic += d.capacity;
   }
-  const workforce = housing * BALANCE.workforceShare;
-  const wantC = workforce * BALANCE.commercialJobShare + BALANCE.seedCommercialJobs;
-  const wantI = workforce * (1 - BALANCE.commercialJobShare) + BALANCE.seedIndustrialJobs;
-  const jobs = commercial + industrial + civic;
-  const wantR = (jobs / BALANCE.workforceShare) * BALANCE.housingSlack + BALANCE.seedHousing;
-  const tax = (taxRate - BALANCE.baseTaxRate) * BALANCE.taxDemandStep;
-  const adjust = (d: number) => Math.max(-1, Math.min(1, d - tax));
+  const jobs = shops + offices + industrial + civic;
+  const openJobs = housing * BALANCE.workforceShare * BALANCE.jobSlack - jobs;
   return {
-    r: adjust(ratio(wantR, housing, DEMAND_FLOOR.r)),
-    c: adjust(ratio(wantC, commercial, DEMAND_FLOOR.c)),
-    i: adjust(ratio(wantI, industrial, DEMAND_FLOOR.i)),
+    housing,
+    shops,
+    offices,
+    industrial,
+    openJobs,
+    wantR: (jobs / BALANCE.workforceShare) * BALANCE.housingSlack + BALANCE.seedHousing,
+    wantShops: housing * BALANCE.shopJobsPerResident + BALANCE.seedCommercialJobs,
+    wantOffices: offices + openJobs * BALANCE.officeJobShare,
+    wantI: industrial + openJobs * (1 - BALANCE.officeJobShare) + BALANCE.seedIndustrialJobs,
+    tax: (taxRate - BALANCE.baseTaxRate) * BALANCE.taxDemandStep,
   };
 }
 
-export function demandFor(demand: ZoneDemand, zone: ZonedType): number {
+export function zoneDemand(world: World, taxRate: number = BALANCE.baseTaxRate): ZoneDemand {
+  const x = demandInputs(world, taxRate);
+  const adjust = (d: number) => Math.max(-1, Math.min(1, d - x.tax));
+  return {
+    r: adjust(ratio(x.wantR, x.housing, DEMAND_FLOOR.r)),
+    c: adjust(ratio(x.wantShops, x.shops, DEMAND_FLOOR.c)),
+    o: adjust(ratio(x.wantOffices, x.offices, DEMAND_FLOOR.o)),
+    i: adjust(ratio(x.wantI, x.industrial, DEMAND_FLOOR.i)),
+  };
+}
+
+/** One plain sentence per bar: why demand is where it is and what raises it (master plan §6.4). */
+export type DemandWhy = Readonly<Record<keyof ZoneDemand, string>>;
+
+export function explainDemand(world: World, taxRate: number = BALANCE.baseTaxRate): DemandWhy {
+  const x = demandInputs(world, taxRate);
+  const n = (v: number) => Math.round(Math.abs(v)).toLocaleString();
+  const taxNote = x.tax > 0.005 ? ` Taxes above ${BALANCE.baseTaxRate}% are holding it down.` : '';
+  const tooManyJobs = `The city already has ${n(x.openJobs)} more jobs than workers. Homes bring workers.`;
+  return {
+    r:
+      (x.wantR > x.housing
+        ? `Jobs need workers: room for about ${n(x.wantR - x.housing)} more residents.`
+        : 'More homes than jobs: shops, offices and industry bring residents.') + taxNote,
+    c:
+      (x.wantShops > x.shops
+        ? `Residents want about ${n(x.wantShops - x.shops)} more shop jobs nearby.`
+        : `There are enough shops (${n(x.shops)} jobs) for your residents. More homes raise this.`) + taxNote,
+    o: (x.openJobs > 0 ? `Workers could fill about ${n(x.openJobs * BALANCE.officeJobShare)} more office jobs.` : tooManyJobs) + taxNote,
+    i: (x.openJobs > 0 ? `Workers could fill about ${n(x.openJobs * (1 - BALANCE.officeJobShare))} more industry jobs.` : tooManyJobs) + taxNote,
+  };
+}
+
+/** Which demand bar a zone grows on: shops and offices have their own. */
+export function demandKey(zone: ZonedType): keyof ZoneDemand {
   const letter = ZONE_LETTER[zone];
-  return letter === 'R' ? demand.r : letter === 'C' ? demand.c : demand.i;
+  if (letter === 'R') return 'r';
+  if (letter === 'I') return 'i';
+  return ZONE_DENSITY[zone] === 'high' ? 'o' : 'c';
+}
+
+export function demandFor(demand: ZoneDemand, zone: ZonedType): number {
+  return demand[demandKey(zone)];
 }
 
 /** 0 = foundation, 1 = scaffold. Only meaningful while `construction > 0`. */
@@ -174,9 +241,13 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
       empty.get(z)?.push({ x, y });
     }
   }
+  const waiting = { r: 0, c: 0, o: 0, i: 0 };
   for (const z of ZONED_TYPES) {
     const d = demandFor(demand, z);
-    if (d <= 0) continue;
+    if (d <= 0) {
+      waiting[demandKey(z)] += empty.get(z)?.length ?? 0;
+      continue;
+    }
     const ids = zonedBuildings(ZONE_LETTER[z], ZONE_DENSITY[z], startLevel(ZONE_LETTER[z], ZONE_DENSITY[z]), 1);
     if (ids.length === 0) continue;
     for (const t of sample(empty.get(z) ?? [], Math.ceil(d * BALANCE.growthPerDay), rng)) build(pick(ids, rng), t.x, t.y);
@@ -208,7 +279,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
     }
   }
 
-  return { changed, started, completed };
+  return { changed, started, completed, waiting };
 }
 
 type Build = (def: BuildingId, x: number, y: number, occupants?: number) => void;
@@ -302,6 +373,8 @@ export class GrowthSystem implements SimSystem {
   readonly name = 'growth';
   private readonly city: City;
   private readonly rng: Rng;
+  /** Today's empty zoned lots held back by low demand (for the "why isn't it growing" notice). */
+  waiting: ZoneDemand = { r: 0, c: 0, o: 0, i: 0 };
   constructor(city: City, rng: Rng) {
     this.city = city;
     this.rng = rng;
@@ -311,8 +384,12 @@ export class GrowthSystem implements SimSystem {
     out.changed.push(...g.changed);
     out.started.push(...g.started);
     out.completed.push(...g.completed);
+    this.waiting = g.waiting;
   }
   demand(): ZoneDemand {
     return zoneDemand(this.city.world, this.city.taxRate);
+  }
+  explain(): DemandWhy {
+    return explainDemand(this.city.world, this.city.taxRate);
   }
 }

@@ -3,6 +3,16 @@
 Newest first. One entry per work session.
 
 
+## 2026-11-01: Spinning wind turbines; "why don't my offices grow?"
+- **Turbine blades spin.** They were baked into the static texture. Now `render/atlas/energy/rotor.ts` is the one blade drawing, used by a new fx layer (`render/fx/Rotors.ts`) that spins them at the day's wind × game speed (still when paused) and by picker thumbnails as a still (`paintBuilding(..., { stillParts: true })`). Art declares hub points (`CivicArt.rotors`), like smoke sources. Verified in Chrome: frames half a second apart differ.
+- **Offices never growing (user report):** diagnosed on the user's real save (River Valley, 1,166 people): 18 empty office lots and 16 shop lots, all next to roads, but commercial demand −10%, while residential (+0.33) and industry (+0.69) had no empty land left. Growth only fills a zone when its bar is above zero, and nothing told the player.
+  - Demand bar tooltips now explain each bar in a sentence (`explainDemand`).
+  - A notice after 10 days of lots waiting on demand, at most once a month per zone kind.
+  - The zone tool's preview says "no demand yet" while painting a zone with no demand.
+  - Test: offices waiting on negative commercial demand are counted and explained.
+- **Found a balance flaw:** shops and offices share one commercial bar, and office towers add so many jobs that the /demo city sits at −100% commercial forever. The fix is Demand v2's split into Shops and Offices bars (master plan §6.4), pending the user's go-ahead because it changes /demo.
+- 145 tests; typecheck and lint clean.
+
 ## 2026-11-01: Feature track A, Energy v2 (D-067, D-068)
 - User direction: focus on the master plan's features (public transport, hospitals, universities, research, proper traffic, drainage, sewage, more advanced water and power). Set the order A–F (D-067) and added drainage (§12.2b) and research (§12.4) to the master plan.
 - **Deterministic clock (D-068):** `City.ticks` and `Simulation.tick()` replace frame-time clock advance. Hours and days come from fixed ticks, so every machine plays a city the same way. The game, the harness (`runDays`) and the tests all use it.

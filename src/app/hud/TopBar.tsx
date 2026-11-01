@@ -115,9 +115,10 @@ function Clock() {
 }
 
 const DEMAND_BARS = [
-  ['r', 'R', 'Residential'],
-  ['c', 'C', 'Commercial'],
-  ['i', 'I', 'Industrial'],
+  ['r', 'R', 'Homes'],
+  ['c', 'C', 'Shops'],
+  ['o', 'O', 'Offices'],
+  ['i', 'I', 'Industry'],
 ] as const;
 
 function demandWord(d: number): string {
@@ -125,9 +126,10 @@ function demandWord(d: number): string {
 }
 
 /** R/C/I demand: bars grow up from the midline when the city wants more, down when it has too much. */
-function DemandMeter({ demand }: { demand: CityInfo['demand'] | undefined }) {
+function DemandMeter({ demand, why }: { demand: CityInfo['demand'] | undefined; why: CityInfo['demandWhy'] | undefined }) {
+  // One line per bar: how strong it is and why (master plan §6.4).
   const title = demand
-    ? DEMAND_BARS.map(([k, , name]) => `${name}: ${demandWord(demand[k])}`).join(' · ')
+    ? DEMAND_BARS.map(([k, , name]) => `${name}: ${demandWord(demand[k])} (${Math.round(demand[k] * 100)}%)${why ? `. ${why[k]}` : ''}`).join('\n')
     : 'Zone demand';
   return (
     <span className="demand" title={title} aria-label={title}>
@@ -221,7 +223,7 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
         </svg>
         <span className="stat-value">{Math.round(happy * 100)}%</span>
       </button>
-      <DemandMeter demand={city?.demand} />
+      <DemandMeter demand={city?.demand} why={city?.demandWhy} />
       <button
         type="button"
         className={`funds ${fundsFlash ? `flash-${fundsFlash === 'down' ? 'spend' : 'gain'}` : ''}`}

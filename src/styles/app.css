@@ -751,6 +751,7 @@ kbd {
 }
 .demand-col.tone-r { --tone: var(--zone-r); }
 .demand-col.tone-c { --tone: var(--zone-c); }
+.demand-col.tone-o { --tone: #3b82f6; }
 .demand-col.tone-i { --tone: var(--zone-i); }
 .demand-track {
   position: relative;
