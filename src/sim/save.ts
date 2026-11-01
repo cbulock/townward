@@ -82,6 +82,8 @@ export interface SaveData {
   readonly city: SavedCity;
   readonly layers: SavedLayers;
   readonly buildings: readonly SavedBuilding[];
+  /** Tile-indexed building ownership snapshot: `"x,y"` → building array index. */
+  readonly buildingTiles?: Readonly<Record<string, number>>;
   readonly sim?: SavedSimState;
 }
 
@@ -106,7 +108,9 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
   const cleared = new Uint8Array(w.width * w.height);
   for (let i = 0; i < cleared.length; i++) cleared[i] = w.tree[i] === 0 && w.decor[i] === Decor.None ? 1 : 0;
   const buildings: SavedBuilding[] = [];
+  const buildingIndex = new Map<number, number>();
   for (const b of w.buildings.values()) {
+    buildingIndex.set(b.id, buildings.length);
     const core: SavedBuildingCore = [
       b.def,
       b.x,
@@ -127,6 +131,16 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
           : core,
     );
   }
+  const buildingTiles: Record<string, number> = {};
+  for (let i = 0; i < w.building.length; i++) {
+    const owner = w.building[i];
+    const index = buildingIndex.get(owner);
+    if (index !== undefined) {
+      const x = i % w.width;
+      const y = Math.floor(i / w.width);
+      buildingTiles[`${x},${y}`] = index;
+    }
+  }
   return {
     v: SAVE_VERSION,
     gen: GENERATOR_VERSION,
@@ -142,6 +156,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       pave: encodeLayer(w.pave),
     },
     buildings,
+    buildingTiles,
     ...(sim && { sim: saveSimState(sim) }),
   };
 }
@@ -195,6 +210,7 @@ export function deserialize(data: SaveData): City {
     }
   }
   for (const s of data.buildings) addSavedBuilding(world, s);
+  validateBuildingTiles(data.buildingTiles, world);
 
   const city = new City(world, data.city.funds);
   city.day = data.city.day;
@@ -260,6 +276,19 @@ function addSavedBuilding(world: World, s: SavedBuilding) {
   b.repairDays = Math.max(0, repairDays);
 }
 
+function validateBuildingTiles(tiles: Readonly<Record<string, number>> | undefined, world: World) {
+  if (!tiles) return;
+  for (const [key, owner] of Object.entries(tiles)) {
+    const match = /^(\d+),(\d+)$/.exec(key);
+    if (!match) throw new SaveError('bad building tile');
+    const x = Number(match[1]);
+    const y = Number(match[2]);
+    if (!Number.isInteger(owner) || owner < 0 || owner >= world.buildings.size || !world.inBounds(x, y)) {
+      throw new SaveError('bad building tile');
+    }
+  }
+}
+
 // ---------------------------------------------------------------- parse (untrusted JSON → SaveData)
 
 type Obj = Readonly<Record<string, unknown>>;
@@ -289,6 +318,7 @@ function obj(o: Obj, key: string): Obj {
 const isBuildingId = (v: unknown): v is BuildingId => typeof v === 'string' && (BUILDING_IDS as readonly string[]).includes(v);
 const isPresetId = (v: unknown): v is PresetId => typeof v === 'string' && (PRESET_IDS as readonly string[]).includes(v);
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
+const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
  * Check untrusted JSON (from the server or IndexedDB) and return it as SaveData.
@@ -319,14 +349,25 @@ export function parseSave(json: unknown): SaveData {
   for (const item of list) {
     if (!Array.isArray(item)) continue;
     const fields: readonly unknown[] = item;
-    if (fields.length !== 10 && fields.length !== 11) continue;
+    if (fields.length !== 10 && fields.length !== 11 && fields.length !== 13) continue;
     const [def, ...rest] = fields;
     if (!isBuildingId(def)) continue;
-    if (!rest.every(isInt)) continue;
-    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored] = rest;
+    if (!rest.every(isFiniteNumber)) continue;
+    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored, condition, repairDays] = rest;
+    if (![x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays].every(isInt)) continue;
+    if (stored !== undefined && !isInt(stored)) continue;
+    if (condition !== undefined && (condition < 0 || condition > 1)) continue;
+    if (repairDays !== undefined && !isInt(repairDays)) continue;
     const core: SavedBuildingCore = [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays];
-    buildings.push(stored === undefined ? core : [...core, stored]);
+    buildings.push(
+      condition === undefined || repairDays === undefined
+        ? stored === undefined
+          ? core
+          : [...core, stored]
+        : [...core, stored ?? 0, condition, repairDays],
+    );
   }
+  const buildingTiles = parseBuildingTiles(json.buildingTiles);
   return {
     v: SAVE_VERSION,
     gen: num(json, 'gen'),
@@ -342,8 +383,20 @@ export function parseSave(json: unknown): SaveData {
       ...(typeof l.pave === 'string' && { pave: l.pave }),
     },
     buildings,
+    ...(buildingTiles && { buildingTiles }),
     ...parseSimState(json.sim),
   };
+}
+
+function parseBuildingTiles(v: unknown): Readonly<Record<string, number>> | undefined {
+  if (v === undefined) return undefined;
+  if (!isObj(v)) throw new SaveError('bad buildingTiles');
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(v)) {
+    if (!/^\d+,\d+$/.test(key) || !isInt(value) || value < 0) throw new SaveError('bad building tile');
+    result[key] = value;
+  }
+  return result;
 }
 
 /** The optional sim block; anything malformed is dropped (the city still loads, just cold). */

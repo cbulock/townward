@@ -11,6 +11,9 @@ Newest first. One entry per work session.
 - Added substations with blue coverage previews. Once a substation exists, plants and
   buildings must share its road island and reach to participate in the power network;
   cities without substations retain legacy delivery.
+- Save data now includes an explicit JSON `buildingTiles` map for every occupied tile,
+  while building tuples remain the authoritative source for restoring runtime state.
+  Maintenance condition and repair fields are also accepted during JSON parsing.
 
 ## 2026-11-01: Parks and shopping landmarks
 - Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.

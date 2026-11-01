@@ -63,6 +63,7 @@ describe('save format', () => {
     expect(b.tree).toEqual(a.tree);
     expect(b.decor).toEqual(a.decor);
     expect(b.terrain).toEqual(a.terrain);
+    expect(parseSave(JSON.parse(json)).buildingTiles).toEqual(data.buildingTiles);
     expect(buildingsOf(loaded)).toEqual(buildingsOf(city));
     expect(cityStats(b).population).toBe(cityStats(a).population);
     expect({ funds: loaded.funds, day: loaded.day, clock: loaded.clock, taxRate: loaded.taxRate }).toEqual({

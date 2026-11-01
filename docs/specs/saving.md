@@ -33,6 +33,13 @@ account so they follow the player to any browser. Design decisions: D-034, D-062
 
 ## Save Format (`sim/save.ts`, version 1)
 
+Building instances remain the authoritative saved records. Each save also contains a
+`buildingTiles` JSON map whose `"x,y"` keys identify every occupied tile and whose values
+refer to the building's index in `buildings`. This makes tile ownership explicit and
+inspectable while keeping the map footprint deterministic and compact. On load, footprints
+are rebuilt from the validated building records and the tile map is validated against map
+bounds and building references. (`sim/save.ts`, version 1)
+
 Only what can't be recomputed (D-034). Terrain is regenerated from its settings; road
 access, utilities, coverage, commutes, needs and traffic are rebuilt on load.
 
