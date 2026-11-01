@@ -13,7 +13,7 @@ Thanks for helping build Openpolis! This guide covers setup, how the project is 
 You need [Bun](https://bun.sh) 1.4+. Docker is optional (for accounts and cloud saves).
 
 ```bash
-git clone https://github.com/subediaakash/sim.git openpolis
+git clone https://github.com/subediaakash/openpolis.git
 cd openpolis
 bun install
 docker compose up -d   # optional: Postgres

@@ -35,7 +35,7 @@ Every building, tree and street is drawn by code at load time: there are no imag
 You need [Bun](https://bun.sh) 1.4+ and, for accounts and cloud saves, Docker.
 
 ```bash
-git clone https://github.com/subediaakash/sim.git openpolis
+git clone https://github.com/subediaakash/openpolis.git
 cd openpolis
 bun install
 docker compose up -d     # Postgres for accounts and cloud saves (optional)
