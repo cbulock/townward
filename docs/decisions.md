@@ -145,3 +145,9 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
   - **Motion:** trees and tall plants sway around their roots (skew on a pivot, a gust front rolling across the map), at 30 Hz, on visible chunks, from zoom 0.75. Fountains spray, mast and spire beacons blink, bird flocks cross by day with shadows, and cloud shadows drift with the wind (`render/ambient/`).
   - Cost: atlas 5 pages, about 380 ms to paint (was about 4). The light sprites and sway only touch visible chunks.
   - Dev pages for review: `/src/dev/art.html` (every tile family; `?rot=1`, `?only=<id>`), `/src/dev/night.html` (demo locked to night), `/src/dev/atlas.html` (atlas cost).
+- **D-073 — Auth limits count failures, not attempts; the client address comes from a configured proxy.** 2026-11-01. User report: getting rate-limited. The old limit allowed 10 login *or signup attempts* per IP per 15 minutes, counting successes and typos, and the server only trusted loopback proxies, so behind a deploy proxy every player would share one address and one budget.
+  - Now only wrong passwords count: per email per address (8 / 15 min), and per address across emails (60 / 15 min, against password spraying). A successful login clears its email. Signups: 20 per address per hour, after validation. 429s carry `Retry-After` and a `retryAfter` field; the dialog shows a countdown.
+  - `TRUST_PROXY` (default `loopback`; `1` behind one load balancer) sets Express `trust proxy`, so `req.ip` is the player.
+  - Counters stay in memory: right for one server process. Running several instances would move them to Postgres or Redis.
+  - Also for deploying: security headers (HSTS in production), `/api/health`, immutable caching for hashed assets with `index.html` revalidated, hourly pruning of expired sessions, and a Docker image ([deploy.md](deploy.md)).
+

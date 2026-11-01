@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import { api, ApiError } from '../save/api';
 import { authAtom, type AuthState } from './atoms';
+import { guestAtom, setChoseGuest } from './screens/landing/guest';
 
 /** Signed-in state for the whole app (docs/specs/saving.md, "Player Experience"). */
 
@@ -33,6 +34,7 @@ export interface AuthActions {
 
 export function useAuth(): AuthActions {
   const [auth, setAuth] = useAtom(authAtom);
+  const [, setGuest] = useAtom(guestAtom);
   const login = useCallback(
     async (email: string, password: string) => setAuth({ status: 'user', user: await api.login(email, password) }),
     [setAuth],
@@ -47,6 +49,9 @@ export function useAuth(): AuthActions {
       if (!(err instanceof ApiError) || err.status !== 401) throw err;
     });
     setAuth({ status: 'guest', online: true });
-  }, [setAuth]);
+    // Back to the landing page next time the menu shows.
+    setChoseGuest(false);
+    setGuest(false);
+  }, [setAuth, setGuest]);
   return { auth, login, signup, logout };
 }

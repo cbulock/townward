@@ -16,6 +16,18 @@
   --radius: 12px;
   --blur: 14px;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  /* Headlines and the wordmark. */
+  --font-display: 'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif;
+  /* Map labels, numbers, small caps captions. */
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Landing palette: drafting-table ink, survey paper and road-sign amber. */
+  --ink: #0e1820;
+  --ink-raised: #15222c;
+  --paper: #ece4d3;
+  --paper-dim: #a9b0a8;
+  --sign: #f0b23e;
+  --sign-deep: #c98a17;
+  --rule: rgba(236, 228, 211, 0.14);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }

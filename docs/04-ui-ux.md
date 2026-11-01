@@ -104,3 +104,10 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 - **Cost label** follows the cursor while dragging and turns red if it's unaffordable.
 - **Hover highlight** is always visible over the tile under the cursor.
 - **Never block the world:** errors show as short toasts or as cursor labels, never modals.
+
+## Landing Page and Accounts
+
+- Visitors who aren't signed in see the **landing page** first: a live-painted city diorama, a headline, and three ways in: *Create a free account*, *Play as guest*, *Log in* (plus *Tour a finished city*, the demo). If the save server is offline, only *Start playing* shows. Choosing guest is remembered on the device; logging out brings the landing page back.
+- The **account dialog** has Log in / Sign up tabs, inline field checks after leaving a field, a show/hide toggle and Caps Lock warning on passwords, a strength meter and a confirm-password field on sign up, and a countdown when the server asks us to wait (429).
+- Signed in, the top-right shows the account avatar; its menu shows the email, that cities are saved to the account, and Log out (which saves first).
+

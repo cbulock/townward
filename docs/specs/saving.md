@@ -98,7 +98,7 @@ server/
   config.ts      env, validated with zod
   app.ts         middleware, routers, error handler, static files
   db/            Db interface + pg pool; ordered migrations
-  http/          HttpError + error middleware; zod `parse`; session cookie, auth, rate limit
+  http/          HttpError + error middleware; zod `parse`; session cookie, security headers; rateLimit
   modules/auth   password · auth.service · auth.schemas · auth.routes
   modules/saves  saves.repository (SQL) · saves.service (rules) · saves.schemas · saves.routes
   test/          PGlite database and a test server with a cookie-keeping client
@@ -119,7 +119,8 @@ server/
 - Passwords: `scrypt` with a per-user salt, compared in constant time.
 - Sessions: random 32-byte token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in
   production); only its SHA-256 is stored. 30-day expiry.
-- Login and signup are limited to 10 attempts per IP per 15 minutes.
+- Brute-force limits count **failures only** (D-073): 8 wrong passwords per email per address and 60 per address in 15 minutes; a successful login clears its email's count. Signup: 20 attempts per address per hour (invalid forms don't count). A 429 carries `Retry-After` and `retryAfter`, and the dialog counts down.
+- `/api/health` returns 200 when Postgres answers (for load balancers). Deploying: [docs/deploy.md](../deploy.md).
 - Bodies are validated with zod; save data must be an object with a numeric `v`. Request
   bodies up to 8 MB; at most 30 cities per account.
 - Tables: `users`, `sessions`, `saves` (JSON text plus `name`, `population`, `funds`,

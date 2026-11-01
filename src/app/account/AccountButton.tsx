@@ -10,11 +10,15 @@ interface AccountButtonProps {
   compact?: boolean;
 }
 
-/** "Log in" for guests; the account's initial with a small menu (email, log out) once signed in. */
+/**
+ * Guests: "Log in" (plus "Sign up" on the start screen). Signed in: the account's initial, with a
+ * menu showing the email, where cities are kept, and log out. Offline: a quiet badge.
+ */
 export function AccountButton({ beforeLogout, compact = false }: AccountButtonProps) {
   const { auth, logout } = useAuth();
   const openDialog = useSetAtom(authDialogAtom);
   const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,52 +26,96 @@ export function AccountButton({ beforeLogout, compact = false }: AccountButtonPr
     const close = (e: PointerEvent) => {
       if (e.target instanceof Node && !ref.current?.contains(e.target)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') setOpen(false);
+    };
     window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   if (auth.status === 'checking') return null;
   if (auth.status === 'guest') {
+    if (!auth.online) {
+      return (
+        <span className={`account-offline ${compact ? 'is-compact' : ''}`} title="The save server is offline; cities are saved on this device">
+          <i aria-hidden="true" />
+          Offline
+        </span>
+      );
+    }
     return (
-      <button
-        type="button"
-        className={`account-login ${compact ? 'is-compact' : ''}`}
-        disabled={!auth.online}
-        title={auth.online ? 'Log in to keep your cities in an account' : 'The save server is offline; cities are saved on this device'}
-        onClick={() => openDialog('login')}
-      >
-        {auth.online ? 'Log in' : 'Offline'}
-      </button>
+      <div className={`account-guest ${compact ? 'is-compact' : ''}`}>
+        <button type="button" className="account-login" title="Log in to keep your cities in an account" onClick={() => openDialog('login')}>
+          Log in
+        </button>
+        {!compact && (
+          <button type="button" className="account-signup" onClick={() => openDialog('signup')}>
+            Sign up
+          </button>
+        )}
+      </div>
     );
   }
 
   const email = auth.user.email;
+  const initial = email[0]?.toUpperCase();
   return (
     <div className="account" ref={ref}>
       <button
         type="button"
-        className="account-avatar"
+        className={`account-trigger ${compact ? 'is-compact' : ''}`}
         title={email}
         aria-label={`Account: ${email}`}
+        aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        {email[0]?.toUpperCase()}
+        <span className="account-avatar" aria-hidden="true">
+          {initial}
+        </span>
+        {!compact && <span className="account-trigger-email">{email}</span>}
+        <svg className="account-chevron" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
         <div className="panel account-menu" role="menu">
-          <span className="account-email">{email}</span>
+          <div className="account-menu-head">
+            <span className="account-avatar is-large" aria-hidden="true">
+              {initial}
+            </span>
+            <span className="account-menu-who">
+              <span className="account-email">{email}</span>
+              <span className="account-sync">
+                <i aria-hidden="true" />
+                Cities saved to your account
+              </span>
+            </span>
+          </div>
           <button
             type="button"
             role="menuitem"
             className="account-menu-item"
+            disabled={leaving}
             onClick={async () => {
-              setOpen(false);
-              await beforeLogout?.();
-              await logout();
+              setLeaving(true);
+              try {
+                await beforeLogout?.();
+                await logout();
+                setOpen(false);
+              } finally {
+                setLeaving(false);
+              }
             }}
           >
-            Log out
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H6M10.5 11 13.5 8l-3-3M13.5 8H6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {leaving ? 'Saving and logging out…' : 'Log out'}
           </button>
         </div>
       )}

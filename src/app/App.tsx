@@ -1,13 +1,17 @@
+import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import type { GameOptions } from '../game/Game';
 import { hasJournal } from '../save/journal';
 import { loadCity, recoverNewCity } from '../save/loadCity';
 import type { CityRef } from '../save/SaveStore';
 import { AuthDialog } from './account/AuthDialog';
+import { authAtom } from './atoms';
 import { useAuthBootstrap } from './auth';
 import { clearUrlOptions, demoOptions, isDemoRoute, readCityRef, readUrlOptions, writeCityUrl, writeDemoUrl, writeUrlOptions } from './options';
 import { GameScreen } from './screens/GameScreen';
 import { NewGameScreen } from './screens/NewGameScreen';
+import { guestAtom, setChoseGuest } from './screens/landing/guest';
+import { LandingScreen } from './screens/landing/LandingScreen';
 
 /** What's on screen. A playing city knows its save (null for a new or demo city). */
 type Screen =
@@ -33,6 +37,8 @@ function initialScreen(): Screen {
 export function App() {
   useAuthBootstrap();
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  const auth = useAtomValue(authAtom);
+  const [guest, setGuest] = useAtom(guestAtom);
 
   // Load a saved city, then play it; on failure, back to the menu with the reason.
   const loadingRef = screen.kind === 'loading' ? screen.ref : null;
@@ -89,9 +95,19 @@ export function App() {
     setScreen({ kind: 'menu' });
   }, []);
 
+  const playAsGuest = () => {
+    setChoseGuest(true);
+    setGuest(true);
+  };
+  // Visitors who aren't signed in meet the landing page first; signing in or choosing guest moves on.
+  const menu = screen.kind === 'menu';
+  const landing = menu && auth.status === 'guest' && !guest;
+
   return (
     <>
-      {screen.kind === 'menu' && <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />}
+      {menu && auth.status === 'checking' && <div className="landing-blank" />}
+      {landing && <LandingScreen onPlay={playAsGuest} onDemo={() => start(demoOptions())} />}
+      {menu && !landing && auth.status !== 'checking' && <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />}
       {(screen.kind === 'loading' || screen.kind === 'recovering') && (
         <div className="loading-screen" role="status">
           <div className="panel loading-card">Loading your city…</div>

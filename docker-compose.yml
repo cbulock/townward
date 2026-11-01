@@ -1,10 +1,11 @@
 # Local Postgres for the save server (docs/specs/saving.md). Start: docker compose up -d
+# The whole app in production mode (docs/deploy.md): docker compose --profile app up -d --build
 services:
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: citybuilder
-      POSTGRES_PASSWORD: citybuilder
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citybuilder}
       POSTGRES_DB: citybuilder
     ports:
       - '5432:5432'
@@ -15,6 +16,20 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+  app:
+    profiles: [app]
+    build: .
+    environment:
+      DATABASE_URL: postgres://citybuilder:${POSTGRES_PASSWORD:-citybuilder}@postgres:5432/citybuilder
+      # One proxy (the host's HTTPS terminator) in front of the app.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    ports:
+      - '8787:8787'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:

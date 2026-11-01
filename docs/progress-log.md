@@ -2,6 +2,13 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Backend hardening and the account flow (D-073)
+- Rate limits count failures only (per email and per address), clear on success, and send `Retry-After`; `TRUST_PROXY` so a deployed server sees real client addresses.
+- Security headers, `/api/health`, asset caching (`/assets` immutable, `index.html` no-cache), hourly session pruning, `Dockerfile` + `docker compose --profile app`, [deploy.md](deploy.md).
+- Account UI: new log in / sign up dialog (tabs, confirm password, show/hide, Caps Lock warning, strength meter, inline validation, error banner, 429 countdown); Log in + Sign up on the start screen; account menu with avatar and email.
+- Guest landing page (`src/app/screens/landing/`): shown on the menu to visitors who aren't signed in and haven't chosen to play as a guest. Hero diorama painted live with the game's own art, sign up / log in / play as guest / tour the demo, feature cards, responsive to phone widths. Choosing guest is remembered (`citybuilder.guest`); logging out shows the landing page again. Dev preview of the dialog: `/src/dev/auth.html?mode=signup`.
+- Tests: `server/modules/auth/auth.limits.test.ts` (limiter, success never limited, per-email lock with Retry-After, invalid forms free, health and headers). Verified the Docker image end to end against local Postgres.
+
 ## 2026-11-01: Art pass, near-3D tiles and a living city (D-072)
 - Split all building, park and nature art into folders per family (`render/atlas/theme`, `core`, `nature`, `buildings`, `civic`, `ambient`) and restyled them with one light model: graded lit and shaded walls, occlusion, rim light, cast shadows, sky-reflecting glass, layered roofs with eave shadows, detailed rooftops.
 - New trees: five species with lit leaf clumps, mixed woods with autumn and blossom accents; 10 forest looks per density. New rocks, flowers and grass. Parks rebuilt: lawns, rounded hedges, benches, lamps, raised flower beds, fountains; each of the six park layouts is its own file.

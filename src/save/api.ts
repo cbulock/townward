@@ -15,16 +15,27 @@ import type {
 export class ApiError extends Error {
   /** HTTP status, or 0 when the server couldn't be reached. */
   readonly status: number;
+  /** 429: seconds until another attempt is allowed. */
+  readonly retryAfter: number | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfter: number | null = null) {
     super(message);
     this.status = status;
+    this.retryAfter = retryAfter;
   }
+}
+
+/** Seconds to wait from a 429's body, or its Retry-After header. */
+function retryAfterOf(res: Response, body: unknown): number | null {
+  if (isErrorBody(body) && typeof body.retryAfter === 'number') return body.retryAfter;
+  const header = Number(res.headers.get('retry-after'));
+  return Number.isFinite(header) && header > 0 ? header : null;
 }
 
 function isErrorBody(v: unknown): v is ApiErrorBody {
   return typeof v === 'object' && v !== null && 'error' in v && typeof v.error === 'string';
 }
+
 
 /**
  * Small bodies go out with `keepalive`, so a save started as the tab closes still arrives
@@ -48,7 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   if (res.status === 204) return undefined as T; // only used with T = void
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, isErrorBody(json) ? json.error : `Server error (${res.status})`);
+  if (!res.ok) throw new ApiError(res.status, isErrorBody(json) ? json.error : `Server error (${res.status})`, res.status === 429 ? retryAfterOf(res, json) : null);
   // Our own server's responses, typed by src/shared/api.ts. Save data is validated separately (parseSave).
   return json as T;
 }

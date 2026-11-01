@@ -113,7 +113,7 @@ export class IsoFrame {
     c.save();
     c.translate(x, y);
     c.transform(1, face === 'sw' ? 0.5 : -0.5, 0, 1, 0, 0);
-    c.font = `bold ${size}px Inter, system-ui, sans-serif`;
+    c.font = `bold ${size}px 'IBM Plex Sans', system-ui, sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillStyle = color;
