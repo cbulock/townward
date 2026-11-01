@@ -119,6 +119,7 @@ export function balancePower(
   needs: (b: BuildingInstance) => boolean,
   isWorking: (b: BuildingInstance) => boolean,
   at: GridHour | null,
+  powerConnected: (b: BuildingInstance) => boolean = () => true,
 ): PowerReport {
   const report: PowerReport = { supply: 0, demand: 0, short: 0, sources: emptySources(), stored: 0, storage: 0, repair: 0 };
   const production = new Map<number, number>();
@@ -128,7 +129,7 @@ export function balancePower(
   for (const b of buildings) {
     const d: BuildingDef = BUILDINGS[b.def];
     if (d.energy && d.energy.source !== 'battery' && b.repairDays > 0) report.repair++;
-    if (d.energy && isWorking(b)) {
+    if (d.energy && isWorking(b) && powerConnected(b)) {
       const island = islandOf(b);
       if (d.energy.source === 'battery') {
         const list = batteries.get(island) ?? [];
@@ -184,7 +185,7 @@ export function balancePower(
     report.demand += need;
     const island = islandOf(b);
     const left = available.get(island) ?? 0;
-    if (island !== -1 && left >= need) {
+    if (island !== -1 && powerConnected(b) && left >= need) {
       available.set(island, left - need);
       b.powered = true;
     } else {

@@ -44,6 +44,7 @@ const ZONE_LINKS: readonly { tool: ZoneToolId; label: string; key: string; tone:
 function cardStat(d: BuildingDef): string {
   if (d.radius) return `${d.radius}-tile reach`;
   if (d.energy?.coverage) return `${d.energy.coverage}-tile reach`;
+  if (d.substation) return `${d.substation.radius}-tile reach`;
   if (d.supplies?.power) return `${d.supplies.power} ⚡`;
   if (d.supplies?.water) return `${d.supplies.water} 💧`;
   return `${d.size.w}×${d.size.h}`;

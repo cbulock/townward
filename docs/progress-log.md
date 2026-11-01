@@ -8,6 +8,9 @@ Newest first. One entry per work session.
 - Plant condition and repair state appear in the inspection panel, can be repaired for a type-specific cost, and persist in saves.
 - The Energy Mix panel reports plants awaiting repair. Existing road-island delivery and battery behavior remain intact.
 - Selecting an existing clinic, school, fire station or police station now shows its colour-coded coverage radius; placement previews continue to show the same reach.
+- Added substations with blue coverage previews. Once a substation exists, plants and
+  buildings must share its road island and reach to participate in the power network;
+  cities without substations retain legacy delivery.
 
 ## 2026-11-01: Parks and shopping landmarks
 - Added four placeable civic landmarks to the Parks & Places picker: Central Park, Botanical Garden, Shopping Complex and Riverside Market.

@@ -14,7 +14,21 @@ and repair state are saved, so a reload does not silently heal a damaged plant. 
 
 Master plan §12.1, brought forward by the user (2026-11-01): the city's power should feel like
 a real grid, with plants that differ, demand that follows the day, and storage that matters.
-Delivery stays over road islands (D-052), with no lines or pipes.
+Delivery follows road-connected power corridors. A substation is the handoff between a
+plant and nearby buildings: it must share the plant's road island, and buildings must be
+within its reach. A city with no substations keeps the legacy road-island behavior so old
+saves remain playable.
+
+## Substations and isolated plants
+
+- **Power Substation** is available under Civic → Utilities.
+- Substations show a blue reach preview while placing or inspecting them.
+- A working plant only contributes to a network when it shares a road island with a working
+  substation. A plant on an unconnected island is isolated and supplies nothing.
+- A building can receive power when it shares that island and lies within a connected
+  substation's reach. This makes plant placement and road connections meaningful without
+  adding a manually painted wire layer.
+- Existing cities without substations continue using the previous road-island rules.
 
 ## Player Experience
 

@@ -8,6 +8,11 @@ Format: **ID — Title** · Status · Date. Reason in one or two lines.
 
 ## Accepted
 
+- **D-072 — Derived road-following power corridors.** 2026-11-01. Substations gate the
+  advanced power network without adding a persistent wire layer: road islands and
+  substation reach are deterministic from the existing world. Cities without substations
+  retain legacy delivery for save compatibility.
+
 - **D-071 — Civic leisure landmarks stay in the parks group.** 2026-11-01. Parks and shopping complexes use the existing civic placement path and Parks & Places picker. This keeps placement, upkeep, happiness and save compatibility stable while giving the city visually distinct leisure destinations; shopping zoning remains separate for demand balance.
 
 - **D-002 — Isometric 2:1 view.** 2026-10-31. Looks much richer than top-down and fits the "very cool UI" goal.

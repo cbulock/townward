@@ -780,11 +780,11 @@ export class Game {
       services: d.category === 'civic' ? [] : SERVICE_KINDS.filter((k) => b.services & serviceBit(k)),
       provides: d.service
         ? { kind: 'service', service: d.service, radius: d.radius ?? 0 }
-        : d.supplies || d.energy
+        : d.supplies || d.energy || d.substation
           ? {
               kind: 'utility',
               ...d.supplies,
-              coverage: d.energy?.coverage,
+              coverage: d.energy?.coverage ?? d.substation?.radius,
               condition: d.energy && d.energy.source !== 'battery' ? b.condition : undefined,
               repairCost: d.energy?.repairCost,
             }

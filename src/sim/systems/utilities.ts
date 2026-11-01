@@ -37,6 +37,30 @@ export function isWorking(b: BuildingInstance): boolean {
   return b.construction === 0 && b.entrance !== -1 && b.repairDays === 0 && b.condition > 0;
 }
 
+function isSubstation(b: BuildingInstance): boolean {
+  const def: BuildingDef = BUILDINGS[b.def];
+  return def.substation !== undefined;
+}
+
+function powerNetwork(buildings: readonly BuildingInstance[], islands: Int32Array) {
+  const substations = buildings.filter((b) => isSubstation(b) && isWorking(b));
+  if (substations.length === 0) return () => true;
+  const islandOf = (b: BuildingInstance) => (b.entrance === -1 ? -1 : islands[b.entrance]);
+  return (b: BuildingInstance): boolean => {
+    const island = islandOf(b);
+    if (island === -1) return false;
+    const def: BuildingDef = BUILDINGS[b.def];
+    const size = def.size;
+    const cx = b.x + size.w / 2;
+    const cy = b.y + size.h / 2;
+    return substations.some((s) => {
+      const substationDef: BuildingDef = BUILDINGS[s.def];
+      const radius = substationDef.substation?.radius ?? 0;
+      return islandOf(s) === island && Math.hypot(s.x + 0.5 - cx, s.y + 0.5 - cy) <= radius;
+    });
+  };
+}
+
 /** Apply one day's maintenance wear and progress existing repairs. */
 function maintainPlants(world: World, report: UtilityReport) {
   for (const b of world.buildings.values()) {
@@ -105,8 +129,9 @@ export function updateUtilities(world: World, at: GridHour | null = null): Utili
   const islands = roadIslands(world);
   const islandOf = (b: BuildingInstance) => (b.entrance === -1 ? -1 : islands[b.entrance]);
   const needs = (b: BuildingInstance) => needsUtilities(BUILDINGS[b.def]);
+  const powerConnected = powerNetwork(buildings, islands);
 
-  const power = balancePower(buildings, islandOf, needs, isWorking, at);
+  const power = balancePower(buildings, islandOf, needs, isWorking, at, powerConnected);
 
   // Water: supply pooled per road island, handed out in building order.
   const pool = new Map<number, number>();

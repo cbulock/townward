@@ -51,6 +51,8 @@ export interface BuildingDef {
   supplies?: { power?: number; water?: number };
   /** Power buildings: what drives their output (sim/systems/energy.ts). */
   energy?: EnergyDef;
+  /** Power corridor node: buildings on the same road island within this reach can connect. */
+  substation?: { readonly radius: number; readonly capacity: number };
 }
 
 export const BUILDINGS = {
@@ -430,6 +432,20 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 25,
     energy: { source: 'battery', storage: 2400, rate: 800 },
+  },
+  substation: {
+    name: 'Power Substation',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 1, h: 1 },
+    cost: 1400,
+    capacity: 0,
+    description: 'Connects a road corridor to nearby homes and businesses.',
+    group: 'utilities',
+    upkeep: 20,
+    substation: { radius: 12, capacity: 300 },
   },
   water_tower: {
     name: 'Water Tower',

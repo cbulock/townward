@@ -507,4 +507,21 @@ export const ART: Readonly<Record<RecipeId, readonly BuildingArt[]>> = {
     { wall: '#ead9b8', facade: 'punched', roof: 'gable', roofH: 10, roofColor: '#7a4a3a', signColor: '#2d5f8a' },
     { wall: '#e6ebef', facade: 'ribbon', roof: 'flat', roofColor: '#6a7076', extras: ['fence', 'solar'], signColor: '#c8602d' },
   ),
+  substation: variants(
+    {
+      floorH: 5,
+      masses: [one(1, 0.08)],
+      wall: '#5d7180',
+      trim: '#c8d7df',
+      roof: 'flat',
+      roofColor: '#39464f',
+      facade: 'bands',
+      ground: 'paved',
+      extras: ['acunits'],
+      sign: 'GRID',
+      signColor: '#55b7ff',
+    },
+    {},
+    { wall: '#71818a', roofColor: '#344a58', signColor: '#ffe28a' },
+  ),
 };

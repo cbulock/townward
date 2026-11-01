@@ -147,6 +147,7 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Slower time (6 s days), true 1×/2×/3×, day/night control (cycle / day / night) in the top bar
 - [x] Density zones: Apartments and Offices (tools 1–5)
 - [x] Utilities: power plant and water tower over the road network; ⚡/💧 badges and first-time hints
+- [x] Substation-gated power corridors with road-following connectivity and coverage preview
 - [x] Services: police, fire, clinic, school with coverage; occupancy and level-ups depend on it; fires
 - [x] Budget panel (click the funds): tax rate, forecast, utility supply; civic upkeep
 - [x] Civic panel tabs (Services / Utilities / Parks & Civic), coverage preview while placing
