@@ -52,6 +52,7 @@ src/
   sim/
     World.ts               map dimensions + layers
     City.ts                funds (budget, population, date later)
+    save.ts                save format: serialize / parseSave / deserialize (D-034)
     commands.ts            plan*/apply* pairs: every world mutation (undo later)
     roads.ts               road types, auto-tile mask, paths
     population.ts          road access, daily population/jobs, monthly budget
@@ -72,7 +73,9 @@ src/
     fx/                    build pops + pooled particles
     agents/                car and pedestrian sprites (pooled, culled, LOD)
     view/                  ViewTransform (world ↔ view for 4 rotations), ViewWorld (rotated tile copy)
-  shared/                  constants, rng, math utils
+  save/                    client saving: api.ts (typed HTTP), SaveStore (local IndexedDB / cloud), CitySaver (autosave)
+  shared/                  constants, rng, math utils, api.ts (HTTP shapes shared with the server)
+server/                    save server (Express + Postgres): see docs/specs/saving.md
 tests/
 docs/
 ```

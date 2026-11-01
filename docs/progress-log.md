@@ -2,6 +2,14 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Phase 10 saving & accounts
+- **Save format** (`sim/save.ts`): the terrain settings (preset, seed, size and every slider the player changed), city state, RLE+base64 road/bridge/zone/cleared layers, and buildings as 10-number tuples. A grown demo city round-trips exactly. Parsing validates untrusted JSON and drops unknown buildings rather than failing. Growth and fire random streams now mix in the day, so a reloaded city doesn't replay day 0.
+- **Server**: the user switched storage to **Postgres in Docker** and asked for a cleanly structured backend (D-062). Express 5, modules (`auth`, `saves`) split into routes → service → repository, one `HttpError` handler, zod validation, scrypt passwords, hashed session tokens in httpOnly cookies, rate-limited login, owner-scoped saves with a 30-city cap. Tests run on PGlite, so no Docker is needed for `pnpm test`.
+- **Client**: IndexedDB store for guests and an HTTP store for accounts behind one `SaveStore` interface; `CitySaver` autosaves every 45 s (also when the tab is hidden and when leaving); `Ctrl/⌘ S`; save status in the top bar; log in / sign up dialog; account menu; "Your cities" on the start screen (continue, delete, move to account); `?city=` reopens a city on reload.
+- New cities aren't saved until the player builds something, so rerolling maps (N) doesn't fill the list.
+- Verified in Chrome (Playwright): sign up → build a road → save → list → reopen → reload, and guest save → sign up → the city moves into the account. No errors besides the missing favicon (it was never there). 136 tests pass; typecheck and lint are clean.
+- **Open:** a favicon; centring the camera on roads when a city has no buildings yet.
+
 ## 2026-11-01: Phase 9 — Citizen needs (step 3 of the plan)
 - User decision: abandonment included.
 - **New `systems/needs.ts`:** ten needs, weighted happiness, complaints, city happiness, and abandonment streaks (abandoned and recovered buildings go into the day outcome).

@@ -184,10 +184,23 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] Happiness view (`Y` / top-bar smiley) and city happiness %; info panel happiness and need scores; abandoned buildings look run-down
 - [x] Tests (3 new, 121 total)
 
+## Phase 10 — Saving & Accounts ✅  → [specs/saving.md](specs/saving.md)
+
+- [x] Save format `sim/save.ts`: seed + terrain settings (the player's preset changes included), city state, RLE layers, compact buildings; validated parsing; tests (5)
+- [x] Save server: Express 5 + Postgres (Docker), modular layout (D-062): auth (scrypt, httpOnly session cookie, rate limit) and saves (owner-scoped CRUD, 30-city cap); tests on PGlite (10)
+- [x] Client stores: IndexedDB for guests, the HTTP API for accounts; `CitySaver` autosave (45 s, tab hidden, leaving), `Ctrl/⌘ S`
+- [x] Start screen "Your cities" (continue, delete, move to account); log in / sign up dialog; account menu; save status in the top bar; `?city=` reopens on reload
+- [x] A guest city moves into the account on its first save after logging in
+- [x] Verified in Chrome: sign up → build → save → list → reopen → reload; guest → log in migration; no errors
+
 ## Later Phases (to be specced when we get there)
+
+User direction (2026-11-01): make the city *evolve*. Every feature is judged by what players will enjoy, how the game can grow in the browser, and staying smooth (60 FPS) as it grows.
 
 | Phase | Theme |
 |---|---|
-| 10 | Save/Load (next): Express + SQLite backend with email/password accounts, IndexedDB autosave, multiple cities (D-034) |
-| 11+ | Public transport (buses, trains), libraries and more services, pollution and data overlays |
-| 12 | Performance pass: sim in a Web Worker, 256×256+ maps |
+| 11 | Economy & production: factories produce goods (materials, steel, electronics…) that unlock and supply big apartments and office towers; a fuller tax system (rates per zone, tax happiness) |
+| 12 | Road evolution: upgrade roads in place (street → avenue → boulevard), wider roads with more capacity as traffic grows |
+| 13 | City progression: universities, research centres and other unlocks that open new buildings and bonuses as the city grows |
+| 14 | Public transport (buses, trains), libraries and more services, pollution and data overlays |
+| 15 | Performance pass: sim in a Web Worker, 256×256+ maps |

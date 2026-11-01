@@ -7,17 +7,19 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phases 0–7 built ✅ (latest: 7, core city: density, services, utilities, budget) plus the `/demo` city. Open: the 60 FPS check on real hardware |
-| **Next phase** | Phase 10 — backend saving (plan: foundation ✅ → traffic ✅ → needs ✅ → backend, D-057) |
-| **Last updated** | 2026-10-31 |
+| **Current phase** | Phases 0–10 built ✅ (latest: 10, saving & accounts) plus the `/demo` city. Open: the 60 FPS check on real hardware |
+| **Next phase** | Phase 11 — economy & production: factory goods for big buildings, a fuller tax system (see roadmap) |
+| **Last updated** | 2026-11-01 |
 
 ## Run It
 
 ```bash
 pnpm install
+docker compose up -d   # Postgres for the save server (accounts and cloud saves)
 pnpm dev          # http://localhost:5173 opens the New Game screen; /demo opens a grown city
                   # (?seed=N&size=64|128|256&preset=coastal&funds=N skips it)
-pnpm test         # unit tests
+                  # pnpm dev runs Vite and the save server (:8787); without Postgres the game still runs, saving on the device
+pnpm test         # unit tests (server tests use in-process PGlite: no Docker needed)
 pnpm typecheck && pnpm lint
 ```
 
@@ -38,6 +40,7 @@ pnpm typecheck && pnpm lint
 | [specs/demo.md](specs/demo.md) | The `/demo` showcase city |
 | [specs/traffic.md](specs/traffic.md) | Commute model, visible traffic, lights, traffic view |
 | [specs/needs.md](specs/needs.md) | Citizen needs, happiness, complaints, abandonment |
+| [specs/saving.md](specs/saving.md) | Save format, accounts, save server, autosave |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

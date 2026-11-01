@@ -56,8 +56,21 @@ Typical size: ~3 KB of layers plus ~45 bytes per building (a 2,000-building city
 
 ## Server (`server/`)
 
-Express 5 on Node's built-in `node:sqlite` (no native build), run with Node's TypeScript
-support. `pnpm dev` starts it alongside Vite, which proxies `/api` to it.
+Express 5 + Postgres (D-062), run with Node's built-in TypeScript support (no build step).
+`docker compose up -d` starts Postgres; `pnpm dev` starts the server alongside Vite, which
+proxies `/api` to it. Env: `PORT` (8787), `DATABASE_URL`, `NODE_ENV`.
+
+```
+server/
+  index.ts       config → db → migrate → app → listen
+  config.ts      env, validated with zod
+  app.ts         middleware, routers, error handler, static files
+  db/            Db interface + pg pool; ordered migrations
+  http/          HttpError + error middleware; zod `parse`; session cookie, auth, rate limit
+  modules/auth   password · auth.service · auth.schemas · auth.routes
+  modules/saves  saves.repository (SQL) · saves.service (rules) · saves.schemas · saves.routes
+  test/          PGlite database and a test server with a cookie-keeping client
+```
 
 | Route | Body / result |
 |---|---|
@@ -78,10 +91,10 @@ support. `pnpm dev` starts it alongside Vite, which proxies `/api` to it.
 - Bodies are validated with zod; save data must be an object with a numeric `v`. Request
   bodies up to 8 MB; at most 30 cities per account.
 - Tables: `users`, `sessions`, `saves` (JSON text plus `name`, `population`, `funds`,
-  `day`, `size`, `preset`, `seed` columns for the list). One row per city; a save
-  overwrites it (last write wins).
-- In production the server also serves `dist/`, so one process runs the whole game.
-  `PORT` and `DB_PATH` come from the environment.
+  `day`, `size`, `preset`, `seed` columns for the list), versioned by `schema_version`.
+  One row per city; a save overwrites it (last write wins). The quota is checked in the
+  same INSERT statement.
+- In production (`pnpm start`) the server also serves `dist/`, so one process runs the whole game.
 
 ## Client
 
