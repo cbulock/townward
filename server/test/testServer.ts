@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
+import { createApp, type AppOptions } from '../app.ts';
 import type { Db } from '../db/db.ts';
 import { createTestDb } from './testDb.ts';
 
@@ -8,6 +8,7 @@ export interface TestResponse {
   readonly status: number;
   readonly json: unknown;
   readonly setCookie: string | null;
+  readonly headers: Headers;
 }
 
 /** Sends requests like a browser: JSON bodies, and it keeps the session cookie. */
@@ -22,9 +23,9 @@ export interface TestServer {
 }
 
 /** Start the real app on a random port over a fresh PGlite database. */
-export async function startTestServer(): Promise<TestServer> {
+export async function startTestServer(opts: Partial<AppOptions> = {}): Promise<TestServer> {
   const db: Db = await createTestDb();
-  const app = createApp(db, { secureCookies: false });
+  const app = createApp(db, { secureCookies: false, ...opts });
   const server = await new Promise<Server>((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
   });
@@ -43,7 +44,7 @@ export async function startTestServer(): Promise<TestServer> {
       if (setCookie) cookie = setCookie.split(';')[0];
       const text = await res.text();
       const json: unknown = text ? JSON.parse(text) : null;
-      return { status: res.status, json, setCookie };
+      return { status: res.status, json, setCookie, headers: res.headers };
     };
   };
 

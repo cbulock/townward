@@ -7,10 +7,13 @@ import type { ApiErrorBody } from '../../src/shared/api.ts';
  */
 export class HttpError extends Error {
   readonly status: number;
+  /** For 429: seconds until the client may try again (also sent as Retry-After). */
+  readonly retryAfter?: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfter?: number) {
     super(message);
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -19,7 +22,10 @@ export const unauthorized = (message = 'Please log in') => new HttpError(401, me
 export const forbidden = (message: string) => new HttpError(403, message);
 export const notFound = (message = 'Not found') => new HttpError(404, message);
 export const conflict = (message: string) => new HttpError(409, message);
-export const tooManyRequests = () => new HttpError(429, 'Too many attempts. Try again in a few minutes.');
+export function tooManyRequests(retryAfterSeconds: number): HttpError {
+  const minutes = Math.ceil(retryAfterSeconds / 60);
+  return new HttpError(429, `Too many attempts. Try again in ${minutes <= 1 ? 'a minute' : `${minutes} minutes`}.`, retryAfterSeconds);
+}
 
 /** Errors from express.json carry a `status` (413 too large, 400 bad JSON). */
 function statusOf(err: unknown): number | null {
@@ -39,7 +45,8 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, next)
   if (res.headersSent) return next(err);
   const status = statusOf(err) ?? 500;
   if (status >= 500) console.error(err);
-  const body: ApiErrorBody = { error: messageFor(err, status) };
+  const retryAfter = err instanceof HttpError ? err.retryAfter : undefined;
+  const body: ApiErrorBody = retryAfter === undefined ? { error: messageFor(err, status) } : { error: messageFor(err, status), retryAfter };
   res.status(status).json(body);
 };
 

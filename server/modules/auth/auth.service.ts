@@ -54,6 +54,11 @@ export class AuthService {
     );
   }
 
+  /** Delete every expired session (run now and then; logins also tidy their own). */
+  async pruneSessions(): Promise<void> {
+    await this.db.query('DELETE FROM sessions WHERE expires_at <= now()');
+  }
+
   async logout(token: string): Promise<void> {
     await this.db.query('DELETE FROM sessions WHERE token_hash = $1', [sha256(token)]);
   }

@@ -1,8 +1,8 @@
 import type { CookieOptions, Request, RequestHandler, Response } from 'express';
 import type { ApiUser } from '../../src/shared/api.ts';
-import { tooManyRequests, unauthorized } from './errors.ts';
+import { unauthorized } from './errors.ts';
 
-/** Cross-cutting HTTP pieces: the session cookie, the signed-in user, rate limiting. */
+/** Cross-cutting HTTP pieces: the session cookie, the signed-in user, security headers. */
 
 export const SESSION_COOKIE = 'cb_session';
 
@@ -51,16 +51,21 @@ export function requireUser(res: Response): ApiUser {
   return user;
 }
 
-/** Fixed-window limit per client IP (login and signup). In memory: fine for one server process. */
-export function rateLimit(max: number, windowMs: number): RequestHandler {
-  const hits = new Map<string, { count: number; reset: number }>();
-  return (req, _res, next) => {
-    const now = Date.now();
-    if (hits.size > 10_000) for (const [k, h] of hits) if (h.reset <= now) hits.delete(k);
-    const key = req.ip ?? 'unknown';
-    const h = hits.get(key);
-    if (!h || h.reset <= now) hits.set(key, { count: 1, reset: now + windowMs });
-    else if (++h.count > max) throw tooManyRequests();
+/**
+ * Security headers on every response. HSTS only in production (it pins the domain to HTTPS).
+ * No CSP yet: the client loads Google Fonts and builds textures from canvases; add one when the
+ * deploy domain is known.
+ */
+export function securityHeaders(production: boolean): RequestHandler {
+  return (_req, res, next) => {
+    res.set({
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    });
+    if (production) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
   };
 }

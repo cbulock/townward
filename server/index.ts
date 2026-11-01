@@ -20,10 +20,19 @@ try {
 }
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const app = createApp(db, { secureCookies: config.production, staticDir: config.production ? `${root}dist` : undefined });
+const app = createApp(db, {
+  secureCookies: config.production,
+  staticDir: config.production ? `${root}dist` : undefined,
+  trustProxy: config.trustProxy,
+});
 const server = app.listen(config.port, () => console.log(`save server on http://localhost:${config.port}`));
 
+// Expired sessions are tidied hourly, so the table doesn't grow with every visitor.
+const pruning = setInterval(() => void app.auth.pruneSessions().catch((err: unknown) => console.error('session prune failed', err)), 3_600_000);
+pruning.unref();
+
 function shutdown() {
+  clearInterval(pruning);
   server.close(() => void db.close());
 }
 process.on('SIGINT', shutdown);

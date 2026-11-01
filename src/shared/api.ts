@@ -56,4 +56,6 @@ export interface SaveLoadResponse {
 }
 export interface ApiErrorBody {
   readonly error: string;
+  /** 429 only: seconds until the client may try again. */
+  readonly retryAfter?: number;
 }
