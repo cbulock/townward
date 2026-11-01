@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Night Preview</title>
+  </head>
+  <body>
+    <!-- Dev only: opens the demo city locked to night, to review lit windows and beacons (D-071). -->
+    <script>
+      localStorage.setItem('citybuilder.dayNightMode', new URLSearchParams(location.search).get('mode') || 'night');
+      location.replace('/demo' + location.search.replace(/[?&]mode=[^&]*/, ''));
+    </script>
+  </body>
+</html>
