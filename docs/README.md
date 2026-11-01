@@ -7,8 +7,8 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Phases 0–10 built ✅ (latest: 10, saving & accounts) plus the `/demo` city. Open: the 60 FPS check on real hardware |
-| **Next phase** | Phase 11 — economy & production: factory goods for big buildings, a fuller tax system (see roadmap) |
+| **Current phase** | Phase 11 (engine for depth): step 11.1 ✅ (harness, timings, exact save continuation). Phases 0–10 built ✅ |
+| **Next phase** | Step 11.2: city history + Graphs panel (see [specs/engine.md](specs/engine.md)) |
 | **Last updated** | 2026-11-01 |
 
 ## Run It
@@ -19,6 +19,8 @@ docker compose up -d   # Postgres for the save server (accounts and cloud saves)
 pnpm dev          # http://localhost:5173 opens the New Game screen; /demo opens a grown city
                   # (?seed=N&size=64|128|256&preset=coastal&funds=N skips it)
                   # pnpm dev runs Vite and the save server (:8787); without Postgres the game still runs, saving on the device
+pnpm sim:run --scenario demo --years 1   # headless sim: history CSV + per-system timings
+pnpm bench        # the same on /demo with the budget report
 pnpm test         # unit tests (server tests use in-process PGlite: no Docker needed)
 pnpm typecheck && pnpm lint
 ```
@@ -42,6 +44,8 @@ pnpm typecheck && pnpm lint
 | [specs/traffic.md](specs/traffic.md) | Commute model, visible traffic, lights, traffic view |
 | [specs/needs.md](specs/needs.md) | Citizen needs, happiness, complaints, abandonment |
 | [specs/saving.md](specs/saving.md) | Save format, accounts, save server, autosave |
+| [05-master-plan.md](05-master-plan.md) | The plan for Phases 11–22: people, land value, transport, economy, government, disasters |
+| [specs/engine.md](specs/engine.md) | Phase 11: harness, timings, determinism, time-slicing, fields, road graph, Worker |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |
 

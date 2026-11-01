@@ -3,6 +3,17 @@
 Newest first. One entry per work session.
 
 
+## 2026-11-01: Phase 11.1 harness, timings and exact save continuation
+- Started the master plan (05-master-plan.md). Phase 11 is split into six measured steps (specs/engine.md, D-065).
+- **Timings:** every sim hook is timed (`SystemTimings`); F3 shows the five slowest against their budgets.
+- **Harness:** `pnpm sim:run` runs the real sim on Node with no rendering or build step, writing monthly CSV plus a timing table; `pnpm bench` adds the budget report. For this, the sim's 14 constructor parameter properties became plain fields, and ESLint now keeps sim, shared, scripts and server to erasable syntax.
+- **Baseline:** a /demo day costs ~92 ms in a single tick (5–6 dropped frames per in-game day). `commute.day` is 72.5 ms (79%) and `needs.day` 12 ms; everything else is under 0.5 ms. 11.3 and 11.5 target exactly these.
+- **Determinism:** saves now carry the random stream states, commute volume and commute minutes; `loadSimulation` restores them, so a reloaded city plays out exactly as the running one. The test fails without the new block (checked).
+- `tsx` was tried and dropped: it needs esbuild's native build script, which pnpm's guard blocks. The failed install left `tsx`/`esbuild` in the lockfile (committed in 85dcb70) and broke the user's running dev server (missing `refresh-runtime.js`). Restored the clean lockfile from d0d0993 and reinstalled.
+- The F3 overlay moved below the top bar (they overlapped).
+- User direction recorded (D-066): split tile art into clean single-purpose components with a modern, 3D, themeable look; added to the roadmap as an Art Track.
+- 140 tests pass; typecheck (client, server, scripts), lint and build are clean.
+
 ## 2026-11-01: Roads continue past rock (D-064)
 - User report: on the Island map, a highway dragged across a grey rock outcrop failed for everything after the rock. `planRoad` now judges each tile on its own. Rock, buildings and the map edge block only their own tiles. A water crossing is checked as a whole (straight, within span, buildable land at both ends, not crossing a bridge sideways), so bridges never dangle.
 - `/demo` keeps the old rule through `leadingRun`. Its roads, bridges and buildings hash the same as before on three seeds.

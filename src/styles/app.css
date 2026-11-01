@@ -65,7 +65,8 @@ body,
 
 /* ---------- Debug overlay ---------- */
 .debug-overlay {
-  top: 16px;
+  /* Below the top bar, which is wide enough to reach the left edge. */
+  top: 72px;
   left: 16px;
   min-width: 190px;
   padding: 12px 14px;

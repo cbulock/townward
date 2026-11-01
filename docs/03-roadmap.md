@@ -193,6 +193,21 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] A guest city moves into the account on its first save after logging in
 - [x] Verified in Chrome: sign up → build → save → list → reopen → reload; guest → log in migration; no errors
 
+## Phase 11 — Engine for Depth (in progress)  → [specs/engine.md](specs/engine.md)
+
+- [x] 11.1 Headless harness (`pnpm sim:run`, `pnpm bench`), per-system timings (F3 + budgets), exact save → load continuation (D-065); baseline: a /demo day costs ~92 ms, 79% of it commute routing
+- [ ] 11.2 City history ring buffer (saved) + Graphs panel
+- [ ] 11.3 Cadence tiers + time-slicing: no sim frame over 16 ms on /demo
+- [ ] 11.4 Fields engine (coarse grids, diffuse, decay, wind)
+- [ ] 11.5 Road segment graph + Dijkstra + isochrones: `commute.day` under 25 ms on /demo
+- [ ] 11.6 Simulation in a Web Worker: main-thread sim cost under 1 ms per frame
+
+## Art Track (runs alongside the phases; D-066)
+
+- [ ] Split tile and building art into small single-purpose modules (ground, water edges, road pieces, bridge parts, furniture, building massing, roofs, facades, rooftop details), refactor first with no visual change
+- [ ] A theme system: palette and lighting as tokens, switchable themes
+- [ ] Modern 3D look: lit, mid and shadow faces, contact shadows, ambient occlusion, refined materials; reviewed with the user one tile family at a time
+
 ## Later Phases
 
 Planned in detail in [05-master-plan.md](05-master-plan.md) (accepted, D-063). Each phase still gets its own spec before code.
