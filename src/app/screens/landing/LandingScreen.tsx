@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { authAtom, authDialogAtom } from '../../atoms';
-import { HeroCity } from './HeroCity';
+import { heroAnchor, HeroCity } from './HeroCity';
 
 interface LandingScreenProps {
   /** Continue as a guest (cities are saved on this device). */
@@ -9,22 +9,23 @@ interface LandingScreenProps {
   onDemo: () => void;
 }
 
-interface Feature {
-  readonly title: string;
-  readonly text: string;
-  readonly icon: string;
-}
+/** Labels pinned onto the diorama like a planning map: a ground point (tiles), a height (px), and which side the tag sits. */
+const PINS: readonly { label: string; x: number; y: number; z: number; side: 'left' | 'right' }[] = [
+  { label: 'Downtown', x: 1, y: 1, z: 150, side: 'left' },
+  { label: 'Corner shops', x: 8.5, y: 2.6, z: 24, side: 'right' },
+  { label: 'Central park', x: 1.4, y: 6.4, z: 6, side: 'left' },
+  { label: 'Main street', x: 4.5, y: 8.6, z: 0, side: 'right' },
+];
 
-const FEATURES: readonly Feature[] = [
-  { icon: '🏙️', title: 'Grow a living city', text: 'Zone homes, shops and industry and watch streets fill with traffic, people and new towers.' },
-  { icon: '🌗', title: 'Day turns to night', text: 'Windows light up at dusk, trees sway in the wind and parks fill with fountains and birdsong.' },
-  { icon: '⚡', title: 'Run it like a mayor', text: 'Power, water, services, budgets and citizens who tell you exactly what they need.' },
-  { icon: '☁️', title: 'Saved as you play', text: 'Play as a guest on this device, or sign in to keep your cities on every browser.' },
+const STEPS: readonly { title: string; text: string }[] = [
+  { title: 'Zone', text: 'Lay roads, then paint homes, shops and industry along them. Lots fill up when people want to live and work there.' },
+  { title: 'Serve', text: 'Run power and water, open schools, clinics and stations. Citizens tell you exactly what their street is missing.' },
+  { title: 'Grow', text: 'Land value rises, cottages give way to apartments and towers, and the city keeps moving long after dark.' },
 ];
 
 /**
- * The first screen for visitors who aren't signed in: what the game is, a city drawn with its
- * own art, and three ways in — sign up, log in, or play straight away as a guest.
+ * The first screen for visitors who aren't signed in: the game drawn with its own art, labelled
+ * like a planning map, and three ways in: sign up, log in, or play straight away as a guest.
  */
 export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
   const auth = useAtomValue(authAtom);
@@ -33,88 +34,115 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
 
   return (
     <div className="landing">
-      <div className="landing-glow" aria-hidden="true" />
       <header className="landing-nav">
-        <span className="landing-brand">
-          <span className="landing-logo" aria-hidden="true" />
-          City Builder
-        </span>
+        <span className="landing-wordmark">City Builder</span>
         {online && (
           <nav className="landing-nav-actions" aria-label="Account">
-            <button type="button" className="landing-link" onClick={() => openDialog('login')}>
+            <button type="button" className="landing-text-button" onClick={() => openDialog('login')}>
               Log in
             </button>
-            <button type="button" className="landing-pill" onClick={() => openDialog('signup')}>
-              Sign up free
+            <button type="button" className="landing-button is-small" onClick={() => openDialog('signup')}>
+              Sign up
             </button>
           </nav>
         )}
       </header>
 
-      <main className="landing-main">
+      <main>
         <section className="landing-hero">
           <div className="landing-copy">
-            <span className="landing-kicker">Free city builder · plays in your browser</span>
+            <p className="landing-eyebrow">A city-building game for the browser</p>
             <h1>
-              Build the city
-              <br />
-              <em>you’ve always imagined.</em>
+              Lay a road.
+              <br />A city moves in.
             </h1>
             <p className="landing-lead">
-              Lay roads, zone neighbourhoods and grow a skyline that lives and breathes: traffic at rush hour, lights after dark, and citizens with opinions.
+              Zone the streets, keep the power on and balance the budget. Homes, shops and towers grow on their own, traffic finds its way, and the windows light up at night.
             </p>
             <div className="landing-ctas">
               {online ? (
                 <>
-                  <button type="button" className="landing-primary" onClick={() => openDialog('signup')}>
-                    Create a free account
+                  <button type="button" className="landing-button" onClick={() => openDialog('signup')}>
+                    Create an account
                   </button>
-                  <button type="button" className="landing-secondary" onClick={onPlay}>
-                    Play as guest
+                  <button type="button" className="landing-button is-ghost" onClick={onPlay}>
+                    Play without one
                   </button>
                 </>
               ) : (
-                <button type="button" className="landing-primary" onClick={onPlay}>
+                <button type="button" className="landing-button" onClick={onPlay}>
                   Start playing
                 </button>
               )}
             </div>
-            <p className="landing-fine">
-              {online ? (
+            <p className="landing-aside">
+              {online && (
                 <>
-                  Already a mayor?{' '}
-                  <button type="button" className="landing-inline" onClick={() => openDialog('login')}>
+                  Have an account?{' '}
+                  <button type="button" className="landing-link" onClick={() => openDialog('login')}>
                     Log in
                   </button>
-                  {' · '}
+                  <span className="landing-sep" aria-hidden="true">
+                    /
+                  </span>
                 </>
-              ) : (
-                'Accounts are offline right now; your cities will be saved on this device. · '
               )}
-              <button type="button" className="landing-inline" onClick={onDemo}>
-                Tour a finished city
+              <button type="button" className="landing-link" onClick={onDemo}>
+                Walk around a finished city
               </button>
             </p>
           </div>
-          <div className="landing-art">
-            <HeroCity className="landing-city" />
-          </div>
+
+          <figure className="landing-map">
+            <div className="landing-map-frame">
+              <HeroCity className="landing-city" />
+              {PINS.map((p) => (
+                <span key={p.label} className={`landing-pin is-${p.side}`} style={heroAnchor(p.x, p.y, p.z)}>
+                  <span className="landing-pin-tag">{p.label}</span>
+                </span>
+              ))}
+            </div>
+            <figcaption>Every building, tree and street here is drawn by the game, live in your browser.</figcaption>
+          </figure>
         </section>
 
-        <section className="landing-features" aria-label="Features">
-          {FEATURES.map((f) => (
-            <article key={f.title} className="landing-feature">
-              <span className="landing-feature-icon" aria-hidden="true">
-                {f.icon}
-              </span>
-              <h2>{f.title}</h2>
-              <p>{f.text}</p>
-            </article>
-          ))}
+        <section className="landing-steps" aria-labelledby="landing-steps-title">
+          <h2 id="landing-steps-title" className="landing-section-title">
+            How a city grows
+          </h2>
+          <ol>
+            {STEPS.map((s, k) => (
+              <li key={s.title}>
+                <span className="landing-step-no">{String(k + 1).padStart(2, '0')}</span>
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="landing-saves">
+          <div>
+            <h2 className="landing-section-title">Your cities stay yours</h2>
+            <p>Start without signing up: your cities save on this device as you play. Make an account whenever you like and move them across, then open them from any browser.</p>
+          </div>
+          <dl className="landing-compare">
+            <div>
+              <dt>As a guest</dt>
+              <dd>Saved on this device</dd>
+            </div>
+            <div>
+              <dt>With an account</dt>
+              <dd>Saved to the cloud, open anywhere</dd>
+            </div>
+          </dl>
         </section>
       </main>
 
-      <footer className="landing-footer">All art is drawn by code, live in your browser. No downloads, no installs.</footer>
+      <footer className="landing-footer">
+        <span className="landing-wordmark is-small">City Builder</span>
+        <span>Free to play. Runs in any modern browser, nothing to install.</span>
+      </footer>
     </div>
   );
 }

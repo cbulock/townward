@@ -92,7 +92,7 @@ export function paintWaterTower(iso: IsoFrame, o: Orient, rng: Rng, variant: num
     ctx.ellipse(x, cy + 3.4, R * 0.92, 2.4, 0, Math.PI, 0, true);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 3.6px 'IBM Plex Sans', system-ui, sans-serif';
+    ctx.font = "bold 3.6px 'IBM Plex Sans', system-ui, sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText('H2O', x - 1, cy - 2.5);
     pole(iso, 0.5, 0.5, legTop + R * 2 - 2, legTop + R * 2 + 3, 0.8, '#5b6169');
@@ -123,7 +123,7 @@ export function paintWaterTower(iso: IsoFrame, o: Orient, rng: Rng, variant: num
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(tx - rx, ty + 5, rx * 2, 2);
     ctx.fillStyle = '#2f7fd6';
-    ctx.font = 'bold 4px 'IBM Plex Sans', system-ui, sans-serif';
+    ctx.font = "bold 4px 'IBM Plex Sans', system-ui, sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText('WATER', tx - 1, ty + 11.5);
   }

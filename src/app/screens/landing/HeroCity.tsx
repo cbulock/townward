@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HALF_H, HALF_W } from '../../../shared/constants';
 import { BUILDINGS, type BuildingId } from '../../../sim/buildings/catalog';
 import { RoadType } from '../../../sim/roads';
@@ -130,6 +130,8 @@ export function heroAnchor(x: number, y: number, z = 0): { left: string; top: st
 /** The landing page's diorama: a small city drawn with the game's own art, painted once. */
 export function HeroCity({ className }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // In state, not classList: a re-render would otherwise reset the class and hide the city.
+  const [painted, setPainted] = useState(false);
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');
@@ -141,9 +143,9 @@ export function HeroCity({ className }: { className?: string }) {
       canvas.height = HERO_H * dpr;
       ctx.scale(dpr, dpr);
       paintDiorama(ctx);
-      canvas.classList.add('is-painted');
+      setPainted(true);
     });
     return () => cancelAnimationFrame(id);
   }, []);
-  return <canvas ref={ref} className={className} style={{ aspectRatio: `${HERO_W} / ${HERO_H}` }} aria-hidden="true" />;
+  return <canvas ref={ref} className={`${className ?? ''} ${painted ? 'is-painted' : ''}`} style={{ aspectRatio: `${HERO_W} / ${HERO_H}` }} aria-hidden="true" />;
 }
