@@ -9,7 +9,7 @@ import { planClear, planMove, planPlace, planRoad, planZone, type MovePlan, type
 import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/systems/access';
 import { BALANCE } from '../shared/balance';
-import { ZONE_TINT } from '../render/atlas/palette';
+import { ZONE_TINT } from '../render/atlas/theme/palette';
 import { rectTiles, roadPath, RoadType, type BuildableRoad, type TilePos } from '../sim/roads';
 import type { World } from '../sim/World';
 import { ROAD_SPECS } from '../sim/roadTypes';

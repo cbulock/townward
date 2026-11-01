@@ -18,7 +18,7 @@ import { siteHeadroom } from './atlas/constructionArt';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { FURNITURE_HEADROOM } from './atlas/streetArt';
 import { WATER_PHASES } from './atlas/groundArt';
-import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/palette';
+import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/theme/palette';
 import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from './atlas/tiles';
 import { roadVariant } from './atlas/roads';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';

@@ -1,7 +1,7 @@
 import { mulberry32 } from '../../shared/rng';
 import { Terrain, type TerrainId } from '../../sim/terrain/types';
 import { diamondPath, SEAM_OVERLAP, tileUVToFrame } from './geometry';
-import { GROUND_BASE, INK } from './palette';
+import { GROUND_BASE, INK } from './theme/palette';
 
 export const WATER_PHASES = 8;
 

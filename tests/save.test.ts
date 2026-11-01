@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { City } from '../src/sim/City';
 import { refreshCity } from '../src/sim/core/Simulation';
 import { buildDemoCity } from '../src/sim/demo';
-import { decodeLayer, deserialize, encodeLayer, parseSave, SaveError, serialize, type SaveData } from '../src/sim/save';
+import { decodeLayer, deserialize, encodeLayer, parseSave, SaveError, serialize, verifySave, type SaveData } from '../src/sim/save';
 import { cityStats } from '../src/sim/systems/population';
 import { generateTerrain } from '../src/sim/terrain/generate';
 import { presetSettings } from '../src/sim/terrain/presets';
@@ -105,5 +105,44 @@ describe('save format', () => {
       ],
     });
     expect(city.world.buildings.size).toBe(1);
+  });
+});
+
+describe('strict saving', () => {
+  it('a charged battery or worn plant never makes the city unloadable', () => {
+    const city = demoCity();
+    const [first, second] = city.world.buildings.values();
+    first.stored = 12.5;
+    second.condition = 0.7;
+    second.repairDays = 2;
+    const data = serialize(city, terrain, 'Batteries');
+    verifySave(data);
+    const loaded = deserialize(parseSave(JSON.parse(JSON.stringify(data))));
+    expect(loaded.world.buildings.size).toBe(city.world.buildings.size);
+  });
+
+  it('keeps the land itself, so a generator change cannot move the ground under a city', () => {
+    const city = demoCity();
+    const data = serialize(city, terrain, 'Ground');
+    // Pretend the generator now makes a different island: the save still has the old one.
+    const moved = deserialize({ ...data, terrain: { ...terrain, seed: 7 } });
+    expect(moved.world.terrain).toEqual(city.world.terrain);
+    expect(moved.world.elevation).toEqual(city.world.elevation);
+    // Still compact: a few KB of layers on top of the buildings.
+    expect(JSON.stringify(data.layers).length).toBeLessThan(40_000);
+  });
+
+  it('a stale or malformed tile map is ignored, not fatal', () => {
+    const data = serialize(demoCity(), terrain, 'Tiles');
+    const parsed = parseSave({ ...JSON.parse(JSON.stringify(data)), buildingTiles: { '1,1': 999_999, nope: 'x' } });
+    expect(() => deserialize(parsed)).not.toThrow();
+  });
+
+  it('verifySave rejects snapshots that would not load back whole', () => {
+    const data = serialize(demoCity(), terrain, 'Bad');
+    expect(() => verifySave({ ...data, buildings: [...data.buildings, ['cottage', 9999, 0, 0, 0, 0, 0, 0, 75, 0]] })).toThrow(/off the map/);
+    const [b] = data.buildings;
+    expect(() => verifySave({ ...data, buildings: [...data.buildings, b] })).toThrow(/overlaps/);
+    expect(() => verifySave({ ...data, layers: { ...data.layers, road: 'AAAA' } })).toThrow(SaveError);
   });
 });

@@ -32,7 +32,21 @@ account so they follow the player to any browser. Design decisions: D-034, D-062
   existed in memory but had not reached the 45-second autosave yet.
 - When the tab is hidden or closed (page `visibilitychange`), and when leaving to the start screen.
 - On `Ctrl/⌘ S` or the status button.
-- A failed cloud save keeps the city marked dirty and retries at the next autosave.
+- A failed save keeps the city marked dirty and retries after 5 seconds.
+
+## Strict Saving (D-071)
+
+- **Verify before writing.** `verifySave` round-trips each snapshot through JSON and
+  `parseSave`: every building must survive, every layer must decode to the map size, and
+  every footprint must fit without overlap. A snapshot that fails is never stored.
+- **Journal.** Every save first writes the snapshot synchronously to localStorage
+  (`citybuilder:journal:<store>:<id>`, or `:new` for a city with no save yet). So does hiding or
+  closing the tab. The entry is removed once the store (IndexedDB or the server) confirms.
+- **Load the newest.** Opening a city compares the store copy with any journal entry by
+  `savedAt` and uses the newer one. If the store can't be read, it uses the journal. A `:new`
+  entry is restored into IndexedDB on the next visit and opened.
+- **Lenient reads.** Counters are rounded instead of dropping a building; `buildingTiles` is
+  a cross-check only and never fails a load.
 
 ## Save Format (`sim/save.ts`, version 1)
 
@@ -43,7 +57,8 @@ inspectable while keeping the map footprint deterministic and compact. On load, 
 are rebuilt from the validated building records and the tile map is validated against map
 bounds and building references. (`sim/save.ts`, version 1)
 
-Only what can't be recomputed (D-034). Terrain is regenerated from its settings; road
+Only what can't be recomputed (D-034), plus the land itself (`ground`, `elev`; D-071) so a
+generator change can't move it. Older saves regenerate terrain from its settings; road
 access, utilities, coverage, commutes, needs and traffic are rebuilt on load.
 
 ```ts
@@ -53,7 +68,8 @@ interface SaveData {
   name: string;
   terrain: TerrainSettings;  // preset, seed, size and sliders
   city: { funds; day; clock; taxRate };
-  layers: { road; bridge; zone; cleared };   // RLE + base64, one byte per tile
+  layers: { road; bridge; zone; cleared; lane?; pave?; ground?; elev? };   // RLE + base64, one byte per tile
+  savedAt?: number;          // client time of the snapshot (newest copy wins on load)
   buildings: SavedBuilding[];  // [def, x, y, variant, flags, construction, fullDays, occupants, happiness %, moodDays]
 }
 ```

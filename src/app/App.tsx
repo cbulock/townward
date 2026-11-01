@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GameOptions } from '../game/Game';
-import { storeFor } from '../save/CitySaver';
+import { hasJournal } from '../save/journal';
+import { loadCity, recoverNewCity } from '../save/loadCity';
 import type { CityRef } from '../save/SaveStore';
 import { AuthDialog } from './account/AuthDialog';
 import { useAuthBootstrap } from './auth';
@@ -11,11 +12,14 @@ import { NewGameScreen } from './screens/NewGameScreen';
 /** What's on screen. A playing city knows its save (null for a new or demo city). */
 type Screen =
   | { readonly kind: 'menu'; readonly notice?: string }
+  | { readonly kind: 'recovering' }
   | { readonly kind: 'loading'; readonly ref: CityRef }
   | { readonly kind: 'play'; readonly options: GameOptions; readonly ref: CityRef | null };
 
 function initialScreen(): Screen {
   if (isDemoRoute()) return { kind: 'play', options: demoOptions(), ref: null };
+  // A new city closed before its first save is in the journal: store it, then reopen it.
+  if (hasJournal('new')) return { kind: 'recovering' };
   const ref = readCityRef();
   if (ref) return { kind: 'loading', ref };
   const options = readUrlOptions();
@@ -35,10 +39,9 @@ export function App() {
   useEffect(() => {
     if (!loadingRef) return;
     let cancelled = false;
-    storeFor(loadingRef.store)
-      .load(loadingRef.id)
+    loadCity(loadingRef)
       .then(
-        ({ data }): Screen => ({ kind: 'play', options: { terrain: data.terrain, name: data.name, save: data }, ref: loadingRef }),
+        (data): Screen => ({ kind: 'play', options: { terrain: data.terrain, name: data.name, save: data }, ref: loadingRef }),
         (err: unknown): Screen => {
           clearUrlOptions();
           const reason = err instanceof Error ? err.message : 'unknown error';
@@ -52,6 +55,22 @@ export function App() {
       cancelled = true;
     };
   }, [loadingRef]);
+
+  const recovering = screen.kind === 'recovering';
+  useEffect(() => {
+    if (!recovering) return;
+    recoverNewCity().then(
+      (ref) => {
+        if (ref) writeCityUrl(ref);
+        setScreen(ref ? { kind: 'loading', ref } : { kind: 'menu' });
+      },
+      (err: unknown) => {
+        // The journal stays, so the next visit tries again.
+        const reason = err instanceof Error ? err.message : 'unknown error';
+        setScreen({ kind: 'menu', notice: `Couldn't restore your unsaved city yet: ${reason}` });
+      },
+    );
+  }, [recovering]);
 
   const start = (o: GameOptions) => {
     if (o.demo) writeDemoUrl(o.terrain.seed);
@@ -73,7 +92,7 @@ export function App() {
   return (
     <>
       {screen.kind === 'menu' && <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />}
-      {screen.kind === 'loading' && (
+      {(screen.kind === 'loading' || screen.kind === 'recovering') && (
         <div className="loading-screen" role="status">
           <div className="panel loading-card">Loading your city…</div>
         </div>

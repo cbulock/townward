@@ -13,7 +13,7 @@ import { flushUVs, QuadBatch, setQuadTexture, type QuadSlot, type Rgba, type Vec
 import { tileToWorld } from './iso';
 import { computeDualCell, isWaterTerrain } from './transitions';
 import { cellQuadPoints, tileQuadPoints } from './view/lift';
-import { GROUND_BASE, hexToRgb } from './atlas/palette';
+import { GROUND_BASE, hexToRgb } from './atlas/theme/palette';
 import { ViewTransform } from './view/ViewTransform';
 import { ViewWorld } from './view/ViewWorld';
 

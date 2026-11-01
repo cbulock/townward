@@ -2,6 +2,13 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-01: Strict saving (D-071)
+- Fixed the progress-loss bug: a city with a charged battery bank couldn't be opened ("bad building tile"). Fractional counters are rounded on parse; the tile map is a non-fatal cross-check.
+- `verifySave` checks every snapshot before it's stored; a bad one never overwrites a good save.
+- Synchronous localStorage journal (`src/save/journal.ts`) written before every save and on tab hide/close; loading takes the newest of store and journal (`src/save/loadCity.ts`); unsaved new cities are restored on the next visit; failed saves retry in 5 s.
+- Saves now include the terrain and elevation layers.
+- Tests: `tests/save.test.ts` (strict saving), `tests/journal.test.ts`. Pre-existing failure untouched: `transport.test.ts` avenue corridor.
+
 ## 2026-11-01: Advanced power coverage and plant maintenance
 - Power plants now expose type-specific coverage radii in the Build preview and picker.
 - Generation is condition-aware: sustained high consumption wears plants down, derates output, and can trigger a repair period.

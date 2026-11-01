@@ -114,6 +114,7 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       // Last chance for unsaved changes (rerolls, unmount): the snapshot is taken before the game goes.
       const saver = saverRef.current;
       saverRef.current = null;
+      saver?.journalNow();
       void saver?.autosave();
       saver?.dispose();
       store.set(saveStatusAtom, null);

@@ -3,7 +3,7 @@ import { RoadType } from '../sim/roads';
 import type { TerrainId } from '../sim/terrain/types';
 import type { World } from '../sim/World';
 import { isZoned } from '../sim/zones';
-import { GROUND_BASE, hexToRgb, numberToRgb, ZONE_TINT } from './atlas/palette';
+import { GROUND_BASE, hexToRgb, numberToRgb, ZONE_TINT } from './atlas/theme/palette';
 import type { Point, ViewTransform } from './view/ViewTransform';
 
 /**

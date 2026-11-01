@@ -5,7 +5,7 @@ import { BridgeAxis, RoadType } from './roads';
 import { PAVEMENTS, roadSpec } from './roadTypes';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
-import { Decor } from './terrain/types';
+import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
 import { ZoneType } from './zones';
 
@@ -56,6 +56,12 @@ export interface SavedLayers {
   /** One-way carriageway directions and footpath styles (docs/specs/transport.md); absent in older saves. */
   readonly lane?: string;
   readonly pave?: string;
+  /**
+   * The land itself (terrain type and height). Regenerating from the seed alone would move
+   * the ground under a saved city if the generator ever changed; absent in older saves.
+   */
+  readonly ground?: string;
+  readonly elev?: string;
 }
 
 /**
@@ -85,6 +91,8 @@ export interface SaveData {
   /** Tile-indexed building ownership snapshot: `"x,y"` → building array index. */
   readonly buildingTiles?: Readonly<Record<string, number>>;
   readonly sim?: SavedSimState;
+  /** When the client took this snapshot (ms since the epoch), to pick the newest copy on load. */
+  readonly savedAt?: number;
 }
 
 /** What the city list shows without loading the city. */
@@ -154,6 +162,8 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       cleared: encodeLayer(cleared),
       lane: encodeLayer(w.lane),
       pave: encodeLayer(w.pave),
+      ground: encodeLayer(w.terrain),
+      elev: encodeLayer(w.elevation),
     },
     buildings,
     buildingTiles,
@@ -197,6 +207,11 @@ export function deserialize(data: SaveData): City {
   const cleared = decodeLayer(data.layers.cleared, n);
   const lane = data.layers.lane ? decodeLayer(data.layers.lane, n) : null;
   const pave = data.layers.pave ? decodeLayer(data.layers.pave, n) : null;
+  if (data.layers.ground && data.layers.elev) {
+    const ground = decodeLayer(data.layers.ground, n);
+    for (let i = 0; i < n; i++) if (TERRAIN_VALUES.has(ground[i])) world.terrain[i] = ground[i];
+    world.elevation.set(decodeLayer(data.layers.elev, n));
+  }
   for (let i = 0; i < n; i++) {
     world.road[i] = ROAD_VALUES.has(road[i]) ? road[i] : RoadType.None;
     world.bridge[i] = world.road[i] !== RoadType.None && BRIDGE_VALUES.has(bridge[i]) ? bridge[i] : BridgeAxis.None;
@@ -209,8 +224,9 @@ export function deserialize(data: SaveData): City {
       world.decor[i] = Decor.None;
     }
   }
+  // Footprints are rebuilt from the building records; buildingTiles is only a cross-check
+  // (verifySave), so a skipped building can never make the whole city unloadable.
   for (const s of data.buildings) addSavedBuilding(world, s);
-  validateBuildingTiles(data.buildingTiles, world);
 
   const city = new City(world, data.city.funds);
   city.day = data.city.day;
@@ -257,6 +273,7 @@ function floatsFrom<T extends Float32Array | Float64Array>(text: string, Kind: {
   return new Kind(bytes.slice(0, usable).buffer);
 }
 
+const TERRAIN_VALUES: ReadonlySet<number> = new Set(Object.values(Terrain));
 const ROAD_VALUES: ReadonlySet<number> = new Set(Object.values(RoadType));
 const BRIDGE_VALUES: ReadonlySet<number> = new Set(Object.values(BridgeAxis));
 const ZONE_VALUES: ReadonlySet<number> = new Set(Object.values(ZoneType));
@@ -276,17 +293,38 @@ function addSavedBuilding(world: World, s: SavedBuilding) {
   b.repairDays = Math.max(0, repairDays);
 }
 
-function validateBuildingTiles(tiles: Readonly<Record<string, number>> | undefined, world: World) {
-  if (!tiles) return;
-  for (const [key, owner] of Object.entries(tiles)) {
-    const match = /^(\d+),(\d+)$/.exec(key);
-    if (!match) throw new SaveError('bad building tile');
-    const x = Number(match[1]);
-    const y = Number(match[2]);
-    if (!Number.isInteger(owner) || owner < 0 || owner >= world.buildings.size || !world.inBounds(x, y)) {
-      throw new SaveError('bad building tile');
-    }
+// ---------------------------------------------------------------- verify (before writing)
+
+/**
+ * Strict check before a save is stored, so a snapshot that wouldn't load back whole can never
+ * overwrite a good one: it must survive JSON → parseSave with every building, every layer must
+ * decode to the map size, and every footprint must fit without overlap. Returns the JSON text
+ * (callers store or send it as is). Throws SaveError naming the first problem.
+ */
+export function verifySave(data: SaveData): string {
+  const text = JSON.stringify(data);
+  const back = parseSave(JSON.parse(text));
+  if (back.buildings.length !== data.buildings.length) {
+    throw new SaveError(`save check failed: ${data.buildings.length - back.buildings.length} building(s) would not load`);
   }
+  const size = back.terrain.size;
+  const n = size * size;
+  for (const [name, layer] of Object.entries(back.layers)) {
+    if (typeof layer === 'string') decodeLayer(layer, n);
+    else throw new SaveError(`save check failed: layer ${name}`);
+  }
+  const taken = new Uint8Array(n);
+  for (const [def, x, y] of back.buildings) {
+    const { w, h } = BUILDINGS[def].size;
+    if (x < 0 || y < 0 || x + w > size || y + h > size) throw new SaveError(`save check failed: ${def} at ${x},${y} is off the map`);
+    for (let ty = y; ty < y + h; ty++)
+      for (let tx = x; tx < x + w; tx++) {
+        const i = ty * size + tx;
+        if (taken[i]) throw new SaveError(`save check failed: ${def} at ${x},${y} overlaps another building`);
+        taken[i] = 1;
+      }
+  }
+  return text;
 }
 
 // ---------------------------------------------------------------- parse (untrusted JSON → SaveData)
@@ -319,6 +357,8 @@ const isBuildingId = (v: unknown): v is BuildingId => typeof v === 'string' && (
 const isPresetId = (v: unknown): v is PresetId => typeof v === 'string' && (PRESET_IDS as readonly string[]).includes(v);
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** A non-negative whole number from a saved counter. */
+const count = (n: number): number => Math.max(0, Math.round(n));
 
 /**
  * Check untrusted JSON (from the server or IndexedDB) and return it as SaveData.
@@ -354,17 +394,28 @@ export function parseSave(json: unknown): SaveData {
     if (!isBuildingId(def)) continue;
     if (!rest.every(isFiniteNumber)) continue;
     const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored, condition, repairDays] = rest;
-    if (![x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays].every(isInt)) continue;
-    if (stored !== undefined && !isInt(stored)) continue;
+    // Position must be exact; counters are rounded rather than dropping the building
+    // (a battery's charge is fractional, and dropping it once made whole cities unloadable).
+    if (!isInt(x) || !isInt(y)) continue;
     if (condition !== undefined && (condition < 0 || condition > 1)) continue;
-    if (repairDays !== undefined && !isInt(repairDays)) continue;
-    const core: SavedBuildingCore = [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays];
+    const core: SavedBuildingCore = [
+      def,
+      x,
+      y,
+      count(variant),
+      count(flags),
+      count(construction),
+      count(fullDays),
+      count(occupants),
+      count(happiness),
+      count(moodDays),
+    ];
     buildings.push(
       condition === undefined || repairDays === undefined
         ? stored === undefined
           ? core
           : [...core, stored]
-        : [...core, stored ?? 0, condition, repairDays],
+        : [...core, stored ?? 0, condition, count(repairDays)],
     );
   }
   const buildingTiles = parseBuildingTiles(json.buildingTiles);
@@ -381,19 +432,21 @@ export function parseSave(json: unknown): SaveData {
       cleared: str(l, 'cleared'),
       ...(typeof l.lane === 'string' && { lane: l.lane }),
       ...(typeof l.pave === 'string' && { pave: l.pave }),
+      ...(typeof l.ground === 'string' && typeof l.elev === 'string' && { ground: l.ground, elev: l.elev }),
     },
     buildings,
     ...(buildingTiles && { buildingTiles }),
     ...parseSimState(json.sim),
+    ...(isFiniteNumber(json.savedAt) && { savedAt: json.savedAt }),
   };
 }
 
+/** The optional tile map; a malformed one is dropped (footprints come from the building records). */
 function parseBuildingTiles(v: unknown): Readonly<Record<string, number>> | undefined {
-  if (v === undefined) return undefined;
-  if (!isObj(v)) throw new SaveError('bad buildingTiles');
+  if (!isObj(v)) return undefined;
   const result: Record<string, number> = {};
   for (const [key, value] of Object.entries(v)) {
-    if (!/^\d+,\d+$/.test(key) || !isInt(value) || value < 0) throw new SaveError('bad building tile');
+    if (!/^\d+,\d+$/.test(key) || !isInt(value) || value < 0) return undefined;
     result[key] = value;
   }
   return result;

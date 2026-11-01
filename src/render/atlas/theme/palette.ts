@@ -1,5 +1,5 @@
-import { Terrain, type TerrainId } from '../../sim/terrain/types';
-import { ZoneType, type ZonedType } from '../../sim/zones';
+import { Terrain, type TerrainId } from '../../../sim/terrain/types';
+import { ZoneType, type ZonedType } from '../../../sim/zones';
 
 /**
  * Bright, saturated pixel-art palette (see docs/04-ui-ux.md, "World art").
