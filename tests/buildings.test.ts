@@ -77,7 +77,7 @@ describe('planPlace / applyPlace', () => {
     const city = new City(w, 10_000);
     applyPlace(city, planPlace(w, 'cottage', 3, 0), 0);
     const plan = planRoad(w, [{ x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }], RoadType.Road);
-    expect(plan.tiles.map((t) => t.valid)).toEqual([true, false, false]);
+    expect(plan.tiles.map((t) => t.valid)).toEqual([true, false, true]);
     expect(applyRoad(city, plan, RoadType.Road).ok).toBe(true);
   });
 

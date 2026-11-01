@@ -17,3 +17,32 @@ export function subSeed(seed: number, salt: number): number {
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
   return (h ^ (h >>> 16)) >>> 0;
 }
+
+/**
+ * A mulberry32 stream whose state can be saved and restored, so a loaded city continues
+ * with exactly the random numbers the running one would have drawn (docs/specs/engine.md).
+ * `next` is bound, so it can be passed wherever a `() => number` is expected.
+ */
+export class RandomStream {
+  private a: number;
+
+  constructor(seed: number) {
+    this.a = seed >>> 0;
+  }
+
+  readonly next = (): number => {
+    this.a = (this.a + 0x6d2b79f5) >>> 0;
+    let t = this.a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  get state(): number {
+    return this.a;
+  }
+
+  set state(value: number) {
+    this.a = value >>> 0;
+  }
+}

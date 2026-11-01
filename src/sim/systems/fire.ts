@@ -29,10 +29,12 @@ export function rollFires(world: World, population: number, rng: () => number): 
 /** Rolls for fires each day; burned lots go into the day's outcome. */
 export class FireSystem implements SimSystem {
   readonly name = 'fire';
-  constructor(
-    private readonly world: World,
-    private readonly rng: () => number,
-  ) {}
+  private readonly world: World;
+  private readonly rng: () => number;
+  constructor(world: World, rng: () => number) {
+    this.world = world;
+    this.rng = rng;
+  }
   onDay(out: DayOutcome) {
     for (const b of rollFires(this.world, cityStats(this.world).population, this.rng)) {
       const { w, h } = BUILDINGS[b.def].size;

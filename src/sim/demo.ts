@@ -3,7 +3,7 @@ import { ART_VARIANTS, BUILDINGS, startLevel, zonedBuildings, type BuildingDef, 
 import { BALANCE } from '../shared/balance';
 import { Decor } from './terrain/types';
 import type { City } from './City';
-import { applyPlace, applyRoad, applyZone, planPlace, planRoad, planZone } from './commands';
+import { applyPlace, applyRoad, applyZone, planPlace, planRoad, planZone, type Plan } from './commands';
 import { growDay } from './systems/growth';
 import { refreshCity } from './core/Simulation';
 import { findEntrance } from './systems/access';
@@ -49,7 +49,7 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
   // Streets: one segment per block edge, so a blocked crossing only loses that segment.
   // The two central avenues are highways.
   const road = (ax: number, ay: number, bx: number, by: number, type: BuildableRoad) =>
-    applyRoad(city, planRoad(w, roadPath({ x: ax, y: ay }, { x: bx, y: by }, true), type), type);
+    applyRoad(city, leadingRun(planRoad(w, roadPath({ x: ax, y: ay }, { x: bx, y: by }, true), type)), type);
   for (let k = 0; k <= 2 * BLOCKS; k++) {
     const line = k * PITCH;
     const type = k === BLOCKS ? RoadType.Highway : RoadType.Road;
@@ -178,6 +178,18 @@ function fillLots(city: City, rng: () => number) {
       if (ids.length > 0) build(ids[Math.floor(rng() * ids.length)], x, y);
     }
   }
+}
+
+/**
+ * Only the run of valid tiles from the start of a road plan. The demo's grid was laid out
+ * when roads stopped at the first blocked tile; keeping that here leaves /demo the same city
+ * (players' roads now continue past rock, D-064).
+ */
+function leadingRun(plan: Plan): Plan {
+  const stop = plan.tiles.findIndex((t) => !t.valid);
+  const tiles = stop === -1 ? plan.tiles : plan.tiles.map((t, k) => (k < stop ? t : { ...t, valid: false, cost: 0 }));
+  const kept = tiles.filter((t) => t.valid);
+  return { tiles, cost: kept.reduce((sum, t) => sum + t.cost, 0), count: kept.filter((t) => t.cost > 0).length };
 }
 
 interface UtilitySlot {

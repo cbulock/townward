@@ -93,10 +93,13 @@ export class NeedsSystem implements SimSystem {
   readonly byBuilding = new Map<number, BuildingNeeds>();
   report: NeedsReport = { happiness: 1, abandoned: 0, complaints: [] };
 
-  constructor(
-    private readonly world: World,
-    private readonly commute: CommuteSystem | null = null,
-  ) {}
+  private readonly world: World;
+  private readonly commute: CommuteSystem | null;
+
+  constructor(world: World, commute: CommuteSystem | null = null) {
+    this.world = world;
+    this.commute = commute;
+  }
 
   /** Re-score after edits (so placing a clinic shows up straight away). */
   onWorldChanged() {

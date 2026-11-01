@@ -62,56 +62,61 @@ const BRIDGE_COST: Readonly<Record<BuildableRoad, number>> = {
   [RoadType.Highway]: BALANCE.highwayBridgeCost,
 };
 
+/** Land a road can go on: not rock, no building. Existing roads count (they're kept or upgraded). */
+function roadableLand(world: World, i: number): boolean {
+  return !isWater(world, i) && world.terrain[i] !== Terrain.Rock && world.building[i] === -1;
+}
+
 /**
- * Check the water run that starts at path[k] (path[k − 1] is land). A bridge must be
- * straight (every step, including the one back onto land, goes the same way), land on
- * the far shore within the path, and span at most maxBridgeSpan tiles.
+ * Check the water run that starts at path[k] (path[k − 1] is land). A bridge must start on
+ * roadable land, be straight (every step, including the one back onto land, goes the same
+ * way), land on roadable land within the path, span at most maxBridgeSpan tiles, and not
+ * cross an existing bridge sideways. Otherwise it would be left dangling.
  */
 function bridgeRunValid(world: World, path: readonly TilePos[], k: number): boolean {
-  const dx = path[k].x - path[k - 1].x;
-  const dy = path[k].y - path[k - 1].y;
+  const start = path[k - 1];
+  if (!world.inBounds(start.x, start.y) || !roadableLand(world, world.index(start.x, start.y))) return false;
+  const dx = path[k].x - start.x;
+  const dy = path[k].y - start.y;
+  const axis = dx !== 0 ? BridgeAxis.X : BridgeAxis.Y;
   for (let j = k; j < path.length; j++) {
     const p = path[j];
     if (p.x - path[j - 1].x !== dx || p.y - path[j - 1].y !== dy) return false;
     if (!world.inBounds(p.x, p.y)) return false;
-    if (!isWater(world, world.index(p.x, p.y))) return j - k <= BALANCE.maxBridgeSpan;
+    const i = world.index(p.x, p.y);
+    if (!isWater(world, i)) return j - k <= BALANCE.maxBridgeSpan && roadableLand(world, i);
+    if (world.bridge[i] !== BridgeAxis.None && world.bridge[i] !== axis) return false;
   }
   return false; // path ends over water
 }
 
 /**
- * Price a road along `path`. Only the contiguous valid run from the start gets built
- * (docs/specs/roads.md): once a tile is blocked, everything after it is invalid too.
- * Water is crossed by straight bridges that start and end on land. Tiles that already
- * carry this road type (or a highway, when placing a road) are free and kept.
+ * Price a road along `path`. Each tile is judged on its own (docs/specs/roads.md): rock,
+ * buildings and the map edge block only their own tiles, and the rest of the drag still builds.
+ * Water is crossed by straight bridges that start and end on roadable land; a crossing that
+ * can't be bridged is blocked as a whole. Tiles that already carry this road type (or a
+ * highway, when placing a road) are free and kept.
  */
 export function planRoad(world: World, path: readonly TilePos[], type: BuildableRoad): Plan {
   const tiles: PlannedTile[] = [];
-  let blocked = false;
   let cost = 0;
   let count = 0;
+  /** Whether the water crossing we're in can be bridged; decided on entering it. */
+  let crossingOk = false;
   for (let k = 0; k < path.length; k++) {
     const p = path[k];
-    if (!world.inBounds(p.x, p.y)) {
-      blocked = true;
-      continue;
-    }
+    if (!world.inBounds(p.x, p.y)) continue;
     const i = world.index(p.x, p.y);
     const water = isWater(world, i);
 
     let bridge: BridgeAxisId = BridgeAxis.None;
-    if (!blocked && water) {
-      const prev = path[k - 1];
-      const enteringWater = k > 0 && !isWater(world, world.index(prev.x, prev.y));
-      if (k === 0 || (enteringWater && !bridgeRunValid(world, path, k))) blocked = true;
-      else {
-        bridge = p.x !== prev.x ? BridgeAxis.X : BridgeAxis.Y;
-        // Can't run a road sideways across an existing bridge.
-        if (world.bridge[i] !== BridgeAxis.None && world.bridge[i] !== bridge) blocked = true;
-      }
+    if (water) {
+      const prev = k > 0 ? path[k - 1] : null;
+      const prevI = prev && world.inBounds(prev.x, prev.y) ? world.index(prev.x, prev.y) : -1;
+      if (prevI === -1 || !isWater(world, prevI)) crossingOk = prevI !== -1 && bridgeRunValid(world, path, k);
+      if (crossingOk && prev) bridge = p.x !== prev.x ? BridgeAxis.X : BridgeAxis.Y;
     }
-    if (blocked || world.terrain[i] === Terrain.Rock || world.building[i] !== -1) {
-      blocked = true;
+    if (water ? !crossingOk : !roadableLand(world, i)) {
       tiles.push({ ...p, valid: false, cost: 0 });
       continue;
     }

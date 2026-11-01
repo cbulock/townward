@@ -3,6 +3,11 @@
 Newest first. One entry per work session.
 
 
+## 2026-11-01: Roads continue past rock (D-064)
+- User report: on the Island map, a highway dragged across a grey rock outcrop failed for everything after the rock. `planRoad` now judges each tile on its own. Rock, buildings and the map edge block only their own tiles. A water crossing is checked as a whole (straight, within span, buildable land at both ends, not crossing a bridge sideways), so bridges never dangle.
+- `/demo` keeps the old rule through `leadingRun`. Its roads, bridges and buildings hash the same as before on three seeds.
+- Tests: 2 new (rock gap, building gap, bridge onto rock) and 4 updated to the new rule; 138 pass.
+
 ## 2026-11-01: Saving fix: "my island progress wasn't shown after logging in again"
 - Nothing was lost: both of the user's Island saves were in Postgres with their roads. But after logging in, the start screen led with "Found a new city", preselected with the same seed, so starting Island again gave an empty copy that looked like lost progress. The small, picture-less city card didn't help.
 - Fix: a **Continue** card for the last-played city with a live map preview, previews on every city card (lazy, queued, cached), *Found a new city* folded away when you have cities, unique default names, and the camera centred on roads and buildings when a city loads.

@@ -329,11 +329,12 @@ export class Traffic {
   private tripCumulative: number[] = [];
   private readonly reversed = new WeakMap<CommuteTrip, Int32Array>();
 
-  constructor(
-    private readonly world: World,
-    seed = 1,
-    private readonly commute: CommuteSource | null = null,
-  ) {
+  private readonly world: World;
+  private readonly commute: CommuteSource | null;
+
+  constructor(world: World, seed = 1, commute: CommuteSource | null = null) {
+    this.world = world;
+    this.commute = commute;
     this.rng = mulberry32(seed);
     this.scratch = new Int32Array(world.width * world.height);
     this.junction = new Uint8Array(world.width * world.height);

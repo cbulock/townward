@@ -47,7 +47,10 @@ export function updateCoverage(world: World) {
 /** Keeps service coverage up to date. */
 export class CoverageSystem implements SimSystem {
   readonly name = 'coverage';
-  constructor(private readonly world: World) {}
+  private readonly world: World;
+  constructor(world: World) {
+    this.world = world;
+  }
   onWorldChanged() {
     updateCoverage(this.world);
   }

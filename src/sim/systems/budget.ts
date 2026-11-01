@@ -59,7 +59,10 @@ export function collectBudget(city: City): BudgetReport {
 export class BudgetSystem implements SimSystem {
   readonly name = 'budget';
   last: BudgetReport | null = null;
-  constructor(private readonly city: City) {}
+  private readonly city: City;
+  constructor(city: City) {
+    this.city = city;
+  }
   onMonth(out: DayOutcome) {
     this.last = collectBudget(this.city);
     out.budget = this.last;

@@ -62,7 +62,10 @@ const DIRS: readonly (readonly [number, number, number])[] = [
 /** Binary min-heap of tile indices keyed by a distance array. */
 class Heap {
   private items: number[] = [];
-  constructor(private readonly key: Float64Array) {}
+  private readonly key: Float64Array;
+  constructor(key: Float64Array) {
+    this.key = key;
+  }
   get size(): number {
     return this.items.length;
   }
@@ -117,7 +120,10 @@ export class CommuteSystem implements SimSystem {
   private readonly load: Float64Array;
   private stamp = 0;
 
-  constructor(private readonly world: World) {
+  private readonly world: World;
+
+  constructor(world: World) {
+    this.world = world;
     const n = world.width * world.height;
     this.volume = new Float32Array(n);
     this.congestion = new Float32Array(n);

@@ -19,7 +19,7 @@ Status: **Phase 3 implemented** (roads, highways, bridges, clearing, build effec
 ## Road Path
 
 - The drag makes an **L-shaped path**: first along the dominant tile axis, then the other. Hold `Shift` for a straight line along the dominant axis.
-- Any land except rock is valid; water is crossed by bridges (below). **Only the contiguous valid run from the start is built.** Once a tile is blocked, the rest of the path is invalid (shown red).
+- Any land except rock is valid; water is crossed by bridges (below). **Each tile is judged on its own:** rock, buildings and the map edge turn only their own tiles red, and the rest of the drag still builds (user request, 2026-11-01). A water crossing that can't be bridged (bent, too long, landing on rock, or crossing a bridge sideways) is red as a whole, so no bridge is left dangling.
 - Trees and rocks on the path are **cleared automatically**, and their clearing cost is added to the price. (D-022. The Clear tool is for bulk clearing.)
 - Existing roads of the same type are free and kept. A road never downgrades a highway. A highway upgrades a road.
 

@@ -300,10 +300,12 @@ function findMergeSquare(
 /** Zoned growth once a day; new and finished sites go into the day's outcome. */
 export class GrowthSystem implements SimSystem {
   readonly name = 'growth';
-  constructor(
-    private readonly city: City,
-    private readonly rng: Rng,
-  ) {}
+  private readonly city: City;
+  private readonly rng: Rng;
+  constructor(city: City, rng: Rng) {
+    this.city = city;
+    this.rng = rng;
+  }
   onDay(out: DayOutcome) {
     const g = growDay(this.city.world, this.rng, this.city.taxRate);
     out.changed.push(...g.changed);

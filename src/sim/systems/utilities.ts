@@ -118,7 +118,10 @@ export function updateUtilities(world: World): UtilityReport {
 export class UtilitiesSystem implements SimSystem {
   readonly name = 'utilities';
   report: UtilityReport = { power: { supply: 0, demand: 0, short: 0 }, water: { supply: 0, demand: 0, short: 0 } };
-  constructor(private readonly world: World) {}
+  private readonly world: World;
+  constructor(world: World) {
+    this.world = world;
+  }
   onWorldChanged() {
     this.report = updateUtilities(this.world);
   }

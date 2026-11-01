@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/shared/balance';
 import { City } from '../src/sim/City';
-import { applyClear, applyRoad, planClear, planRoad } from '../src/sim/commands';
+import { applyClear, applyPlace, applyRoad, planClear, planPlace, planRoad } from '../src/sim/commands';
 import { BridgeAxis, rectTiles, roadMask, roadPath, RoadType } from '../src/sim/roads';
 import { Decor, Terrain } from '../src/sim/terrain/types';
 import { World } from '../src/sim/World';
@@ -66,12 +66,22 @@ describe('planRoad / applyRoad', () => {
     expect(plan.cost).toBe(3 * BALANCE.roadCost + 2 * BALANCE.treeClearCost + BALANCE.boulderClearCost);
   });
 
-  it('stops at rock: only the contiguous run from the start is valid', () => {
+  it('rock blocks only its own tiles; the rest of the drag still builds', () => {
     const w = grassWorld();
     w.terrain[w.index(2, 0)] = Terrain.Rock;
+    w.terrain[w.index(3, 0)] = Terrain.Rock;
+    const plan = planRoad(w, roadPath({ x: 0, y: 0 }, { x: 5, y: 0 }, false), RoadType.Road);
+    expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, false, true, true]);
+    expect(plan.count).toBe(4);
+    expect(plan.cost).toBe(4 * BALANCE.roadCost);
+  });
+
+  it('a building blocks only its own tile', () => {
+    const w = grassWorld();
+    const city = new City(w, 10_000);
+    applyPlace(city, planPlace(w, 'park', 2, 0), 0);
     const plan = planRoad(w, roadPath({ x: 0, y: 0 }, { x: 4, y: 0 }, false), RoadType.Road);
-    expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, false, false]);
-    expect(plan.count).toBe(2);
+    expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, true, true]);
   });
 
   it('existing roads are free; roads never downgrade highways', () => {
@@ -161,6 +171,13 @@ describe('bridges', () => {
     expect(plan.cost).toBe(4 * BALANCE.roadCost + 3 * BALANCE.bridgeCost);
   });
 
+  it('a bridge must start and land on buildable land', () => {
+    const w = riverWorld([3, 4, 5]);
+    w.terrain[w.index(6, 2)] = Terrain.Rock; // far bank is rock
+    const plan = planRoad(w, roadPath({ x: 1, y: 2 }, { x: 8, y: 2 }, false), RoadType.Road);
+    expect(plan.tiles.map((t) => t.valid)).toEqual([true, true, false, false, false, false, true, true]);
+  });
+
   it('cannot end over water', () => {
     const w = riverWorld([3, 4, 5]);
     const plan = planRoad(w, roadPath({ x: 1, y: 2 }, { x: 4, y: 2 }, false), RoadType.Road);
@@ -170,7 +187,8 @@ describe('bridges', () => {
   it('cannot start in water', () => {
     const w = riverWorld([3, 4, 5]);
     const plan = planRoad(w, roadPath({ x: 4, y: 2 }, { x: 7, y: 2 }, false), RoadType.Road);
-    expect(plan.count).toBe(0);
+    // No bridge from mid-river; the land after it still builds.
+    expect(plan.tiles.map((t) => t.valid)).toEqual([false, false, true, true]);
   });
 
   it('cannot bend over water', () => {
@@ -184,7 +202,8 @@ describe('bridges', () => {
     const span = BALANCE.maxBridgeSpan + 1;
     const w = riverWorld(Array.from({ length: span }, (_, k) => 2 + k), span + 6);
     const plan = planRoad(w, roadPath({ x: 1, y: 0 }, { x: span + 3, y: 0 }, true), RoadType.Road);
-    expect(plan.count).toBe(1);
+    // The too-long crossing is red as a whole; the land on both sides still builds.
+    expect(plan.tiles.filter((t) => t.valid).map((t) => t.x)).toEqual([1, span + 2, span + 3]);
   });
 
   it('applies the bridge axis and clearing removes it', () => {
@@ -223,7 +242,8 @@ describe('bridges', () => {
     applyRoad(city, planRoad(w, roadPath({ x: 2, y: 5 }, { x: 6, y: 5 }, true), RoadType.Road), RoadType.Road);
     const across = planRoad(w, roadPath({ x: 4, y: 2 }, { x: 4, y: 8 }, true), RoadType.Road);
     const at = (x: number, y: number) => across.tiles.find((t) => t.x === x && t.y === y)!;
-    expect(at(4, 4).valid).toBe(true);
-    expect(at(4, 5).valid).toBe(false);
+    // The whole crossing is refused (half a bridge would dangle); the banks still build.
+    for (let y = 3; y <= 7; y++) expect(at(4, y).valid).toBe(false);
+    expect(at(4, 2).valid && at(4, 8).valid).toBe(true);
   });
 });

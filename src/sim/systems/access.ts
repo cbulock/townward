@@ -65,7 +65,10 @@ export function isActive(b: BuildingInstance): boolean {
 /** Recomputes every building's entrance after edits. */
 export class AccessSystem implements SimSystem {
   readonly name = 'access';
-  constructor(private readonly world: World) {}
+  private readonly world: World;
+  constructor(world: World) {
+    this.world = world;
+  }
   onWorldChanged() {
     updateRoadAccess(this.world);
   }

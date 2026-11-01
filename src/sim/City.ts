@@ -11,10 +11,10 @@ export class City {
   /** Sim seconds on the time-of-day clock (separate from the calendar; see docs/04-ui-ux.md). */
   clock = 0;
 
-  constructor(
-    readonly world: World,
-    funds: number = BALANCE.startingFunds,
-  ) {
+  readonly world: World;
+
+  constructor(world: World, funds: number = BALANCE.startingFunds) {
+    this.world = world;
     this.funds = funds;
   }
 

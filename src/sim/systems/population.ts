@@ -82,7 +82,10 @@ export function simulateDay(world: World) {
 /** Moves people into homes and jobs once a day. */
 export class PopulationSystem implements SimSystem {
   readonly name = 'population';
-  constructor(private readonly world: World) {}
+  private readonly world: World;
+  constructor(world: World) {
+    this.world = world;
+  }
   onDay() {
     simulateDay(this.world);
   }

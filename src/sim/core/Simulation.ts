@@ -1,5 +1,5 @@
 import { BALANCE } from '../../shared/balance';
-import { mulberry32, subSeed } from '../../shared/rng';
+import { RandomStream, subSeed } from '../../shared/rng';
 import type { City } from '../City';
 import { AccessSystem, updateRoadAccess } from '../systems/access';
 import { BudgetSystem } from '../systems/budget';
@@ -13,6 +13,7 @@ import { TrafficSystem } from '../systems/traffic';
 import { UtilitiesSystem, updateUtilities, type UtilityReport } from '../systems/utilities';
 import type { World } from '../World';
 import { emptyOutcome, type DayOutcome, type SimSystem, type WorldChange } from './System';
+import { SystemTimings } from './timings';
 
 /** Salts for the systems' random streams (each system gets its own, so they never interfere). */
 const SALT = { growth: 0x6077, fire: 0xf12e } as const;
@@ -37,16 +38,23 @@ export class Simulation {
   readonly traffic: TrafficSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
+  /** Random streams whose state is saved, so a loaded city continues exactly (sim/save.ts). */
+  readonly streams: { readonly growth: RandomStream; readonly fire: RandomStream };
+  /** Time per system and hook (F3 overlay, `pnpm sim:run`). */
+  readonly timings = new SystemTimings();
+  readonly city: City;
 
-  constructor(readonly city: City) {
+  constructor(city: City) {
+    this.city = city;
     const world = city.world;
     this.access = new AccessSystem(world);
     this.utilities = new UtilitiesSystem(world);
     this.coverage = new CoverageSystem(world);
     // Mixing in the day means a loaded city doesn't replay the events of day 0 (identical for new cities).
     const seed = world.seed ^ city.day;
-    this.growth = new GrowthSystem(city, mulberry32(subSeed(seed, SALT.growth)));
-    this.fire = new FireSystem(world, mulberry32(subSeed(seed, SALT.fire)));
+    this.streams = { growth: new RandomStream(subSeed(seed, SALT.growth)), fire: new RandomStream(subSeed(seed, SALT.fire)) };
+    this.growth = new GrowthSystem(city, this.streams.growth.next);
+    this.fire = new FireSystem(world, this.streams.fire.next);
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
     this.commute = new CommuteSystem(world);
@@ -61,28 +69,29 @@ export class Simulation {
 
   /** Roads or buildings changed: bring every dependent system up to date. */
   worldChanged(change: WorldChange) {
-    for (const s of this.onChange) s.onWorldChanged?.(change);
+    for (const s of this.onChange) if (s.onWorldChanged) this.timings.run(`${s.name}.change`, () => s.onWorldChanged?.(change));
   }
 
   /** One in-game day. Returns what happened, for effects, toasts and refreshes. */
   day(): DayOutcome {
     const out = emptyOutcome();
+    const t = this.timings;
     this.city.day++;
-    this.growth.onDay(out);
-    this.fire.onDay(out);
+    t.run('growth.day', () => this.growth.onDay(out));
+    t.run('fire.day', () => this.fire.onDay(out));
     this.worldChanged({ roads: false });
-    this.commute.onDay();
-    this.needs.onDay(out);
-    this.population.onDay();
-    this.traffic.onDay();
-    if (this.city.day % BALANCE.daysPerMonth === 0) this.budget.onMonth(out);
+    t.run('commute.day', () => this.commute.onDay());
+    t.run('needs.day', () => this.needs.onDay(out));
+    t.run('population.day', () => this.population.onDay());
+    t.run('traffic.day', () => this.traffic.onDay());
+    if (this.city.day % BALANCE.daysPerMonth === 0) t.run('budget.month', () => this.budget.onMonth(out));
     return out;
   }
 
   /** Every frame: `dt` in sim seconds, already scaled by game speed. */
   frame(dt: number) {
     this.city.clock += dt;
-    this.traffic.onFrame(dt, this.city.hour);
+    this.timings.run('traffic.frame', () => this.traffic.onFrame(dt, this.city.hour));
   }
 }
 
