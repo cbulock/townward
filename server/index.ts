@@ -25,13 +25,17 @@ const app = createApp(db, {
   secureCookies: config.production,
   staticDir: config.production ? `${root}dist` : undefined,
   trustProxy: config.trustProxy,
+  guests: config.guests,
   github: config.github ? { clientId: config.github.clientId, publicUrl: config.github.publicUrl, api: httpGithubApi(config.github.clientId, config.github.clientSecret) } : undefined,
 });
 if (config.github) console.log(`GitHub sign-in on (callback ${config.github.publicUrl}/api/auth/github/callback)`);
 const server = app.listen(config.port, () => console.log(`save server on http://localhost:${config.port}`));
 
-// Expired sessions are tidied hourly, so the table doesn't grow with every visitor.
-const pruning = setInterval(() => void app.auth.pruneSessions().catch((err: unknown) => console.error('session prune failed', err)), 3_600_000);
+// Expired sessions and long-gone guests are tidied hourly, so the tables don't grow with every visitor.
+const pruning = setInterval(() => {
+  void app.auth.pruneSessions().catch((err: unknown) => console.error('session prune failed', err));
+  void app.guests.prune().catch((err: unknown) => console.error('guest prune failed', err));
+}, 3_600_000);
 pruning.unref();
 
 function shutdown() {

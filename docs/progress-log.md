@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Server-side guest trial and a new gate (D-083)
+- `server/modules/guests/` (schemas → routes → service → repository, plus `fingerprint.ts`), migration 5 (`guests`: id, keyed fingerprint, play seconds, last seen, claimed by). `POST /api/guest/heartbeat`; hourly prune of guests unseen for 90 days. Config `GUEST_SECRET` (required in production), `GUEST_NUDGE_MINUTES`, `GUEST_LIMIT_MINUTES`; passed through docker-compose, in `.env.example` and deploy.md.
+- Client: heartbeats every 30 s while visible, id copied to localStorage, 5-minute offline grace then a "Reconnecting…" pause; off in dev unless `VITE_GUEST_TRIAL=on`.
+- Gate redesigned (user: "not good"): the auth dialog's drafting-table look; the player's city on survey paper with a stamp beside the pitch, perks, Create account / GitHub / Log in. Matching nudge.
+- Tests: `server/modules/guests/guests.test.ts` (cookie and new guest, server-side counting with breaks ignored, nudge then gate, cleared cookies keep used time, localStorage id fallback, members exempt, bad ids, nothing personal stored, IPv6 /64, fingerprint per device and secret). Screenshots at 1440×900 and 844×390 with a mocked server.
+
 ## 2026-11-03: Onboarding tour and guest sign-in prompts (D-081, D-082)
 - Tour (`src/app/tour/`): ten steps; action steps finish when the player does them (Roads picked, road built, Homes picked, zone painted, power and water supplied). Desktop popover anchored to its control with a ring; landscape phones get a docked card that folds into a pill, with touch wording. **?** in the top bar replays it.
 - Progress `{ step, done }` saved per step: device for guests, plus `server/modules/tour/` (migration 4, `tour_progress`, `GET/PUT /api/tour`) for signed-in players; guest progress is copied in on sign-up; a reload mid-tour resumes.

@@ -80,6 +80,19 @@ const MIGRATIONS: readonly string[] = [
     updated_at timestamptz NOT NULL DEFAULT now()
   );
   `,
+  // 5: guest trials (D-083): a keyed fingerprint, never the address or User-Agent
+  `
+  CREATE TABLE guests (
+    id           text PRIMARY KEY,
+    fingerprint  text NOT NULL,
+    play_seconds integer NOT NULL DEFAULT 0,
+    last_seen_ms bigint NOT NULL,
+    claimed_by   integer REFERENCES users(id) ON DELETE SET NULL,
+    created_at   timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX guests_by_fingerprint ON guests(fingerprint, last_seen_ms DESC);
+  CREATE INDEX guests_by_last_seen ON guests(last_seen_ms);
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

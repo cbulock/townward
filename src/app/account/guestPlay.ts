@@ -1,48 +1,35 @@
 /**
- * How long this browser has played as a guest, so it can be asked to make an account (D-082).
- * Kept on the device: a guest has nothing else to count against. Clearing site data resets it,
- * which is acceptable: the goal is a nudge, not a lock.
+ * Guest trial, client side (D-083). The server keeps the clock; the device only keeps a copy of
+ * the guest id (in case the cookie goes) and whether the reminder was closed.
  */
-const KEY = 'citybuilder.guestPlay';
+const ID_KEY = 'citybuilder.guestId';
+const NUDGED_KEY = 'citybuilder.guestNudged';
 
-export const GUEST_LIMITS = {
-  /** A dismissible reminder that the city is only on this device. */
-  nudgeMinutes: 10,
-  /** Past this, play pauses until the player signs up or logs in. */
-  gateMinutes: 30,
-} as const;
+/** On in production builds; `VITE_GUEST_TRIAL=on` turns it on in development. */
+export const GUEST_TRIAL_ON: boolean = import.meta.env.PROD || import.meta.env.VITE_GUEST_TRIAL === 'on';
 
-interface GuestPlay {
-  /** Milliseconds of play with the tab visible. */
-  readonly ms: number;
-  readonly nudged: boolean;
-}
+/** The server counts the time between beats, so they go only while the tab is visible. */
+export const HEARTBEAT_MS = 30_000;
+/** Visible play without the server's say-so before play pauses (blocking the API doesn't skip the trial). */
+export const OFFLINE_GRACE_MS = 5 * 60_000;
 
-function isGuestPlay(v: unknown): v is GuestPlay {
-  return typeof v === 'object' && v !== null && 'ms' in v && typeof v.ms === 'number' && 'nudged' in v && typeof v.nudged === 'boolean';
-}
-
-export function readGuestPlay(): GuestPlay {
+function read(key: string): string | null {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    return isGuestPlay(v) ? v : { ms: 0, nudged: false };
+    return localStorage.getItem(key);
   } catch {
-    return { ms: 0, nudged: false };
+    return null;
   }
 }
 
-export function writeGuestPlay(p: GuestPlay) {
+function write(key: string, value: string) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    localStorage.setItem(key, value);
   } catch {
-    // Blocked storage: the count starts over each visit.
+    // Blocked storage: the cookie and the server's fingerprint still carry the trial.
   }
 }
 
-export type GuestPrompt = 'none' | 'nudge' | 'gate';
-
-export function guestPrompt(p: GuestPlay): GuestPrompt {
-  if (p.ms >= GUEST_LIMITS.gateMinutes * 60_000) return 'gate';
-  if (p.ms >= GUEST_LIMITS.nudgeMinutes * 60_000 && !p.nudged) return 'nudge';
-  return 'none';
-}
+export const readGuestId = () => read(ID_KEY);
+export const writeGuestId = (id: string) => write(ID_KEY, id);
+export const readNudged = () => read(NUDGED_KEY) === '1';
+export const writeNudged = () => write(NUDGED_KEY, '1');

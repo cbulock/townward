@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { GuestRules } from './modules/guests/guests.service.ts';
 
 /** Server settings from the environment, validated once at startup (docs/deploy.md). */
 
@@ -18,7 +19,15 @@ const Env = z.object({
   /** GitHub OAuth app (docs/deploy.md). Sign-in with GitHub is off unless both are set. */
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
+  /** Key for guest fingerprints (D-083). Required in production; any long random string. */
+  GUEST_SECRET: z.string().min(32).optional(),
+  /** Guest trial: a reminder after this many minutes of play, a sign-in wall after the limit. */
+  GUEST_NUDGE_MINUTES: z.coerce.number().positive().default(10),
+  GUEST_LIMIT_MINUTES: z.coerce.number().positive().default(30),
 });
+
+/** Development and tests only. */
+export const DEV_GUEST_SECRET = 'development-guest-secret-not-for-production';
 
 export type TrustProxy = boolean | number | string;
 
@@ -29,6 +38,7 @@ export interface Config {
   readonly trustProxy: TrustProxy;
   /** GitHub sign-in, when configured. */
   readonly github: GithubConfig | null;
+  readonly guests: GuestRules;
 }
 
 export interface GithubConfig {
@@ -51,5 +61,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     e.GITHUB_CLIENT_ID && e.GITHUB_CLIENT_SECRET
       ? { clientId: e.GITHUB_CLIENT_ID, clientSecret: e.GITHUB_CLIENT_SECRET, publicUrl: (e.PUBLIC_URL ?? `http://localhost:${e.PORT}`).replace(/\/+$/, '') }
       : null;
-  return { production: e.NODE_ENV === 'production', port: e.PORT, databaseUrl: e.DATABASE_URL, trustProxy: parseTrustProxy(e.TRUST_PROXY), github };
+  const production = e.NODE_ENV === 'production';
+  // A known secret would let anyone recompute fingerprints, so production refuses to start without one.
+  if (production && !e.GUEST_SECRET) throw new Error('GUEST_SECRET is required in production (32+ random characters, e.g. `openssl rand -base64 48`)');
+  const guests: GuestRules = { secret: e.GUEST_SECRET ?? DEV_GUEST_SECRET, nudgeMinutes: e.GUEST_NUDGE_MINUTES, limitMinutes: e.GUEST_LIMIT_MINUTES };
+  return { production, port: e.PORT, databaseUrl: e.DATABASE_URL, trustProxy: parseTrustProxy(e.TRUST_PROXY), github, guests };
 }

@@ -74,10 +74,14 @@ Bun 1.4 (it runs the server's TypeScript directly).
 | `PORT` | `8787` | |
 | `NODE_ENV` | `development` | `production` turns on `Secure` cookies, HSTS and serving `dist/`. |
 | `TRUST_PROXY` | `loopback` | How many proxies sit in front: `1` behind one load balancer or HTTPS proxy (Render, Fly, Railway, nginx). Wrong here means every player shares the proxy's address for login limits. |
+| `GUEST_SECRET` | — | **Required in production** (the server won't start without it). Key for guest fingerprints (D-083), 32+ random characters: `openssl rand -base64 48`. Changing it starts every guest's trial over. |
+| `GUEST_NUDGE_MINUTES` | `10` | Guest play before the "back up your city" reminder. |
+| `GUEST_LIMIT_MINUTES` | `30` | Guest play before play pauses until sign-up or log-in. |
 
 ## Checklist
 
 - **HTTPS is required in production:** session cookies are `Secure` and HSTS is sent. Put the app behind a TLS-terminating proxy and set `TRUST_PROXY` to match.
+- Set `GUEST_SECRET` and keep it stable. `TRUST_PROXY` must be right too: guest fingerprints use the client address.
 - Run **one instance** (login-limit counters are in memory), or move them to Postgres/Redis before scaling out.
 - Point uptime checks at `GET /api/health` (200 = up, 503 = no database).
 - Back up the Postgres volume: it holds accounts and cloud saves.

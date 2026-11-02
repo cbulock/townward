@@ -5,7 +5,7 @@ import { API_LIMITS } from '../src/shared/api.ts';
 import type { Db } from './db/db.ts';
 import { errorHandler, notFoundHandler } from './http/errors.ts';
 import { loadUser, securityHeaders } from './http/middleware.ts';
-import type { TrustProxy } from './config.ts';
+import { DEV_GUEST_SECRET, type TrustProxy } from './config.ts';
 import { authRoutes } from './modules/auth/auth.routes.ts';
 import { AnalyticsRepository } from './modules/analytics/analytics.repository.ts';
 import { analyticsRoutes } from './modules/analytics/analytics.routes.ts';
@@ -19,6 +19,9 @@ import { OAuthService } from './modules/oauth/oauth.service.ts';
 import { SavesRepository } from './modules/saves/saves.repository.ts';
 import { savesRoutes } from './modules/saves/saves.routes.ts';
 import { SavesService } from './modules/saves/saves.service.ts';
+import { GuestsRepository } from './modules/guests/guests.repository.ts';
+import { guestsRoutes } from './modules/guests/guests.routes.ts';
+import { GuestsService, type GuestRules } from './modules/guests/guests.service.ts';
 import { TourRepository } from './modules/tour/tour.repository.ts';
 import { tourRoutes } from './modules/tour/tour.routes.ts';
 import { TourService } from './modules/tour/tour.service.ts';
@@ -36,13 +39,21 @@ export interface AppOptions {
   readonly authLimits?: AuthLimiter;
   /** Sign in with GitHub, when configured (config GITHUB_*; tests pass a fake API). */
   readonly github?: { readonly clientId: string; readonly publicUrl: string; readonly api: GithubApi };
+  /** Guest trial rules (config GUEST_*); tests may also pass a clock. */
+  readonly guests?: GuestRules;
+  readonly guestClock?: () => number;
 }
 
-export function createApp(db: Db, opts: AppOptions): express.Express & { auth: AuthService } {
+export function createApp(db: Db, opts: AppOptions): express.Express & { auth: AuthService; guests: GuestsService } {
   const auth = new AuthService(db);
   const saves = new SavesService(new SavesRepository(db));
   const analytics = new AnalyticsService(new AnalyticsRepository(db));
   const tour = new TourService(new TourRepository(db));
+  const guests = new GuestsService(
+    new GuestsRepository(db),
+    opts.guests ?? { secret: DEV_GUEST_SECRET, nudgeMinutes: 10, limitMinutes: 30 },
+    opts.guestClock,
+  );
 
   const app = express();
   app.disable('x-powered-by');
@@ -61,6 +72,7 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits, { github: !!opts.github }));
   api.use('/saves', savesRoutes(saves));
   api.use('/tour', tourRoutes(tour));
+  api.use('/guest', guestsRoutes(guests, opts.secureCookies));
   api.use('/events', analyticsRoutes(analytics));
   api.use(notFoundHandler);
   api.use(errorHandler);
@@ -77,5 +89,5 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
       res.sendFile(join(dir, 'index.html'));
     });
   }
-  return Object.assign(app, { auth });
+  return Object.assign(app, { auth, guests });
 }

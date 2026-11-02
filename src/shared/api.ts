@@ -103,3 +103,20 @@ export interface TourResponse {
   /** null: never started. */
   readonly progress: TourProgress | null;
 }
+
+/** Guest trial (D-083): the server measures play time and says when to ask for an account. */
+export type GuestState = 'ok' | 'nudge' | 'gate';
+export interface GuestHeartbeatRequest {
+  /** The device's copy of the guest id, used when the cookie was cleared. */
+  readonly guestId?: string;
+}
+export type GuestHeartbeatResponse =
+  | { readonly kind: 'member' }
+  | {
+      readonly kind: 'guest';
+      readonly guestId: string;
+      readonly state: GuestState;
+      readonly playSeconds: number;
+      readonly nudgeMinutes: number;
+      readonly limitMinutes: number;
+    };

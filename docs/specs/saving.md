@@ -117,6 +117,7 @@ server/
 | `DELETE /api/saves/:id` | `204` |
 | `GET /api/tour` | `{ progress: { step, done } \| null }` (first-play tour, docs/04-ui-ux.md) |
 | `PUT /api/tour` | `{ step, done }` → `204`; a finished tour stays finished |
+| `POST /api/guest/heartbeat` | `{ guestId? }` → `{ kind: 'guest', guestId, state, playSeconds, nudgeMinutes, limitMinutes }` + `cb_guest` cookie, or `{ kind: 'member' }` when signed in (D-083) |
 
 - Passwords: `scrypt` with a per-user salt, compared in constant time.
 - Sessions: random 32-byte token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in

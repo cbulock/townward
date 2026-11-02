@@ -128,9 +128,12 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 - **Desktop.** The card sits above or below the control it means, with an arrow and a pulsing ring around the control; steps about the map sit top centre. Mouse wording (right-drag, wheel, Shift, keys).
 - **Phones** (`max-height: 520px`). The card docks on the right, clear of the toolbar, pickers and minimap; the − button folds it into a pill showing the step. Touch wording (drag then tap Build, pinch, two fingers). The ring still marks the control, and a sideways-scrolling toolbar scrolls it into view. Bigger tap targets on coarse pointers.
 
-## Guest Sign-in Prompts (D-082)
+## Guest Trial (D-082, D-083)
 
-- Guests (server reachable) have their visible-tab play time counted on the device (`citybuilder.guestPlay`).
-- After **10 minutes**: a reminder they can close ("Keep this city safe…", Create account / Later).
-- After **30 minutes**: play pauses behind a card that stays until they sign up or log in; the city moves into the account. Limits are in `GUEST_LIMITS` (`src/app/account/guestPlay.ts`).
-- With no server nobody can sign in, so nothing is asked.
+- **The server keeps the clock.** While a guest plays with the tab visible, the client sends `POST /api/guest/heartbeat` every 30 s. The server credits the time since the last beat (up to 60 s; a gap over 90 s is a break) and answers `ok`, `nudge` or `gate`. The client never reports its own time.
+- **Who a guest is.** A random id in an httpOnly cookie (`cb_guest`, 400 days), copied to `citybuilder.guestId` so either can restore the other. A keyed fingerprint (HMAC of the network (IPv4, or IPv6 /64) + device class + OS + browser) means a "new" guest on the same device and network within 30 days carries on the used time. Raw addresses and User-Agents are never stored; guests unseen for 90 days are deleted.
+- **After 10 minutes** (`GUEST_NUDGE_MINUTES`): a reminder in the auth dialog's style, top right ("Only in this browser… Save my city / Later"). Closing it is remembered on the device.
+- **After 30 minutes** (`GUEST_LIMIT_MINUTES`): play pauses (Space and speed keys too) behind a two-part card: the player's city on survey paper (name, residents, treasury, minutes, a "Not backed up" stamp) and the way in (Create free account, Continue with GitHub when enabled, Log in). Signing in lifts it and moves the city into the account. On narrow screens the city shrinks to a strip on top; landscape phones keep both halves side by side, tighter.
+- **Offline.** If beats fail for 5 minutes of visible play, the same card says "Reconnecting…" with Try again, so blocking the API doesn't skip the trial. It lifts on the next good beat.
+- **Development.** Off unless `VITE_GUEST_TRIAL=on`, so working without Postgres isn't interrupted. Always on in production builds.
+- **Limits of this.** The game runs in the browser, so someone who edits the client code can remove the card. The trial is meant to stop clearing cookies, private windows and blocking requests, not a determined hacker.

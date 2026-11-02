@@ -8,6 +8,7 @@ import type {
   SaveMeta,
   SaveWriteRequest,
   SaveWriteResponse,
+  GuestHeartbeatResponse,
   TourProgress,
   TourResponse,
   TrackRequest,
@@ -84,6 +85,8 @@ export const api = {
 
   getTour: () => request<TourResponse>('GET', '/tour').then((r) => r.progress),
   putTour: (body: TourProgress) => request<void>('PUT', '/tour', body),
+
+  guestHeartbeat: (guestId: string | null) => request<GuestHeartbeatResponse>('POST', '/guest/heartbeat', guestId ? { guestId } : {}),
 
   track: (body: TrackRequest) => request<void>('POST', '/events', body),
 };
