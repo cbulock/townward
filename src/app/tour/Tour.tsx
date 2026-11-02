@@ -46,7 +46,7 @@ const keyOf = (r: Rect | null) => (r ? `${Math.round(r.left)},${Math.round(r.top
 
 /**
  * Where the `data-tour` control and any open picker are, followed every frame (panels animate
- * and the compact toolbar scrolls). Brings the control into view once.
+ * and the compact toolbar scrolls). Scrolls the compact toolbar to the control once.
  */
 function useTourLayout(name: string | undefined): TourLayout {
   const [layout, setLayout] = useState<TourLayout>(NO_LAYOUT);
@@ -59,7 +59,12 @@ function useTourLayout(name: string | undefined): TourLayout {
       const target = rectOf(el);
       if (el && target && !scrolled) {
         scrolled = true;
-        el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        // Only the sideways toolbar strip (phones) scrolls, never the page: scrollIntoView would
+        // move every scrollable ancestor and shift the whole HUD.
+        const strip = el.closest<HTMLElement>('.toolbar');
+        if (strip && strip.scrollWidth > strip.clientWidth) {
+          strip.scrollTo({ left: el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' });
+        }
       }
       const targetOn = el?.getAttribute('aria-selected') === 'true';
       const picker = rectOf(document.querySelector('.building-picker, .road-picker'));

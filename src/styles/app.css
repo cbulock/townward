@@ -20,6 +20,8 @@ body,
 .game-screen {
   position: fixed;
   inset: 0;
+  /* Clip, not hidden: a HUD wider than the window must never let script scroll the screen sideways. */
+  overflow: clip;
 }
 
 .game-canvas {
