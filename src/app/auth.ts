@@ -1,7 +1,7 @@
 import { useAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import { api, ApiError } from '../save/api';
-import { authAtom, type AuthState } from './atoms';
+import { authAtom, authDialogAtom, authNoticeAtom, authProvidersAtom, type AuthState } from './atoms';
 import { guestAtom, setChoseGuest } from './screens/landing/guest';
 
 /** Signed-in state for the whole app (docs/specs/saving.md, "Player Experience"). */
@@ -9,11 +9,26 @@ import { guestAtom, setChoseGuest } from './screens/landing/guest';
 /** Ask the server who we are, once at startup. No server means guest mode, saving on this device. */
 export function useAuthBootstrap() {
   const [, setAuth] = useAtom(authAtom);
+  const [, setProviders] = useAtom(authProvidersAtom);
+  const [, setDialog] = useAtom(authDialogAtom);
+  const [, setNotice] = useAtom(authNoticeAtom);
   useEffect(() => {
+    // Back from a failed GitHub sign-in: show why, and tidy the address bar.
+    const url = new URL(location.href);
+    const authError = url.searchParams.get('auth_error');
+    if (authError) {
+      url.searchParams.delete('auth_error');
+      history.replaceState(null, '', url.pathname + url.search + url.hash);
+      setNotice(authError.slice(0, 200));
+      setDialog('login');
+    }
     let cancelled = false;
     api
       .me()
-      .then((user): AuthState => (user ? { status: 'user', user } : { status: 'guest', online: true }))
+      .then(({ user, providers }): AuthState => {
+        if (!cancelled) setProviders(providers);
+        return user ? { status: 'user', user } : { status: 'guest', online: true };
+      })
       .catch((): AuthState => ({ status: 'guest', online: false }))
       .then((state) => {
         if (!cancelled) setAuth(state);
@@ -21,7 +36,7 @@ export function useAuthBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [setAuth]);
+  }, [setAuth, setProviders, setDialog, setNotice]);
 }
 
 export interface AuthActions {

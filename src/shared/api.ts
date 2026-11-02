@@ -37,8 +37,14 @@ export type SaveMetaInput = Omit<SaveMeta, 'id' | 'updatedAt'>;
 export interface AuthResponse {
   readonly user: ApiUser;
 }
+/** Sign-in methods the server has configured. */
+export interface AuthProviders {
+  readonly github: boolean;
+}
+
 export interface MeResponse {
   readonly user: ApiUser | null;
+  readonly providers: AuthProviders;
 }
 export interface SaveListResponse {
   readonly saves: readonly SaveMeta[];

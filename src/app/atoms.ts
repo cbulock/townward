@@ -3,7 +3,7 @@ import type { BudgetInfo, CityInfo, DayNightMode, DebugStats, InspectInfo, Notic
 import type { Game } from '../game/Game';
 import type { ToolId } from '../game/tools';
 import type { SaveStatus } from '../save/CitySaver';
-import type { ApiUser } from '../shared/api';
+import type { ApiUser, AuthProviders } from '../shared/api';
 import type { BuildingId } from '../sim/buildings/catalog';
 
 /** UI state only. Game state lives in the City/World; these atoms mirror what the HUD shows. */
@@ -44,5 +44,9 @@ export type AuthState =
 export const authAtom = atom<AuthState>({ status: 'checking' });
 /** The log in / sign up dialog, if open. */
 export const authDialogAtom = atom<'login' | 'signup' | null>(null);
+/** Sign-in methods the server offers besides email (from /api/auth/me). */
+export const authProvidersAtom = atom<AuthProviders>({ github: false });
+/** A message for the dialog to show when it opens (e.g. why a GitHub sign-in failed). */
+export const authNoticeAtom = atom<string | null>(null);
 /** Save state of the open city; null when it isn't saved at all (the demo). */
 export const saveStatusAtom = atom<SaveStatus | null>(null);

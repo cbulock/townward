@@ -35,18 +35,32 @@ export async function startTestServer(opts: Partial<AppOptions> = {}): Promise<T
   const base = `http://127.0.0.1:${port}/api`;
 
   const client = (): TestClient => {
-    let cookie = '';
+    // A tiny cookie jar: every cookie the server sets, minus the ones it clears.
+    const jar = new Map<string, string>();
     return async (method, path, body) => {
       const res = await fetch(base + path, {
         method,
-        headers: { 'content-type': 'application/json', cookie },
+        redirect: 'manual',
+        headers: { 'content-type': 'application/json', cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; ') },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-      const setCookie = res.headers.get('set-cookie');
-      if (setCookie) cookie = setCookie.split(';')[0];
+      const setCookies = res.headers.getSetCookie();
+      for (const c of setCookies) {
+        const [pair] = c.split(';');
+        const eq = pair.indexOf('=');
+        const name = pair.slice(0, eq).trim();
+        const cleared = /Expires=Thu, 01 Jan 1970|Max-Age=0/i.test(c) || pair.slice(eq + 1) === '';
+        if (cleared) jar.delete(name);
+        else jar.set(name, pair.slice(eq + 1));
+      }
       const text = await res.text();
-      const json: unknown = text ? JSON.parse(text) : null;
-      return { status: res.status, json, setCookie, headers: res.headers };
+      let json: unknown;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = text;
+      }
+      return { status: res.status, json, setCookie: setCookies.length ? setCookies.join(', ') : null, headers: res.headers };
     };
   };
 

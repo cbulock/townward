@@ -2,6 +2,11 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-02: Sign in with GitHub (D-077)
+- `server/modules/oauth/` (GitHub API client, repository, service, routes), migration 3 (`oauth_accounts`, nullable `pass_hash`), config `PUBLIC_URL` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` (passed through docker-compose from `.env`). `/api/auth/me` now returns the available providers.
+- Dialog: "Continue with GitHub" / "Sign up with GitHub" above the email form when enabled; failed sign-ins come back with a message in the dialog; players return to the page they were on.
+- Tests: `server/modules/oauth/oauth.test.ts` (redirect and state cookie, new account, repeat sign-in, linking by verified email, noreply fallback with no password, forged/missing state, failed exchange, open-redirect attempts, disabled mode). The test client now keeps several cookies and doesn't follow redirects.
+
 ## 2026-11-02: Usage analytics (D-076)
 - `events` table (migration 2) and `server/modules/analytics/` (schemas → routes → service → repository, plus a small User-Agent reader). The client (`src/app/analytics.ts`) sends a `visit` per page load and a `city_start` when a city goes into play (new, opened, demo; with preset, size and whether custom funds were used).
 - Anonymous: random visitor ID in localStorage, no IPs, no raw User-Agents, Do Not Track respected. Rate-limited to 120 events per address per 10 minutes.

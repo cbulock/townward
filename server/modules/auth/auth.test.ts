@@ -42,7 +42,7 @@ describe('auth', () => {
   it('logout ends the session', async () => {
     const api = await t.signedUp('bye@x.co');
     expect((await api('POST', '/auth/logout')).status).toBe(204);
-    expect((await api('GET', '/auth/me')).json).toEqual({ user: null });
+    expect((await api('GET', '/auth/me')).json).toMatchObject({ user: null });
   });
 
   it('limits repeated attempts', async () => {

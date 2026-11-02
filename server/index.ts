@@ -3,6 +3,7 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createPgDb } from './db/db.ts';
 import { migrate } from './db/migrations.ts';
+import { httpGithubApi } from './modules/oauth/github.api.ts';
 
 /**
  * Save server entry point, run by bun. `bun run dev` runs it next to Vite (which proxies /api
@@ -24,7 +25,9 @@ const app = createApp(db, {
   secureCookies: config.production,
   staticDir: config.production ? `${root}dist` : undefined,
   trustProxy: config.trustProxy,
+  github: config.github ? { clientId: config.github.clientId, publicUrl: config.github.publicUrl, api: httpGithubApi(config.github.clientId, config.github.clientSecret) } : undefined,
 });
+if (config.github) console.log(`GitHub sign-in on (callback ${config.github.publicUrl}/api/auth/github/callback)`);
 const server = app.listen(config.port, () => console.log(`save server on http://localhost:${config.port}`));
 
 // Expired sessions are tidied hourly, so the table doesn't grow with every visitor.

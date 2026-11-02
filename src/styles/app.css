@@ -1875,6 +1875,53 @@ button.funds:hover {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   color: var(--text);
 }
+.auth-provider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid rgba(236, 228, 211, 0.22);
+  border-radius: 4px;
+  background: #f4f1ea;
+  color: #11161c;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.auth-provider:hover:not(:disabled) {
+  background: #ffffff;
+}
+.auth-provider:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+.auth-provider:focus-visible {
+  outline: 2px solid var(--sign);
+  outline-offset: 2px;
+}
+.auth-provider svg {
+  width: 18px;
+  height: 18px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--rule);
+}
 .auth-field {
   display: flex;
   flex-direction: column;

@@ -38,7 +38,7 @@ export class AuthService {
 
   /** 401 for an unknown email or a wrong password (the same message for both). */
   async login(email: string, password: string): Promise<Session> {
-    const row = await queryOne<ApiUser & { pass_hash: string }>(this.db, 'SELECT id, email, pass_hash FROM users WHERE email = $1', [
+    const row = await queryOne<ApiUser & { pass_hash: string | null }>(this.db, 'SELECT id, email, pass_hash FROM users WHERE email = $1', [
       normalizeEmail(email),
     ]);
     const ok = await verifyPassword(password, row?.pass_hash ?? DUMMY_HASH);
@@ -63,7 +63,8 @@ export class AuthService {
     await this.db.query('DELETE FROM sessions WHERE token_hash = $1', [sha256(token)]);
   }
 
-  private async startSession(user: ApiUser): Promise<Session> {
+  /** Sign in a known user (password login, signup, or an OAuth provider). */
+  async startSession(user: ApiUser): Promise<Session> {
     const token = randomBytes(32).toString('base64url');
     await this.db.query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [user.id]);
     await this.db.query(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))`, [

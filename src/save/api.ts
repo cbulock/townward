@@ -66,7 +66,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  me: () => request<MeResponse>('GET', '/auth/me').then((r) => r.user),
+  me: () => request<MeResponse>('GET', '/auth/me'),
   signup: (email: string, password: string): Promise<ApiUser> =>
     request<AuthResponse>('POST', '/auth/signup', { email, password }).then((r) => r.user),
   login: (email: string, password: string): Promise<ApiUser> =>

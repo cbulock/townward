@@ -120,6 +120,7 @@ server/
 - Sessions: random 32-byte token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in
   production); only its SHA-256 is stored. 30-day expiry.
 - Brute-force limits count **failures only** (D-073): 8 wrong passwords per email per address and 60 per address in 15 minutes; a successful login clears its email's count. Signup: 20 attempts per address per hour (invalid forms don't count). A 429 carries `Retry-After` and `retryAfter`, and the dialog counts down.
+- **Sign in with GitHub** (D-077), when the server has `GITHUB_CLIENT_ID`/`SECRET`: `GET /api/auth/github?returnTo=/path` sets a 10-minute httpOnly state cookie and redirects to GitHub; `/api/auth/github/callback` checks the state (constant-time), swaps the code for the profile, and signs in. A linked GitHub account signs in as its user; otherwise a user with the same GitHub-*verified* email is linked; otherwise a new account is made (no password; GitHub's noreply address if no verified email). Failures return to the page with `?auth_error=…`, shown in the dialog. `returnTo` only accepts same-site paths. Callbacks are limited to 30 per address per 10 minutes. `/api/auth/me` reports `providers: { github }` so the client shows the button only when it works.
 - `/api/health` returns 200 when Postgres answers (for load balancers). Deploying: [docs/deploy.md](../deploy.md).
 - Bodies are validated with zod; save data must be an object with a numeric `v`. Request
   bodies up to 8 MB; at most 30 cities per account.

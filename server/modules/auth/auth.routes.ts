@@ -1,5 +1,5 @@
 import { Router, type Response } from 'express';
-import type { AuthResponse, MeResponse } from '../../../src/shared/api.ts';
+import type { AuthProviders, AuthResponse, MeResponse } from '../../../src/shared/api.ts';
 import { HttpError } from '../../http/errors.ts';
 import { currentUser, readCookie, SESSION_COOKIE, sessionCookieOptions } from '../../http/middleware.ts';
 import { checkLimits } from '../../http/rateLimit.ts';
@@ -9,7 +9,7 @@ import { Credentials } from './auth.schemas.ts';
 import { SESSION_DAYS, type AuthService, type Session } from './auth.service.ts';
 
 /** /api/auth: signup, login, logout, me. */
-export function authRoutes(auth: AuthService, secureCookies: boolean, limits = new AuthLimiter()): Router {
+export function authRoutes(auth: AuthService, secureCookies: boolean, limits = new AuthLimiter(), providers: AuthProviders = { github: false }): Router {
   const router = Router();
   const cookie = sessionCookieOptions(secureCookies);
 
@@ -58,7 +58,7 @@ export function authRoutes(auth: AuthService, secureCookies: boolean, limits = n
   });
 
   router.get('/me', (_req, res) => {
-    const body: MeResponse = { user: currentUser(res) };
+    const body: MeResponse = { user: currentUser(res), providers };
     res.json(body);
   });
 

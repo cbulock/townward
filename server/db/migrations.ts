@@ -59,6 +59,18 @@ const MIGRATIONS: readonly string[] = [
   CREATE INDEX events_by_time ON events(created_at DESC);
   CREATE INDEX events_by_kind ON events(kind, created_at DESC);
   `,
+  // 3: sign-in with GitHub (docs/specs/saving.md, "Accounts"); OAuth-only accounts have no password
+  `
+  ALTER TABLE users ALTER COLUMN pass_hash DROP NOT NULL;
+  CREATE TABLE oauth_accounts (
+    provider         text NOT NULL,
+    provider_user_id text NOT NULL,
+    user_id          integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (provider, provider_user_id)
+  );
+  CREATE INDEX oauth_by_user ON oauth_accounts(user_id);
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

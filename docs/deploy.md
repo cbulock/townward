@@ -82,6 +82,27 @@ Bun 1.4 (it runs the server's TypeScript directly).
 - Point uptime checks at `GET /api/health` (200 = up, 503 = no database).
 - Back up the Postgres volume: it holds accounts and cloud saves.
 
+## Sign in with GitHub
+
+Off until configured; the GitHub button only appears when the server has its keys.
+
+1. On GitHub: **Settings → Developer settings → OAuth Apps → New OAuth App**.
+   - Application name: `Openpolis`
+   - Homepage URL: `https://openpolis.space`
+   - Authorization callback URL: `https://openpolis.space/api/auth/github/callback`
+2. Copy the **Client ID**, then **Generate a new client secret** and copy it.
+3. Add to `.env` on the server (never to the repo):
+   ```
+   PUBLIC_URL=https://openpolis.space
+   GITHUB_CLIENT_ID=…
+   GITHUB_CLIENT_SECRET=…
+   ```
+4. `docker compose --profile app up -d` and check the logs say `GitHub sign-in on`.
+
+For local development, make a second OAuth App with callback
+`http://localhost:5173/api/auth/github/callback` and run the server with
+`PUBLIC_URL=http://localhost:5173` plus that app's ID and secret.
+
 ## Usage numbers
 
 Anonymous usage events (visits and cities started, guests included) are in the `events` table

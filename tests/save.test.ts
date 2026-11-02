@@ -72,7 +72,7 @@ describe('save format', () => {
       clock: 123.5,
       taxRate: 11,
     });
-  });
+  }, 30_000); // Grows the demo city first: slow when the whole suite runs in parallel.
 
   it('parseSave rejects junk and drops unknown buildings instead of failing', () => {
     expect(() => parseSave(null)).toThrow(SaveError);

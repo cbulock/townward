@@ -13,6 +13,9 @@ import { AnalyticsService } from './modules/analytics/analytics.service.ts';
 import { AuthLimiter } from './modules/auth/auth.limits.ts';
 import { AuthService } from './modules/auth/auth.service.ts';
 import { healthRoutes } from './modules/health/health.routes.ts';
+import type { GithubApi } from './modules/oauth/github.api.ts';
+import { githubRoutes } from './modules/oauth/oauth.routes.ts';
+import { OAuthService } from './modules/oauth/oauth.service.ts';
 import { SavesRepository } from './modules/saves/saves.repository.ts';
 import { savesRoutes } from './modules/saves/saves.routes.ts';
 import { SavesService } from './modules/saves/saves.service.ts';
@@ -28,6 +31,8 @@ export interface AppOptions {
   readonly trustProxy?: TrustProxy;
   /** Login and signup limits (tests pass their own clock or rules). */
   readonly authLimits?: AuthLimiter;
+  /** Sign in with GitHub, when configured (config GITHUB_*; tests pass a fake API). */
+  readonly github?: { readonly clientId: string; readonly publicUrl: string; readonly api: GithubApi };
 }
 
 export function createApp(db: Db, opts: AppOptions): express.Express & { auth: AuthService } {
@@ -48,7 +53,8 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   });
   api.use('/health', healthRoutes(db));
   api.use(loadUser((token) => auth.userForToken(token)));
-  api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits));
+  if (opts.github) api.use('/auth/github', githubRoutes(new OAuthService(db, auth), { ...opts.github, secureCookies: opts.secureCookies }));
+  api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits, { github: !!opts.github }));
   api.use('/saves', savesRoutes(saves));
   api.use('/events', analyticsRoutes(analytics));
   api.use(notFoundHandler);
