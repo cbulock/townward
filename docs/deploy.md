@@ -85,7 +85,10 @@ Bun 1.4 (it runs the server's TypeScript directly).
 ## Usage numbers
 
 Anonymous usage events (visits and cities started, guests included) are in the `events` table
-([specs/analytics.md](specs/analytics.md)). On the VPS, from the project folder, open the database
+([specs/analytics.md](specs/analytics.md)). The quick way: from the project folder on the VPS, run
+`./scripts/stats.sh` (last 7 days) or `./scripts/stats.sh 30` for a full report.
+
+For your own questions, open the database
 with `docker compose exec postgres psql -U citybuilder citybuilder`, then:
 
 ```sql
