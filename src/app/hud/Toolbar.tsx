@@ -158,6 +158,7 @@ export function Toolbar() {
         <button
           type="button"
           className={`tool-button ${t.tone ?? ''} ${isActive(t.id) ? 'is-active' : ''}`}
+          data-tour={`tool-${t.id}`}
           aria-pressed={isActive(t.id)}
           disabled={!game}
           onClick={() => {

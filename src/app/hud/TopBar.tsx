@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
 import { budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 import { AccountButton } from '../account/AccountButton';
+import { tourStepAtom } from '../tour/tourState';
 import { SaveStatus } from './SaveStatus';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -132,7 +133,7 @@ function DemandMeter({ demand, why }: { demand: CityInfo['demand'] | undefined; 
     ? DEMAND_BARS.map(([k, , name]) => `${name}: ${demandWord(demand[k])} (${Math.round(demand[k] * 100)}%)${why ? `. ${why[k]}` : ''}`).join('\n')
     : 'Zone demand';
   return (
-    <span className="demand" title={title} aria-label={title}>
+    <span className="demand" title={title} aria-label={title} data-tour="demand">
       {DEMAND_BARS.map(([k, letter]) => {
         const d = demand?.[k] ?? 0;
         const h = Math.round(Math.abs(d) * 100) / 2;
@@ -166,6 +167,7 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
   const game = useAtomValue(gameAtom);
   const rotation = useAtomValue(rotationAtom);
   const setBudgetOpen = useSetAtom(budgetOpenAtom);
+  const setTourStep = useSetAtom(tourStepAtom);
   const trafficView = useAtomValue(trafficViewAtom);
   const happinessView = useAtomValue(happinessViewAtom);
   const happy = city?.needs.happiness ?? 1;
@@ -234,7 +236,7 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
         {funds.toLocaleString()}
       </button>
       <span className="top-divider" />
-      <div className="speed-group" role="group" aria-label="Game speed">
+      <div className="speed-group" role="group" aria-label="Game speed" data-tour="speed">
         {SPEED_LABELS.map((label, i) => (
           <button
             key={label}
@@ -314,6 +316,15 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
           ) : (
             <path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           )}
+        </svg>
+      </button>
+      <button type="button" className="icon-button" title="Tour the basics" aria-label="Tour the basics" onClick={() => setTourStep(0)}>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <g {...icon}>
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M9.6 9.5a2.5 2.5 0 014.8.9c0 1.7-2.4 2-2.4 3.6" />
+            <path d="M12 17h.01" strokeWidth="2.6" />
+          </g>
         </svg>
       </button>
       <AccountButton compact beforeLogout={beforeLogout} />

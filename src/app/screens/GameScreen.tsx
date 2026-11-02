@@ -20,6 +20,8 @@ import { Minimap } from '../hud/Minimap';
 import { Notices } from '../hud/Notices';
 import { Toolbar } from '../hud/Toolbar';
 import { TopBar } from '../hud/TopBar';
+import { Tour } from '../tour/Tour';
+import { GuestLimit } from '../account/GuestLimit';
 
 interface GameScreenProps {
   options: GameOptions;
@@ -141,6 +143,9 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       <Notices />
       <CostLabel />
       <ControlsHint />
+      {/* Starts on a new city until finished; an opened city only carries on a tour left midway. */}
+      <Tour autoStart={options.demo ? 'never' : options.save ? 'resume' : 'start'} />
+      <GuestLimit />
       <RotatePrompt />
     </div>
   );

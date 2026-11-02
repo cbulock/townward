@@ -91,3 +91,15 @@ export interface TrackRequest {
   readonly screen?: string;
   readonly props?: EventProps;
 }
+
+/** How far a player got through the first-play tour (docs/04-ui-ux.md, "Onboarding tour"). */
+export interface TourProgress {
+  /** Id of the last step reached (ids, not positions, so steps can be reordered). */
+  readonly step: string;
+  /** Finished or skipped: the tour no longer starts by itself. */
+  readonly done: boolean;
+}
+export interface TourResponse {
+  /** null: never started. */
+  readonly progress: TourProgress | null;
+}

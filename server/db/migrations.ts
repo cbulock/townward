@@ -71,6 +71,15 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX oauth_by_user ON oauth_accounts(user_id);
   `,
+  // 4: first-play tour progress (docs/04-ui-ux.md, "Onboarding tour")
+  `
+  CREATE TABLE tour_progress (
+    user_id    integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    step       text NOT NULL,
+    done       boolean NOT NULL DEFAULT false,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

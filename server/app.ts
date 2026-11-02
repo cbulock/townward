@@ -19,6 +19,9 @@ import { OAuthService } from './modules/oauth/oauth.service.ts';
 import { SavesRepository } from './modules/saves/saves.repository.ts';
 import { savesRoutes } from './modules/saves/saves.routes.ts';
 import { SavesService } from './modules/saves/saves.service.ts';
+import { TourRepository } from './modules/tour/tour.repository.ts';
+import { tourRoutes } from './modules/tour/tour.routes.ts';
+import { TourService } from './modules/tour/tour.service.ts';
 
 /** Assembles the save server (docs/specs/saving.md): services, then middleware and routers. */
 
@@ -39,6 +42,7 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   const auth = new AuthService(db);
   const saves = new SavesService(new SavesRepository(db));
   const analytics = new AnalyticsService(new AnalyticsRepository(db));
+  const tour = new TourService(new TourRepository(db));
 
   const app = express();
   app.disable('x-powered-by');
@@ -56,6 +60,7 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   if (opts.github) api.use('/auth/github', githubRoutes(new OAuthService(db, auth), { ...opts.github, secureCookies: opts.secureCookies }));
   api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits, { github: !!opts.github }));
   api.use('/saves', savesRoutes(saves));
+  api.use('/tour', tourRoutes(tour));
   api.use('/events', analyticsRoutes(analytics));
   api.use(notFoundHandler);
   api.use(errorHandler);

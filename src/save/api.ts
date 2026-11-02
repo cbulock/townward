@@ -8,6 +8,8 @@ import type {
   SaveMeta,
   SaveWriteRequest,
   SaveWriteResponse,
+  TourProgress,
+  TourResponse,
   TrackRequest,
 } from '../shared/api';
 
@@ -79,6 +81,9 @@ export const api = {
   updateSave: (id: number, body: SaveWriteRequest): Promise<SaveMeta> =>
     request<SaveWriteResponse>('PUT', `/saves/${id}`, body).then((r) => r.meta),
   deleteSave: (id: number) => request<void>('DELETE', `/saves/${id}`),
+
+  getTour: () => request<TourResponse>('GET', '/tour').then((r) => r.progress),
+  putTour: (body: TourProgress) => request<void>('PUT', '/tour', body),
 
   track: (body: TrackRequest) => request<void>('POST', '/events', body),
 };
