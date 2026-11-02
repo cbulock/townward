@@ -114,6 +114,11 @@ export class Game {
   private speedIndex = 1;
   private inspected: number | null = null;
   private drag: ToolDrag | null = null;
+  /**
+   * The drag is finished but was drawn with a finger, so it waits for Build or Cancel (D-080):
+   * a finger hides what it draws, and a tap shouldn't spend money.
+   */
+  private awaitingConfirm = false;
   private lastPointer: ScreenPoint | null = null;
   private dayNightMode = readDayNight();
   /** The data view shown over the city, if any (roads by congestion, buildings by happiness). */
@@ -148,7 +153,7 @@ export class Game {
       onKey: (code) => this.onKey(code),
       onPrimaryDown: (p, shift) => this.onPrimaryDown(p, shift),
       onPrimaryMove: (p, shift) => this.onPrimaryMove(p, shift),
-      onPrimaryUp: () => this.onPrimaryUp(),
+      onPrimaryUp: (_p, _shift, touch) => this.onPrimaryUp(touch),
       onCancel: () => this.cancel(),
       onClick: (p) => this.onClick(p),
     });
@@ -298,6 +303,7 @@ export class Game {
     if (tool !== this.toolId) this.sound.play('tool');
     this.toolId = tool;
     this.drag = null;
+    this.awaitingConfirm = false;
     this.renderer.app.canvas.style.cursor = tool === 'select' ? '' : 'crosshair';
     this.renderer.hover.set(tool === 'select' ? this.hovered : null);
     this.renderer.setZoneView(isZoneTool(tool));
@@ -335,6 +341,7 @@ export class Game {
       return true;
     }
     this.drag = { start: t, current: t, straight: shift };
+    this.awaitingConfirm = false;
     this.lastPointer = screen;
     this.updatePreview();
     return true;
@@ -352,10 +359,26 @@ export class Game {
     this.updatePreview();
   }
 
-  private onPrimaryUp() {
+  private onPrimaryUp(touch: boolean) {
     if (!this.drag) return;
-    const p = this.plan(this.drag, null);
+    if (touch) {
+      // Keep the drag as a draft: its preview stays on the map until the player confirms.
+      this.awaitingConfirm = true;
+      this.emitPreviewLabel();
+      return;
+    }
+    this.commitDrag();
+  }
+
+  /** Build the drafted touch drag (the confirm bar's Build button). */
+  confirmDraft() {
+    if (this.awaitingConfirm) this.commitDrag();
+  }
+
+  private commitDrag() {
+    const p = this.drag ? this.plan(this.drag, null) : null;
     this.drag = null;
+    this.awaitingConfirm = false;
     if (p) this.execute(p);
     this.updatePreview();
   }
@@ -980,6 +1003,7 @@ export class Game {
     }
     if (this.drag) {
       this.drag = null;
+      this.awaitingConfirm = false;
       this.updatePreview();
     } else if (this.toolId !== 'select') {
       this.setTool('select');
@@ -1027,6 +1051,7 @@ export class Game {
       count: p.plan.count,
       affordable: p.plan.cost <= this.city.funds,
       note: this.previewNote(p),
+      awaitingConfirm: this.drag !== null && this.awaitingConfirm,
     });
   }
 

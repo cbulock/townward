@@ -2,6 +2,10 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Touch building and compact pickers (D-080)
+- Touch drags wait for a Build / Cancel bar (`Game.confirmDraft`, `ToolPreviewInfo.awaitingConfirm`, `CostLabel` confirm bar); the touch hint says so.
+- Landscape-phone pickers are a single sideways-scrolling row (picture, name, price), about a third of their old height. Checked at 693×310 with the Road and Civic pickers open.
+
 ## 2026-11-03: Landing pitch moves to the open-world vision (D-079)
 - Landing hero ("Build the city. Then let it live."), new "Not just a city. A living world." section with four pillars marked *In development*, the city-builder steps retitled "Playable today", and an FAQ entry saying the AI agents aren't in yet.
 - Same pitch in the page title, meta/OG/Twitter descriptions, JSON-LD, the crawlable boot text, the web manifest and the README intro.

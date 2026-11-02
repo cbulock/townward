@@ -31,7 +31,8 @@ export interface InputCallbacks {
   /** Left button pressed. Return true if the active tool takes the drag; false lets it pan the camera. */
   onPrimaryDown: (screen: ScreenPoint, shift: boolean) => boolean;
   onPrimaryMove: (screen: ScreenPoint, shift: boolean) => void;
-  onPrimaryUp: (screen: ScreenPoint, shift: boolean) => void;
+  /** The drag ended; `touch` when a finger made it (touch drags wait for a confirm). */
+  onPrimaryUp: (screen: ScreenPoint, shift: boolean, touch: boolean) => void;
   /** Right click without dragging: cancel the current tool action. */
   onCancel: () => void;
   /** Left click without dragging while no tool takes the drag (e.g. inspect). */
@@ -182,7 +183,7 @@ export class InputController {
     if (this.toolPointer === e.pointerId) {
       this.toolPointer = null;
       if (e.type === 'pointercancel') this.cb.onCancel();
-      else this.cb.onPrimaryUp(this.local(e), e.shiftKey);
+      else this.cb.onPrimaryUp(this.local(e), e.shiftKey, e.pointerType === 'touch');
       if (e.pointerType === 'touch' && this.touches.size === 0) this.clearTouchPointer();
       return;
     }

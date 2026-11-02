@@ -19,7 +19,7 @@ const HINTS: [string, string][] = [
 ];
 
 const TOUCH_HINTS: [string, string][] = [
-  ['Drag', 'Move / build'],
+  ['Drag', 'Move, or draw then tap Build'],
   ['Pinch', 'Zoom'],
   ['Two fingers', 'Pan while building'],
   ['Tap', 'Inspect'],

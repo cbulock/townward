@@ -135,6 +135,8 @@ export interface ToolPreviewInfo {
   affordable: boolean;
   /** Extra warning under the cost (e.g. zone tiles that no road reaches). */
   note: string | null;
+  /** A finished touch drag waiting for Build or Cancel (D-080). */
+  awaitingConfirm: boolean;
 }
 
 export interface Notice {
