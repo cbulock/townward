@@ -22,6 +22,12 @@ export interface TourStep {
   readonly body: TourCopy;
   /** `data-tour` name of the control to point at; none for a step about the map itself. */
   readonly target?: string;
+  /** Once the player has opened the panel this step points at, point inside it instead. */
+  readonly inside?: {
+    readonly when: (now: TourSnapshot) => boolean;
+    readonly target: string;
+    readonly body: TourCopy;
+  };
   /** Centred card over a dimmed screen (the first and last steps). */
   readonly modal?: boolean;
   /**
@@ -90,6 +96,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     target: 'tool-build',
     title: 'Power and water',
     body: same('Homes stay empty without power and water. Open Civic, go to Utilities, and place a power plant and a water pump next to your road.'),
+    inside: {
+      when: (now) => now.tool === 'build',
+      target: 'civic-utilities',
+      body: same('Pick Utilities, then place a power plant and a water pump beside your road.'),
+    },
     done: (now) => (now.city?.power.supply ?? 0) > 0 && (now.city?.water.supply ?? 0) > 0,
   },
   {

@@ -74,6 +74,7 @@ export function BuildingPicker() {
             role="tab"
             aria-selected={g.id === tab}
             className={`picker-tab ${g.id === tab ? 'is-active' : ''}`}
+            data-tour={`civic-${g.id}`}
             onClick={() => setTab(g.id)}
           >
             {g.label}

@@ -25,36 +25,60 @@ function readSnapshot(store: Store): TourSnapshot {
   return { tool: store.get(activeToolAtom), funds: store.get(fundsAtom), worldVersion: store.get(worldVersionAtom), city: store.get(cityAtom) };
 }
 
+/** What the card has to fit around this frame. */
+interface TourLayout {
+  /** The control the step means; null when hidden or missing. */
+  readonly target: Rect | null;
+  /** The control is already switched on (a selected tab): no need to ring it. */
+  readonly targetOn: boolean;
+  /** An open building or road picker, which the card must never cover. */
+  readonly picker: Rect | null;
+}
+
+const NO_LAYOUT: TourLayout = { target: null, targetOn: false, picker: null };
+
+function rectOf(el: Element | null): Rect | null {
+  const r = el?.getBoundingClientRect();
+  return r && r.width > 0 && r.height > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
+}
+
+const keyOf = (r: Rect | null) => (r ? `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}` : '-');
+
 /**
- * Where the `data-tour` control is on screen, followed every frame (panels animate and the
- * compact toolbar scrolls). A hidden or missing control gives null. Brings it into view once.
+ * Where the `data-tour` control and any open picker are, followed every frame (panels animate
+ * and the compact toolbar scrolls). Brings the control into view once.
  */
-function useTargetRect(name: string | undefined): Rect | null {
-  const [rect, setRect] = useState<Rect | null>(null);
+function useTourLayout(name: string | undefined): TourLayout {
+  const [layout, setLayout] = useState<TourLayout>(NO_LAYOUT);
   useEffect(() => {
     let frame = 0;
     let last = '';
     let scrolled = false;
     const tick = () => {
       const el = name ? document.querySelector<HTMLElement>(`[data-tour="${name}"]`) : null;
-      const r = el?.getBoundingClientRect();
-      const shown = r !== undefined && r.width > 0 && r.height > 0;
-      if (el && shown && !scrolled) {
+      const target = rectOf(el);
+      if (el && target && !scrolled) {
         scrolled = true;
         el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
       }
-      const key = shown ? `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}` : '';
+      const targetOn = el?.getAttribute('aria-selected') === 'true';
+      const picker = rectOf(document.querySelector('.building-picker, .road-picker'));
+      const key = `${keyOf(target)}|${targetOn}|${keyOf(picker)}`;
       if (key !== last) {
         last = key;
-        setRect(shown ? { left: r.left, top: r.top, width: r.width, height: r.height } : null);
+        setLayout({ target, targetOn, picker });
       }
       frame = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(frame);
   }, [name]);
-  return rect;
+  return layout;
 }
+
+const overlapsX = (r: Rect, left: number, width: number) => r.left < left + width && left < r.left + r.width;
+const inside = (inner: Rect, outer: Rect) =>
+  inner.left >= outer.left && inner.top >= outer.top && inner.left + inner.width <= outer.left + outer.width && inner.top + inner.height <= outer.top + outer.height;
 
 /** Opening by itself: on a new city from the start, on an opened one only to carry on a tour left midway. */
 export type TourAutoStart = 'start' | 'resume' | 'never';
@@ -135,8 +159,11 @@ function TourCard({ index }: { index: number }) {
     return () => clearTimeout(t);
   }, [met, go, index]);
 
-  const rect = useTargetRect(step.modal ? undefined : step.target);
-  const body = touch ? step.body.touch : step.body.mouse;
+  // A step that opened a panel points into it from then on (e.g. the Utilities tab).
+  const stage = step.inside?.when(now) ? step.inside : null;
+  const { target: rect, targetOn, picker } = useTourLayout(step.modal ? undefined : (stage?.target ?? step.target));
+  const copy = stage?.body ?? step.body;
+  const body = touch ? copy.touch : copy.mouse;
   // Progress counts the steps between the welcome and the goodbye.
   const total = TOUR_STEPS.length - 2;
 
@@ -163,7 +190,7 @@ function TourCard({ index }: { index: number }) {
     );
   }
 
-  const ring = rect && (
+  const ring = rect && !targetOn && (
     <div
       className="tour-ring"
       aria-hidden="true"
@@ -187,16 +214,25 @@ function TourCard({ index }: { index: number }) {
   }
 
   // Elsewhere it sits above or below its control, arrow pointing at it; free steps go top centre.
+  // An open picker is never covered: a card for a control below it (the toolbar) goes above the
+  // picker instead, without the arrow, and the ring still marks the control.
   let placement: CSSProperties | undefined;
   let arrow: CSSProperties | undefined;
   let side: 'above' | 'below' | 'free' = 'free';
-  if (!compact && rect) {
+  if (compact) {
+    const width = Math.min(260, window.innerWidth * 0.4);
+    if (picker && overlapsX(picker, window.innerWidth - width - 8, width)) placement = { maxHeight: Math.max(96, picker.top - 52) };
+  } else if (rect) {
     const width = Math.min(CARD_W, window.innerWidth - GUTTER * 2);
     const centre = rect.left + rect.width / 2;
     const left = Math.max(GUTTER, Math.min(window.innerWidth - width - GUTTER, centre - width / 2));
-    side = rect.top + rect.height / 2 > window.innerHeight / 2 ? 'above' : 'below';
-    placement = side === 'above' ? { left, width, bottom: window.innerHeight - rect.top + GAP } : { left, width, top: rect.top + rect.height + GAP };
-    arrow = { left: Math.max(18, Math.min(width - 18, centre - left)) };
+    // A control inside the picker (a tab) gets the card above the whole picker, arrow down to it.
+    const inPicker = picker !== null && inside(rect, picker);
+    side = inPicker || rect.top + rect.height / 2 > window.innerHeight / 2 ? 'above' : 'below';
+    const blocked = side === 'above' && picker !== null && !inPicker && picker.top < rect.top && overlapsX(picker, left, width);
+    const anchorTop = picker && (inPicker || blocked) ? picker.top : rect.top;
+    placement = side === 'above' ? { left, width, bottom: window.innerHeight - anchorTop + GAP } : { left, width, top: rect.top + rect.height + GAP };
+    if (!blocked) arrow = { left: Math.max(18, Math.min(width - 18, centre - left)) };
   }
 
   return (
