@@ -150,6 +150,61 @@ function DemandMeter({ demand, why }: { demand: CityInfo['demand'] | undefined; 
   );
 }
 
+const CALENDAR = (
+  <g {...icon}>
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+    <path d="M4 10h16M9 3v4M15 3v4" />
+  </g>
+);
+const EYE = (
+  <g {...icon}>
+    <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </g>
+);
+
+type FoldId = 'city' | 'view';
+/** Screens where even one open group is a squeeze: start with both folded. Mirrors app.css. */
+const FOLD_SHUT = '(max-width: 960px), (max-height: 520px)';
+
+interface FoldProps {
+  id: FoldId;
+  /** The group that's open, if any; the others fold to their toggle. */
+  open: FoldId | null;
+  /** Only the first part of a group carries the toggle. */
+  onOpen?: (id: FoldId | null) => void;
+  label?: string;
+  glyph?: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * A group of top-bar items that folds away on narrow windows and phones, so the bar fits: its
+ * toggle opens it and folds the other, or folds it again. Wide windows show everything and never
+ * see the toggles.
+ */
+function Fold({ id, open, onOpen, label, glyph, children }: FoldProps) {
+  return (
+    <span className={`top-fold ${open === id ? 'is-open' : ''}`}>
+      {onOpen && (
+        <button
+          type="button"
+          className={`icon-button top-fold-toggle ${open === id ? 'is-on' : ''}`}
+          title={label}
+          aria-label={label}
+          aria-expanded={open === id}
+          onClick={() => onOpen(open === id ? null : id)}
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+            {glyph}
+          </svg>
+        </button>
+      )}
+      {children}
+    </span>
+  );
+}
+
 interface TopBarProps {
   cityName: string;
   onNewCity: () => void;
@@ -175,6 +230,9 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
   const popFlash = useFlash(city?.population ?? 0);
 
   const date = city ? `${MONTHS[city.date.month]} ${city.date.dayOfMonth}, Y${city.date.year}` : '—';
+  // Narrow windows and phones show at most one of these (CSS decides when folding applies);
+  // small screens start with both folded so the bar fits.
+  const [fold, setFold] = useState<FoldId | null>(() => (window.matchMedia(FOLD_SHUT).matches ? null : 'city'));
 
   return (
     <div className="panel top-bar">
@@ -189,10 +247,12 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
       <span className="city-name">{cityName}</span>
       <SaveStatus onSave={onSave} />
       <span className="top-divider" />
-      <Stat title="Date" glyph={<g {...icon}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></g>}>
-        <span className="stat-value date">{date}</span>
-        <Clock />
-      </Stat>
+      <Fold id="city" open={fold} onOpen={setFold} label="Show the date, clock and jobs" glyph={CALENDAR}>
+        <Stat title="Date" glyph={CALENDAR}>
+          <span className="stat-value date">{date}</span>
+          <Clock />
+        </Stat>
+      </Fold>
       <Stat
         title={city ? `Population ${city.population.toLocaleString()} of ${city.housing.toLocaleString()} homes` : 'Population'}
         flash={popFlash}
@@ -200,15 +260,18 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
       >
         <span className="stat-value">{(city?.population ?? 0).toLocaleString()}</span>
       </Stat>
-      <Stat
-        title={city ? `${city.workers.toLocaleString()} workers in ${city.jobs.toLocaleString()} jobs · ${city.unemployed.toLocaleString()} unemployed` : 'Jobs'}
-        glyph={<g {...icon}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5h6v3M3 13h18" /></g>}
-      >
-        <span className="stat-value">
-          {(city?.workers ?? 0).toLocaleString()}
-          <span className="stat-dim">/{(city?.jobs ?? 0).toLocaleString()}</span>
-        </span>
-      </Stat>
+      {/* Jobs folds with the date: one toggle, shown in the date's place. */}
+      <Fold id="city" open={fold}>
+        <Stat
+          title={city ? `${city.workers.toLocaleString()} workers in ${city.jobs.toLocaleString()} jobs · ${city.unemployed.toLocaleString()} unemployed` : 'Jobs'}
+          glyph={<g {...icon}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5h6v3M3 13h18" /></g>}
+        >
+          <span className="stat-value">
+            {(city?.workers ?? 0).toLocaleString()}
+            <span className="stat-dim">/{(city?.jobs ?? 0).toLocaleString()}</span>
+          </span>
+        </Stat>
+      </Fold>
       <button
         type="button"
         className={`happy-stat ${happinessView ? 'is-on' : ''}`}
@@ -258,66 +321,68 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
           </button>
         ))}
       </div>
-      <span className="top-divider" />
-      <div className="rotate-group" role="group" aria-label="Rotate view">
-        <button type="button" className="icon-button" title="Rotate left (,)" aria-label="Rotate view left" onClick={() => game?.rotate(-1)}>
-          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+      <Fold id="view" open={fold} onOpen={setFold} label="Show rotate, traffic view and sound" glyph={EYE}>
+        <span className="top-divider" />
+        <div className="rotate-group" role="group" aria-label="Rotate view">
+          <button type="button" className="icon-button" title="Rotate left (,)" aria-label="Rotate view left" onClick={() => game?.rotate(-1)}>
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+              <g {...icon}>
+                <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+                <path d="M4 4v4h4" />
+              </g>
+            </svg>
+          </button>
+          {/* Compass: the arrow points to the map's north as seen from this side. */}
+          <span className="compass" title="North" style={{ transform: `rotate(${45 + rotation * 90}deg)` }} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 3l4 9h-8z" fill="#f87171" />
+              <path d="M12 21l-4-9h8z" fill="currentColor" opacity="0.55" />
+            </svg>
+          </span>
+          <button type="button" className="icon-button" title="Rotate right (.)" aria-label="Rotate view right" onClick={() => game?.rotate(1)}>
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+              <g {...icon}>
+                <path d="M20 12a8 8 0 1 1-2.4-5.7" />
+                <path d="M20 4v4h-4" />
+              </g>
+            </svg>
+          </button>
+        </div>
+        <span className="top-divider" />
+        <button
+          type="button"
+          className={`icon-button ${trafficView ? 'is-on' : ''}`}
+          aria-pressed={trafficView}
+          title="Traffic view (T)"
+          aria-label="Traffic view"
+          onClick={() => game?.setTrafficView(!trafficView)}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <g {...icon}>
-              <path d="M4 12a8 8 0 1 0 2.4-5.7" />
-              <path d="M4 4v4h4" />
+              <path d="M5 16V11l2-5h10l2 5v5" />
+              <path d="M3 16h18v3H3z" />
+              <circle cx="7.5" cy="13.5" r="0.6" />
+              <circle cx="16.5" cy="13.5" r="0.6" />
             </g>
           </svg>
         </button>
-        {/* Compass: the arrow points to the map's north as seen from this side. */}
-        <span className="compass" title="North" style={{ transform: `rotate(${45 + rotation * 90}deg)` }} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18">
-            <path d="M12 3l4 9h-8z" fill="#f87171" />
-            <path d="M12 21l-4-9h8z" fill="currentColor" opacity="0.55" />
-          </svg>
-        </span>
-        <button type="button" className="icon-button" title="Rotate right (.)" aria-label="Rotate view right" onClick={() => game?.rotate(1)}>
-          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-            <g {...icon}>
-              <path d="M20 12a8 8 0 1 1-2.4-5.7" />
-              <path d="M20 4v4h-4" />
-            </g>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={muted ? 'Unmute sound (M)' : 'Mute sound (M)'}
+          title={muted ? 'Unmute (M)' : 'Mute (M)'}
+          onClick={() => game?.setMuted(!muted)}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+            {muted ? (
+              <path d="M17 9l5 6M22 9l-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            ) : (
+              <path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            )}
           </svg>
         </button>
-      </div>
-      <span className="top-divider" />
-      <button
-        type="button"
-        className={`icon-button ${trafficView ? 'is-on' : ''}`}
-        aria-pressed={trafficView}
-        title="Traffic view (T)"
-        aria-label="Traffic view"
-        onClick={() => game?.setTrafficView(!trafficView)}
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <g {...icon}>
-            <path d="M5 16V11l2-5h10l2 5v5" />
-            <path d="M3 16h18v3H3z" />
-            <circle cx="7.5" cy="13.5" r="0.6" />
-            <circle cx="16.5" cy="13.5" r="0.6" />
-          </g>
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={muted ? 'Unmute sound (M)' : 'Mute sound (M)'}
-        title={muted ? 'Unmute (M)' : 'Mute (M)'}
-        onClick={() => game?.setMuted(!muted)}
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
-          {muted ? (
-            <path d="M17 9l5 6M22 9l-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          ) : (
-            <path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          )}
-        </svg>
-      </button>
+      </Fold>
       <button type="button" className="icon-button" title="Tour the basics" aria-label="Tour the basics" onClick={() => setTourStep(0)}>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <g {...icon}>
