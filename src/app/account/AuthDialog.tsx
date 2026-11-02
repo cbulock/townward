@@ -26,7 +26,7 @@ function Mark() {
   );
 }
 
-function GithubMark() {
+export function GithubMark() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path
@@ -38,7 +38,7 @@ function GithubMark() {
 }
 
 /** Leave for GitHub's sign-in page; the server sends the player back to where they were. */
-function signInWithGithub() {
+export function signInWithGithub() {
   const returnTo = location.pathname + location.search;
   location.href = `/api/auth/github?returnTo=${encodeURIComponent(returnTo)}`;
 }

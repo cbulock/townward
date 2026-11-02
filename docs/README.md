@@ -9,7 +9,7 @@ work session, read **Current Status** below, then the relevant spec.
 |---|---|
 | **Current phase** | Transport (specs/transport.md): T1 ✅ avenue, **T2 ✅** boulevard, expressway, ramps, pedestrian streets, paving |
 | **Next phase** | User requests: Move tool and drag-to-rotate camera; then T3 (flyovers, interchanges, big bridges, tunnels) |
-| **Last updated** | 2026-11-01 |
+| **Last updated** | 2026-11-03 |
 
 ## Run It
 

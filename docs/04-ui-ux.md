@@ -119,3 +119,18 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 - **Start screen and dialogs** scroll on small screens instead of clipping, and keep clear of the account buttons.
 - Review sizes with the dev pages: `/src/dev/device.html?w=390&h=844&src=/` (any size, for portrait phones below headless Chrome's 500 px minimum) and `/src/dev/press.html?keys=KeyE` (the demo city with hotkeys pressed, to see pickers).
 
+
+## Onboarding Tour (D-081)
+
+- **What it is.** A first-play tour (`src/app/tour/`): welcome → look around → pick Roads → draw a road → pick Homes → paint a zone → power and water → demand bars → speed → goodbye. Action steps wait for the player to actually do it (tool picked; world changed and money spent with that tool; power and water supply above zero), show a tick, then move on. Every step can be skipped; the × ends the tour.
+- **When it shows.** By itself on a new city until finished or skipped; on an opened city only to carry on a tour left midway; never on the demo. The **?** button in the top bar replays it.
+- **Where progress lives.** The step id and a done flag (`{ step, done }`), saved on every step: on the device for everyone (`citybuilder.tour`), and in the account for signed-in players (`/api/tour`, table `tour_progress`). Ids, not positions, so steps can be reordered. A guest who signs up has their progress copied into the account.
+- **Desktop.** The card sits above or below the control it means, with an arrow and a pulsing ring around the control; steps about the map sit top centre. Mouse wording (right-drag, wheel, Shift, keys).
+- **Phones** (`max-height: 520px`). The card docks on the right, clear of the toolbar, pickers and minimap; the − button folds it into a pill showing the step. Touch wording (drag then tap Build, pinch, two fingers). The ring still marks the control, and a sideways-scrolling toolbar scrolls it into view. Bigger tap targets on coarse pointers.
+
+## Guest Sign-in Prompts (D-082)
+
+- Guests (server reachable) have their visible-tab play time counted on the device (`citybuilder.guestPlay`).
+- After **10 minutes**: a reminder they can close ("Keep this city safe…", Create account / Later).
+- After **30 minutes**: play pauses behind a card that stays until they sign up or log in; the city moves into the account. Limits are in `GUEST_LIMITS` (`src/app/account/guestPlay.ts`).
+- With no server nobody can sign in, so nothing is asked.

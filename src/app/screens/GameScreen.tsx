@@ -145,7 +145,7 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       <ControlsHint />
       {/* Starts on a new city until finished; an opened city only carries on a tour left midway. */}
       <Tour autoStart={options.demo ? 'never' : options.save ? 'resume' : 'start'} />
-      <GuestLimit />
+      <GuestLimit cityName={options.name} />
       <RotatePrompt />
     </div>
   );

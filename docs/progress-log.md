@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Onboarding tour and guest sign-in prompts (D-081, D-082)
+- Tour (`src/app/tour/`): ten steps; action steps finish when the player does them (Roads picked, road built, Homes picked, zone painted, power and water supplied). Desktop popover anchored to its control with a ring; landscape phones get a docked card that folds into a pill, with touch wording. **?** in the top bar replays it.
+- Progress `{ step, done }` saved per step: device for guests, plus `server/modules/tour/` (migration 4, `tour_progress`, `GET/PUT /api/tour`) for signed-in players; guest progress is copied in on sign-up; a reload mid-tour resumes.
+- Guest prompts (`src/app/account/GuestLimit.tsx`): reminder at 10 minutes, pause-until-sign-in at 30 (`GUEST_LIMITS`).
+- Tests: `server/modules/tour/tour.test.ts` (session needed, remembers the step, done stays done, private per user, bad bodies). Checked by headless screenshots at 1440×900 (welcome → road built → next step, saved step id) and 844×390 touch (resume, docked card, fold, gate). Pre-existing failure untouched: `transport.test.ts` avenue corridor.
+
 ## 2026-11-03: Touch building and compact pickers (D-080)
 - Touch drags wait for a Build / Cancel bar (`Game.confirmDraft`, `ToolPreviewInfo.awaitingConfirm`, `CostLabel` confirm bar); the touch hint says so.
 - Landscape-phone pickers are a single sideways-scrolling row (picture, name, price), about a third of their old height. Checked at 693×310 with the Road and Civic pickers open.

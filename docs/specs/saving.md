@@ -115,6 +115,8 @@ server/
 | `POST /api/saves` | `{ meta, data }` → `{ meta }` (new city) |
 | `PUT /api/saves/:id` | `{ meta, data }` → `{ meta }` |
 | `DELETE /api/saves/:id` | `204` |
+| `GET /api/tour` | `{ progress: { step, done } \| null }` (first-play tour, docs/04-ui-ux.md) |
+| `PUT /api/tour` | `{ step, done }` → `204`; a finished tour stays finished |
 
 - Passwords: `scrypt` with a per-user salt, compared in constant time.
 - Sessions: random 32-byte token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in

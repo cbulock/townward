@@ -245,4 +245,4 @@ Planned in detail in [05-master-plan.md](05-master-plan.md) (accepted, D-063). E
 | 20 | Government: stages, districts, policies, approval |
 | 21a | Weather and terrain-based disasters (tsunami, floods, wildfire, tornado …) |
 | 21b | Living city: events, tourism, landmarks, seaport, airport |
-| 22 | Polish and modes: Sandbox/Career, tutorial, balance |
+| 22 | Polish and modes: Sandbox/Career, tutorial (onboarding tour done early, D-081), balance |
