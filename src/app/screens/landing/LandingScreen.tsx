@@ -21,7 +21,8 @@ const PINS: readonly { label: string; x: number; y: number; z: number; side: 'le
 const FAQ: readonly { q: string; a: string }[] = [
   { q: 'Is Openpolis free?', a: 'Yes. The whole game is free to play, with no ads in the game and nothing to buy.' },
   { q: 'Do I need to download anything?', a: 'No. Openpolis is a city building game that runs in your web browser. Open the page and start building; there is nothing to install.' },
-  { q: 'What kind of game is it?', a: 'A classic-style city builder: you lay roads, zone land, build a town block by block and run it like a mayor, with power, water, services, budgets and traffic.' },
+  { q: 'What kind of game is it?', a: 'An open-world city simulation. You build and govern a city, but its people, businesses and government will make their own decisions, so the world can surprise you. Today it plays as a classic city builder: roads, zones, power, water, services, budgets and traffic.' },
+  { q: 'Are the AI citizens and governments in the game yet?', a: 'Not yet. The city builder is the foundation and is playable now. Citizens, workers, governments, trade and politics with minds of their own are being built in the open and arrive in updates, one system at a time.' },
   { q: 'Are my cities saved?', a: 'Always. As a guest your cities save on your device as you play. With a free account they save to the cloud, so you can carry on from any browser.' },
   { q: 'What do I play it on?', a: 'Any modern browser on a computer. It is built for a mouse or trackpad, and runs smoothly on ordinary laptops.' },
 ];
@@ -30,6 +31,14 @@ const STEPS: readonly { title: string; text: string }[] = [
   { title: 'Zone', text: 'Lay roads, then paint homes, shops and industry along them. Lots fill up when people want to live and work there.' },
   { title: 'Serve', text: 'Run power and water, open schools, clinics and stations. Citizens tell you exactly what their street is missing.' },
   { title: 'Grow', text: 'Land value rises, cottages give way to apartments and towers, and the city keeps moving long after dark.' },
+];
+
+/** Where the game is heading: inhabitants that decide for themselves. Not in the game yet, and labelled so. */
+const WORLD: readonly { title: string; text: string }[] = [
+  { title: 'Citizens and workers', text: 'People who choose where to live, where to work and when to leave, for reasons of their own.' },
+  { title: 'Governments', text: 'Establish a government, then live with the one that takes power. Policies have consequences you did not plan for.' },
+  { title: 'Economies and trade', text: 'Markets that move on their own, resources to manage and trade deals between cities.' },
+  { title: 'Politics and conflict', text: 'Alliances, rivalries and, one day, wars between cities that want different things.' },
 ];
 
 /**
@@ -60,13 +69,15 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
       <main>
         <section className="landing-hero">
           <div className="landing-copy">
-            <p className="landing-eyebrow">A city builder for everyone, in the browser</p>
+            <p className="landing-eyebrow">An open-world city simulation, in your browser</p>
             <h1>
-              Lay a road.
-              <br />A city moves in.
+              Build the city.
+              <br />
+              Then let it live.
             </h1>
             <p className="landing-lead">
-              Zone the streets, keep the power on and balance the budget. Homes, shops and towers grow on their own, traffic finds its way, and the windows light up at night.
+              Shape streets, set up a government and steer the economy of a city whose people make their own decisions. You won't control everything: the world has its own dynamics, and
+              its choices have consequences.
             </p>
             <div className="landing-ctas">
               {online ? (
@@ -115,9 +126,28 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
           </figure>
         </section>
 
+        <section className="landing-steps is-world" aria-labelledby="landing-world-title">
+          <h2 id="landing-world-title" className="landing-section-title">
+            Not just a city. A living world.
+          </h2>
+          <p className="landing-section-lead">
+            Most city builders follow fixed rules. Openpolis is growing into a world run by AI-driven citizens, workers, governments and markets, each deciding for itself. You don't just
+            build the city, you become part of it.
+          </p>
+          <ol>
+            {WORLD.map((w) => (
+              <li key={w.title}>
+                <span className="landing-step-no">In development</span>
+                <h3>{w.title}</h3>
+                <p>{w.text}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         <section className="landing-steps" aria-labelledby="landing-steps-title">
           <h2 id="landing-steps-title" className="landing-section-title">
-            How a city grows
+            Playable today: how a city grows
           </h2>
           <ol>
             {STEPS.map((s, k) => (
@@ -164,7 +194,7 @@ export function LandingScreen({ onPlay, onDemo }: LandingScreenProps) {
 
       <footer className="landing-footer">
         <span className="landing-wordmark is-small">Openpolis</span>
-        <span>Free to play. Runs in any modern browser, nothing to install.</span>
+        <span>An open-world city simulation. Free to play in any modern browser, nothing to install.</span>
       </footer>
     </div>
   );

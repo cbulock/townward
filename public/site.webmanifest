@@ -1,7 +1,7 @@
 {
   "name": "Openpolis",
   "short_name": "Openpolis",
-  "description": "A free city builder you play in your browser.",
+  "description": "An open-world city simulation you play in your browser.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0e1820",

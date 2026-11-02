@@ -2,9 +2,9 @@
 
 # ◆ Openpolis
 
-**Lay a road. A city moves in.**
+**Build the city. Then let it live.**
 
-A free, open city-building game that runs in your browser. No download, no install.
+A free, open-world city simulation that runs in your browser. No download, no install.
 
 ### [▶ Play now at openpolis.space](https://openpolis.space)
 
@@ -16,7 +16,13 @@ A free, open city-building game that runs in your browser. No download, no insta
 
 ## What it is
 
-Openpolis is a classic-style city builder for the web, made for everyone who grew up building towns block by block and wanted to do it again without installing anything. Zone the streets, keep the power on, balance the budget, and watch your town grow into a living city.
+Openpolis is a browser-based open-world city simulation where players build and govern cities inhabited by autonomous AI agents. Unlike traditional city builders, where most systems follow predetermined rules, Openpolis aims to create a world that evolves through independent decisions made by AI-driven governments, citizens, workers and economic systems.
+
+Players shape cities, establish governments, manage resources, influence economies, form trade relationships, and eventually face political conflicts and wars. But they won't have complete control over what happens: the world has its own dynamics, and the decisions of its inhabitants can create unexpected consequences. You don't just build a city, you become part of a living world.
+
+**Where it is today.** The foundation is a full city builder, playable now. The autonomous agents, governments, trade and politics are being built in the open and land in updates, one system at a time.
+
+### Playable now
 
 - **Grow a city that runs itself.** Paint residential, commercial and industrial zones along your roads. Homes, shops, offices and factories grow when there's demand, and upgrade from cottages to towers as land value rises.
 - **Be the mayor.** Power plants, water towers, substations and batteries; schools, clinics, police and fire stations; taxes, upkeep and a budget that has to balance.

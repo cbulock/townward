@@ -2,6 +2,10 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Landing pitch moves to the open-world vision (D-079)
+- Landing hero ("Build the city. Then let it live."), new "Not just a city. A living world." section with four pillars marked *In development*, the city-builder steps retitled "Playable today", and an FAQ entry saying the AI agents aren't in yet.
+- Same pitch in the page title, meta/OG/Twitter descriptions, JSON-LD, the crawlable boot text, the web manifest and the README intro.
+
 ## 2026-11-03: Mobile and landscape (D-078)
 - Touch: pinch to zoom, two-finger pan, tap to inspect, no edge scroll from fingers, no stuck hover after a tap (`src/game/input/InputController.ts`).
 - Rotate prompt for upright phones with full screen + landscape lock where supported (`src/app/mobile/`); manifest `orientation: landscape`; `viewport-fit=cover` and safe-area insets.

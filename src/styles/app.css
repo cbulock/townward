@@ -2784,6 +2784,25 @@ button.funds:hover {
   font-size: 15px;
   line-height: 1.6;
 }
+.landing-section-lead {
+  max-width: 640px;
+  margin: 16px 0 0;
+  color: var(--paper-dim);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+.landing-steps.is-world ol {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px;
+}
+.landing-steps.is-world li {
+  border-top-color: var(--sign);
+}
+.landing-steps.is-world .landing-step-no {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .landing-saves {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -2887,6 +2906,7 @@ button.funds:hover {
     padding-top: 36px;
   }
   .landing-steps ol,
+  .landing-steps.is-world ol,
   .landing-saves,
   .landing-faq {
     grid-template-columns: minmax(0, 1fr);
