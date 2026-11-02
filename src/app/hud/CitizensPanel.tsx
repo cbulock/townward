@@ -1,5 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useState } from 'react';
+import { COMPACT } from '../mobile/useMedia';
 import type { ComplaintKind } from '../../sim/systems/needs';
 import { cityAtom, gameAtom } from '../atoms';
 
@@ -23,7 +24,8 @@ const TONE: Readonly<Record<ComplaintKind, string>> = {
 export function CitizensPanel() {
   const city = useAtomValue(cityAtom);
   const game = useAtomValue(gameAtom);
-  const [open, setOpen] = useState(true);
+  // Folded on short (landscape phone) screens, where it would cover the city.
+  const [open, setOpen] = useState(() => !window.matchMedia(COMPACT).matches);
   const complaints = city?.needs.complaints ?? [];
   if (complaints.length === 0) return null;
   return (

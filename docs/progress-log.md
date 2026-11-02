@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Mobile and landscape (D-078)
+- Touch: pinch to zoom, two-finger pan, tap to inspect, no edge scroll from fingers, no stuck hover after a tap (`src/game/input/InputController.ts`).
+- Rotate prompt for upright phones with full screen + landscape lock where supported (`src/app/mobile/`); manifest `orientation: landscape`; `viewport-fit=cover` and safe-area insets.
+- Compact HUD for landscape phones, touch hint, folded citizens panel; start screen, login dialog and landing page fixed for small screens.
+- Checked by screenshots at 568×320, 667×375, 844×390 and 932×430 (game, pickers), 390×844 (rotate prompt, landing), and the start screen and dialog in landscape.
+
 ## 2026-11-02: Sign in with GitHub (D-077)
 - `server/modules/oauth/` (GitHub API client, repository, service, routes), migration 3 (`oauth_accounts`, nullable `pass_hash`), config `PUBLIC_URL` / `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` (passed through docker-compose from `.env`). `/api/auth/me` now returns the available providers.
 - Dialog: "Continue with GitHub" / "Sign up with GitHub" above the email form when enabled; failed sign-ins come back with a message in the dialog; players return to the page they were on.

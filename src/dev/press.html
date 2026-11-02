@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Press</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      Dev only: opens the demo city and presses keys after it loads, so screenshots can show
+      panels that need input. ?keys=Digit1,KeyB   &at=7000 (ms)
+    -->
+    <script type="module">
+      const q = new URLSearchParams(location.search);
+      const keys = (q.get('keys') || '').split(',').filter(Boolean);
+      const at = Number(q.get('at') || 7000);
+      history.replaceState(null, '', '/demo?size=64');
+      await import('/src/main.tsx');
+      keys.forEach((code, k) =>
+        setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true })), at + k * 400),
+      );
+    </script>
+  </body>
+</html>

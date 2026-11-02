@@ -14,6 +14,7 @@ import {
 import type { World } from '../../sim/World';
 import type { CityRef } from '../../save/SaveStore';
 import { AccountButton } from '../account/AccountButton';
+import { RotatePrompt } from '../mobile/RotatePrompt';
 import { DEFAULT_SEED, randomSeed } from '../options';
 import { CityList } from './CityList';
 import { useCities } from './useCities';
@@ -340,6 +341,7 @@ export function NewGameScreen({ onStart, onOpen, notice }: NewGameScreenProps) {
           </form>
         )}
       </div>
+      <RotatePrompt />
     </div>
   );
 }

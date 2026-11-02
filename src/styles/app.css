@@ -2923,3 +2923,343 @@ button.funds:hover {
     align-items: flex-start;
   }
 }
+
+/* ======================================================================
+   Phones and tablets (touch, small screens). Desktop layout is above; these
+   rules only narrow it. Landscape phones (short screens) get a compact HUD;
+   phones held upright see the rotate prompt over the game.
+   ====================================================================== */
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
+button,
+a,
+summary {
+  /* No double-tap zoom delay on buttons. */
+  touch-action: manipulation;
+}
+
+/* Touch screens: no hover, so hover-only help goes away. */
+@media (hover: none) and (pointer: coarse) {
+  .tool-tip,
+  .tool-key {
+    display: none;
+  }
+  .controls-hint.is-touch {
+    animation: hint-fade 9s ease-in both;
+  }
+}
+@keyframes hint-fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Rotate prompt (phone held upright) ---------- */
+.rotate-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: calc(24px + var(--safe-t)) 28px calc(24px + var(--safe-b));
+  background: radial-gradient(ellipse at 50% 35%, rgba(240, 178, 62, 0.1), transparent 60%), var(--ink);
+  color: var(--paper);
+  text-align: center;
+  animation: fade-in 200ms ease-out;
+}
+.rotate-phone {
+  width: 96px;
+  height: 96px;
+  color: var(--paper);
+  animation: rotate-hint 2.4s var(--ease-out) infinite;
+}
+@keyframes rotate-hint {
+  0%,
+  20% {
+    transform: rotate(0deg);
+  }
+  55%,
+  85% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+.rotate-prompt h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.rotate-prompt p {
+  max-width: 300px;
+  margin: 0 0 8px;
+  color: var(--paper-dim);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.rotate-primary {
+  min-width: 220px;
+  padding: 13px 20px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--sign);
+  box-shadow: 0 3px 0 var(--sign-deep);
+  color: #1c1406;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rotate-skip {
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--paper-dim);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate-phone {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
+
+/* ---------- Narrow screens (phones upright, small tablets) ---------- */
+@media (max-width: 760px) {
+  /* Start screen: scroll instead of clipping, clear of the account buttons. */
+  .new-game {
+    place-items: start center;
+    overflow-y: auto;
+    padding: calc(64px + var(--safe-t)) 0 calc(20px + var(--safe-b));
+  }
+  .ng-stack {
+    max-height: none;
+    width: calc(100vw - 24px - var(--safe-l) - var(--safe-r));
+  }
+  .ng-preview canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+  /* Landing map pins: tags sit above their dots, inside the picture. */
+  .landing-pin::after {
+    display: none;
+  }
+  .landing-pin.is-left .landing-pin-tag,
+  .landing-pin.is-right .landing-pin-tag {
+    top: -30px;
+    right: auto;
+    left: 0;
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------- Landscape phones: compact HUD ---------- */
+@media (max-height: 520px) {
+  /* Top bar: slimmer, the least-needed stats hidden, clear of the notch. */
+  .top-bar {
+    top: calc(6px + var(--safe-t));
+    gap: 8px;
+    padding: 4px 10px;
+    font-size: 12.5px;
+  }
+  .top-bar .city-name,
+  .top-bar .stat:has(.date),
+  .top-bar .stat:has(.stat-dim),
+  .top-bar .compass {
+    display: none;
+  }
+  .top-bar .top-divider {
+    height: 14px;
+  }
+
+  /* Toolbar bottom-left, scrolling sideways if the screen is narrow; minimap bottom-right. */
+  .toolbar {
+    left: calc(8px + var(--safe-l));
+    bottom: calc(6px + var(--safe-b));
+    transform: none;
+    max-width: calc(100vw - 150px - var(--safe-l) - var(--safe-r));
+    padding: 4px;
+    gap: 1px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    animation-name: panel-in;
+  }
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .tool-button {
+    flex: none;
+    width: 50px;
+    padding: 5px 2px 4px;
+  }
+  .tool-button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .tool-label {
+    font-size: 9.5px;
+  }
+  .tool-key,
+  .tool-tip {
+    display: none;
+  }
+  .minimap {
+    right: calc(8px + var(--safe-r));
+    bottom: calc(6px + var(--safe-b));
+    padding: 4px;
+    zoom: 0.58;
+  }
+
+  /* Pickers above the toolbar, scrolling within the screen. */
+  .building-picker,
+  .road-picker {
+    left: calc(8px + var(--safe-l));
+    bottom: calc(68px + var(--safe-b));
+    transform: none;
+    width: min(460px, calc(100vw - 160px - var(--safe-l) - var(--safe-r)));
+    max-height: calc(100dvh - 120px - var(--safe-t) - var(--safe-b));
+    overflow-y: auto;
+    padding: 8px;
+    animation-name: panel-in;
+    /* An open picker is what the player is using: in front of the side panels. */
+    z-index: 5;
+  }
+  .road-picker {
+    width: calc(100vw - 160px - var(--safe-l) - var(--safe-r));
+  }
+
+  /* Side panels between the top bar and the bottom row, scrolling inside. */
+  .citizens {
+    top: calc(48px + var(--safe-t));
+    left: calc(8px + var(--safe-l));
+    width: min(250px, 40vw);
+    max-height: calc(100dvh - 130px - var(--safe-t) - var(--safe-b));
+    overflow-y: auto;
+    font-size: 12px;
+  }
+  .info-panel {
+    top: calc(48px + var(--safe-t));
+    right: calc(8px + var(--safe-r));
+    width: min(250px, 42vw);
+    max-height: calc(100dvh - 140px - var(--safe-t) - var(--safe-b));
+    overflow-y: auto;
+    padding: 10px 12px 12px;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .budget-panel {
+    top: calc(48px + var(--safe-t));
+    max-height: calc(100dvh - 60px - var(--safe-t) - var(--safe-b));
+    overflow-y: auto;
+  }
+  .traffic-legend {
+    right: calc(8px + var(--safe-r));
+    bottom: calc(86px + var(--safe-b));
+    width: 200px;
+    zoom: 0.9;
+  }
+  .notices {
+    bottom: calc(72px + var(--safe-b));
+  }
+  .debug-overlay {
+    top: calc(48px + var(--safe-t));
+    zoom: 0.85;
+  }
+
+  /* Keyboard help means nothing on a phone; the short touch hint sits under the top bar. */
+  .controls-hint:not(.is-touch) {
+    display: none;
+  }
+  .controls-hint.is-touch {
+    top: calc(48px + var(--safe-t));
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: none;
+    white-space: nowrap;
+    animation-name: hint-fade;
+  }
+
+  /* Start screen: scroll, and keep the card clear of the account buttons. */
+  .new-game {
+    place-items: start center;
+    overflow-y: auto;
+    padding: calc(56px + var(--safe-t)) 0 calc(16px + var(--safe-b));
+  }
+  .ng-account {
+    top: calc(8px + var(--safe-t));
+    right: calc(10px + var(--safe-r));
+  }
+  .ng-stack {
+    max-height: none;
+    width: min(880px, calc(100vw - 24px - var(--safe-l) - var(--safe-r)));
+  }
+  .ng-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    gap: 16px;
+  }
+  .ng-preview canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+
+  /* Account dialog: fits a short screen and scrolls if it must. */
+  .auth-backdrop {
+    display: flex;
+    padding: calc(10px + var(--safe-t)) 16px calc(10px + var(--safe-b));
+  }
+  .auth-dialog {
+    margin: auto;
+    gap: 10px;
+    padding: 16px 20px 16px;
+  }
+  .auth-mark,
+  .auth-lead,
+  .auth-perks,
+  .auth-foot {
+    display: none;
+  }
+  .auth-head h2 {
+    font-size: 20px;
+  }
+}
+
+/* The login dialog never clips its top on any short screen. */
+.auth-backdrop {
+  display: flex;
+}
+.auth-dialog {
+  margin: auto;
+}
+
+/* Smallest landscape phones (iPhone SE, small Androids). */
+@media (max-height: 520px) and (max-width: 700px) {
+  .top-bar {
+    zoom: 0.84;
+    gap: 6px;
+  }
+  /* More tools than width: fade the right edge so it reads as "scroll for more". */
+  .toolbar {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    padding-right: 24px;
+  }
+}

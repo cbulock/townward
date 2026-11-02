@@ -41,6 +41,8 @@ export interface InputCallbacks {
 /**
  * Translates raw DOM input into camera motion, tool drags and pointer updates.
  * Right/middle drag always pans; left drag goes to the active tool, or pans if there is none.
+ * Touch: one finger works like the left button (build, or pan when no tool takes it, tap to
+ * inspect); two fingers pinch to zoom and drag to pan, and cancel any half-done tool drag.
  */
 export class InputController {
   edgeScroll = true;
@@ -58,6 +60,10 @@ export class InputController {
   private toolPointer: number | null = null;
   private pointer: { x: number; y: number } | null = null;
   private trackpadUntil = 0;
+  /** Fingers on the screen, by pointer id (screen coords). */
+  private readonly touches = new Map<number, { x: number; y: number }>();
+  /** Two-finger gesture: last midpoint and finger spread. */
+  private pinch: { midX: number; midY: number; spread: number } | null = null;
   private readonly cleanup: (() => void)[] = [];
 
   constructor(
@@ -96,6 +102,14 @@ export class InputController {
   private onPointerDown = (e: PointerEvent) => {
     const p = this.local(e);
     this.el.setPointerCapture(e.pointerId);
+    if (e.pointerType === 'touch') {
+      this.touches.set(e.pointerId, p);
+      if (this.touches.size === 2) {
+        this.startPinch();
+        return;
+      }
+      if (this.touches.size > 2) return;
+    }
     if (e.button === 0 && this.cb.onPrimaryDown(p, e.shiftKey)) {
       this.toolPointer = e.pointerId;
       return;
@@ -103,8 +117,39 @@ export class InputController {
     this.drag = { id: e.pointerId, button: e.button, lastX: p.x, lastY: p.y, startX: p.x, startY: p.y, moved: false };
   };
 
+  /** A second finger landed: whatever the first finger started becomes a pinch. */
+  private startPinch() {
+    if (this.toolPointer !== null) {
+      this.toolPointer = null;
+      this.cb.onCancel();
+    }
+    this.drag = null;
+    const [a, b] = [...this.touches.values()];
+    this.pinch = { midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2, spread: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) };
+  }
+
+  private movePinch() {
+    const pinch = this.pinch;
+    if (!pinch || this.touches.size < 2) return;
+    const [a, b] = [...this.touches.values()];
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const spread = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    this.camera.dragBy(midX - pinch.midX, midY - pinch.midY);
+    this.camera.zoomAt(spread / pinch.spread, midX, midY);
+    this.pinch = { midX, midY, spread };
+  }
+
   private onPointerMove = (e: PointerEvent) => {
     const p = this.local(e);
+    if (e.pointerType === 'touch') {
+      if (!this.touches.has(e.pointerId)) return;
+      this.touches.set(e.pointerId, p);
+      if (this.pinch) {
+        this.movePinch();
+        return;
+      }
+    }
     this.pointer = p;
     if (this.toolPointer === e.pointerId) {
       this.cb.onPointer(p);
@@ -125,10 +170,20 @@ export class InputController {
   };
 
   private onPointerUp = (e: PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      this.touches.delete(e.pointerId);
+      if (this.pinch) {
+        // Lifting one finger ends the pinch; the other doesn't start a new drag.
+        if (this.touches.size < 2) this.pinch = null;
+        if (this.touches.size === 0) this.clearTouchPointer();
+        return;
+      }
+    }
     if (this.toolPointer === e.pointerId) {
       this.toolPointer = null;
       if (e.type === 'pointercancel') this.cb.onCancel();
       else this.cb.onPrimaryUp(this.local(e), e.shiftKey);
+      if (e.pointerType === 'touch' && this.touches.size === 0) this.clearTouchPointer();
       return;
     }
     if (this.drag?.id === e.pointerId) {
@@ -137,7 +192,14 @@ export class InputController {
       this.drag = null;
       this.el.style.cursor = '';
     }
+    if (e.pointerType === 'touch' && this.touches.size === 0) this.clearTouchPointer();
   };
+
+  /** A finger lifted: there's no hovering pointer any more (no stuck highlight, no edge scroll). */
+  private clearTouchPointer() {
+    this.pointer = null;
+    this.cb.onPointer(null);
+  }
 
   private onPointerLeave = () => {
     if (this.drag || this.toolPointer !== null) return; // captured; keep tracking

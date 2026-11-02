@@ -9,6 +9,7 @@ import { randomSeed } from '../options';
 import { BuildingPicker } from '../hud/BuildingPicker';
 import { RoadPicker } from '../hud/RoadPicker';
 import { ControlsHint } from '../hud/ControlsHint';
+import { RotatePrompt } from '../mobile/RotatePrompt';
 import { CostLabel } from '../hud/CostLabel';
 import { DebugOverlay } from '../hud/DebugOverlay';
 import { InfoPanel } from '../hud/InfoPanel';
@@ -140,6 +141,7 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       <Notices />
       <CostLabel />
       <ControlsHint />
+      <RotatePrompt />
     </div>
   );
 }

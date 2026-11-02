@@ -111,3 +111,11 @@ Full-screen backdrop with a slowly panning generated map. A centered card holds:
 - The **account dialog** has Log in / Sign up tabs, inline field checks after leaving a field, a show/hide toggle and Caps Lock warning on passwords, a strength meter and a confirm-password field on sign up, and a countdown when the server asks us to wait (429).
 - Signed in, the top-right shows the account avatar; its menu shows the email, that cities are saved to the account, and Log out (which saves first).
 
+## Phones and Tablets (D-078)
+
+- **Orientation:** the game and the start screen are built for landscape. On a phone held upright, a "Turn your phone sideways" prompt covers them, with **Play in full screen** (which also locks landscape where the browser allows it: Android Chrome, not iOS Safari) and **Continue in portrait**. The landing page works in portrait. The web manifest asks installed copies to open in landscape.
+- **Touch:** one finger builds with the active tool, or pans when no tool takes the drag; a tap inspects. Two fingers pinch to zoom and drag to pan, and cancel a half-done build drag. Edge scrolling is mouse-only. A short touch hint replaces the keyboard list and fades after a few seconds.
+- **Compact HUD** on short screens (height ≤ 520 px, i.e. landscape phones): a slimmer top bar without the city name, date, jobs and compass; the toolbar bottom-left (scrolling sideways, with a fade on the right, on the narrowest phones); a smaller minimap bottom-right; pickers above the toolbar and in front of other panels; side panels between the top bar and the bottom row, scrolling inside; "Citizens say" starts folded. Everything respects the notch and home-indicator safe areas.
+- **Start screen and dialogs** scroll on small screens instead of clipping, and keep clear of the account buttons.
+- Review sizes with the dev pages: `/src/dev/device.html?w=390&h=844&src=/` (any size, for portrait phones below headless Chrome's 500 px minimum) and `/src/dev/press.html?keys=KeyE` (the demo city with hotkeys pressed, to see pickers).
+
