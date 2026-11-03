@@ -12,12 +12,19 @@ export interface HumanCheck {
 
 export const noHumanCheck: HumanCheck = { verify: async () => true };
 
-const SiteVerify = z.object({ success: z.boolean() });
+const SiteVerify = z.object({
+  success: z.boolean(),
+  'error-codes': z.array(z.string()).optional(),
+  hostname: z.string().optional(),
+});
 
 export function turnstileCheck(secretKey: string): HumanCheck {
   return {
     async verify(token, address) {
-      if (!token) return false;
+      if (!token) {
+        console.warn('Turnstile: no token sent with the form');
+        return false;
+      }
       try {
         const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
           method: 'POST',
@@ -25,7 +32,13 @@ export function turnstileCheck(secretKey: string): HumanCheck {
           signal: AbortSignal.timeout(10_000),
         });
         const body = SiteVerify.safeParse(await res.json());
-        return body.success && body.data.success;
+        if (!body.success) {
+          console.error(`Turnstile answered ${res.status} with an unexpected body`);
+          return false;
+        }
+        // invalid-input-secret: wrong TURNSTILE_SECRET_KEY; timeout-or-duplicate: token expired or reused.
+        if (!body.data.success) console.warn(`Turnstile refused a token: ${(body.data['error-codes'] ?? []).join(', ') || 'no reason given'}`);
+        return body.data.success;
       } catch (err) {
         // Fail closed: if Cloudflare can't vouch for the player, no email goes out.
         console.error('Turnstile unreachable', err);
