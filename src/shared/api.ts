@@ -8,6 +8,8 @@ export const API_LIMITS = {
   passwordMax: 200,
   cityNameMax: 64,
   savesPerUser: 30,
+  /** Digits in an emailed sign-up or reset code. */
+  codeLength: 6,
   /** Request body limit; a huge 256×256 city is well under 2 MB. */
   bodyBytes: 8 * 1024 * 1024,
 } as const;
@@ -40,6 +42,27 @@ export interface AuthResponse {
 /** Sign-in methods the server has configured. */
 export interface AuthProviders {
   readonly github: boolean;
+  /** Sign-up confirms the email with a code, and "Forgot password" works (D-084). */
+  readonly emailCodes: boolean;
+  /** Cloudflare Turnstile site key for the bot check, when the server has one. */
+  readonly turnstileSiteKey: string | null;
+}
+
+/** Sign-up either signs in at once, or (with email codes on) waits for the emailed code. */
+export type SignupResponse = { readonly kind: 'user'; readonly user: ApiUser } | { readonly kind: 'verify'; readonly email: string };
+
+/** Bot defences sent with forms that email a code (D-084). */
+export interface HumanProof {
+  /** Turnstile token. */
+  readonly captcha?: string;
+  /** Honeypot: a hidden field people never fill in. */
+  readonly website?: string;
+}
+export type CodePurpose = 'signup' | 'reset';
+
+/** 202 from password/forgot and code/resend: a code is on its way (if the account exists). */
+export interface CodeSentResponse {
+  readonly email: string;
 }
 
 export interface MeResponse {

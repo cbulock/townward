@@ -2,12 +2,16 @@ import type {
   ApiErrorBody,
   ApiUser,
   AuthResponse,
+  CodePurpose,
+  CodeSentResponse,
+  HumanProof,
   MeResponse,
   SaveListResponse,
   SaveLoadResponse,
   SaveMeta,
   SaveWriteRequest,
   SaveWriteResponse,
+  SignupResponse,
   GuestHeartbeatResponse,
   TourProgress,
   TourResponse,
@@ -70,8 +74,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   me: () => request<MeResponse>('GET', '/auth/me'),
-  signup: (email: string, password: string): Promise<ApiUser> =>
-    request<AuthResponse>('POST', '/auth/signup', { email, password }).then((r) => r.user),
+  signup: (email: string, password: string, human: HumanProof = {}) => request<SignupResponse>('POST', '/auth/signup', { email, password, ...human }),
+  verifySignup: (email: string, code: string): Promise<ApiUser> =>
+    request<AuthResponse>('POST', '/auth/signup/verify', { email, code }).then((r) => r.user),
+  forgotPassword: (email: string, human: HumanProof = {}) => request<CodeSentResponse>('POST', '/auth/password/forgot', { email, ...human }),
+  resetPassword: (email: string, code: string, password: string): Promise<ApiUser> =>
+    request<AuthResponse>('POST', '/auth/password/reset', { email, code, password }).then((r) => r.user),
+  resendCode: (purpose: CodePurpose, email: string) => request<CodeSentResponse>('POST', '/auth/code/resend', { email, purpose }),
   login: (email: string, password: string): Promise<ApiUser> =>
     request<AuthResponse>('POST', '/auth/login', { email, password }).then((r) => r.user),
   logout: () => request<void>('POST', '/auth/logout'),

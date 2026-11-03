@@ -45,7 +45,7 @@ export const authAtom = atom<AuthState>({ status: 'checking' });
 /** The log in / sign up dialog, if open. */
 export const authDialogAtom = atom<'login' | 'signup' | null>(null);
 /** Sign-in methods the server offers besides email (from /api/auth/me). */
-export const authProvidersAtom = atom<AuthProviders>({ github: false });
+export const authProvidersAtom = atom<AuthProviders>({ github: false, emailCodes: false, turnstileSiteKey: null });
 /** A message for the dialog to show when it opens (e.g. why a GitHub sign-in failed). */
 export const authNoticeAtom = atom<string | null>(null);
 /** Save state of the open city; null when it isn't saved at all (the demo). */

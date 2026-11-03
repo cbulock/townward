@@ -31,6 +31,13 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # Emailed codes for sign-up and password reset (Brevo) and the bot check (Turnstile); off when empty.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
+      MAIL_DAILY_LIMIT: ${MAIL_DAILY_LIMIT:-}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
       # Guest trial (D-083): the secret is required; the minutes are optional.
       GUEST_SECRET: ${GUEST_SECRET:-}
       GUEST_NUDGE_MINUTES: ${GUEST_NUDGE_MINUTES:-}

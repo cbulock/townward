@@ -24,7 +24,9 @@ export const notFound = (message = 'Not found') => new HttpError(404, message);
 export const conflict = (message: string) => new HttpError(409, message);
 export function tooManyRequests(retryAfterSeconds: number): HttpError {
   const minutes = Math.ceil(retryAfterSeconds / 60);
-  return new HttpError(429, `Too many attempts. Try again in ${minutes <= 1 ? 'a minute' : `${minutes} minutes`}.`, retryAfterSeconds);
+  const hours = Math.ceil(minutes / 60);
+  const wait = minutes <= 1 ? 'a minute' : minutes < 90 ? `${minutes} minutes` : `${hours} hours`;
+  return new HttpError(429, `Too many attempts. Try again in ${wait}.`, retryAfterSeconds);
 }
 
 /** Errors from express.json carry a `status` (413 too large, 400 bad JSON). */

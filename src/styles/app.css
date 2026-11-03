@@ -2120,6 +2120,59 @@ button.funds:hover {
   height: 16px;
   margin-top: 1px;
 }
+.auth-banner.is-info {
+  border-color: rgba(79, 209, 197, 0.35);
+  background: rgba(79, 209, 197, 0.1);
+  color: #ccfbf1;
+}
+/* Each dialog step is its own form; it lays out as part of the dialog's column (D-084). */
+.auth-form {
+  display: contents;
+}
+.auth-link {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--sign);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.auth-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.auth-link:disabled {
+  color: var(--paper-dim);
+  cursor: default;
+}
+.auth-forgot {
+  align-self: flex-end;
+  margin-top: -8px;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.auth-code {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+/* Turnstile takes no space unless Cloudflare asks the player to click. */
+.auth-turnstile:empty {
+  display: none;
+}
+/* Honeypot: off-screen, so people never see it but naive bots fill it in. */
+.auth-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
 .auth-submit {
   display: flex;
   align-items: center;

@@ -93,6 +93,19 @@ const MIGRATIONS: readonly string[] = [
   CREATE INDEX guests_by_fingerprint ON guests(fingerprint, last_seen_ms DESC);
   CREATE INDEX guests_by_last_seen ON guests(last_seen_ms);
   `,
+  // 6: emailed one-time codes for sign-up and password reset (D-084); only hashes are kept
+  `
+  CREATE TABLE email_codes (
+    email      text NOT NULL,
+    purpose    text NOT NULL,
+    code_hash  text NOT NULL,
+    pass_hash  text,
+    attempts   integer NOT NULL DEFAULT 0,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (email, purpose)
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

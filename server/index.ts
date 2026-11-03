@@ -3,6 +3,8 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createPgDb } from './db/db.ts';
 import { migrate } from './db/migrations.ts';
+import { turnstileCheck } from './modules/auth/humanCheck.ts';
+import { brevoMailer, consoleMailer } from './modules/email/mailer.ts';
 import { httpGithubApi } from './modules/oauth/github.api.ts';
 
 /**
@@ -20,13 +22,27 @@ try {
   process.exit(1);
 }
 
+// Brevo when configured; in development the codes are printed here instead, so the flow still works.
+const mailer = config.email ? brevoMailer(config.email) : config.production ? null : consoleMailer();
+if (config.email) console.log(`Email codes on (Brevo, from ${config.email.fromEmail})`);
+else if (mailer) console.log('Email codes on (printed to this console: set BREVO_API_KEY and MAIL_FROM to send them)');
+else console.warn('Email codes off: sign-up skips email confirmation and there is no password reset (set BREVO_API_KEY and MAIL_FROM)');
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const app = createApp(db, {
   secureCookies: config.production,
   staticDir: config.production ? `${root}dist` : undefined,
   trustProxy: config.trustProxy,
   guests: config.guests,
-  github: config.github ? { clientId: config.github.clientId, publicUrl: config.github.publicUrl, api: httpGithubApi(config.github.clientId, config.github.clientSecret) } : undefined,
+  email: mailer ? { mailer, dailyLimit: config.mailDailyLimit } : undefined,
+  human: config.turnstile ? { check: turnstileCheck(config.turnstile.secretKey), siteKey: config.turnstile.siteKey } : undefined,
+  github: config.github
+    ? {
+        clientId: config.github.clientId,
+        publicUrl: config.github.publicUrl,
+        api: httpGithubApi(config.github.clientId, config.github.clientSecret),
+      }
+    : undefined,
 });
 if (config.github) console.log(`GitHub sign-in on (callback ${config.github.publicUrl}/api/auth/github/callback)`);
 const server = app.listen(config.port, () => console.log(`save server on http://localhost:${config.port}`));

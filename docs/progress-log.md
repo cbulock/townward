@@ -2,6 +2,11 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-03: Email codes for sign-up, password reset, and anti-bombing limits (D-084)
+- Server: `server/modules/email/mailer.ts` (Brevo, console for development), `auth/emailCodes.ts` (hashed codes, migration 6 `email_codes`), `auth/humanCheck.ts` (Turnstile), new routes `signup/verify`, `password/forgot`, `password/reset`, `code/resend`; send limits per inbox, per address and per day in `auth.limits.ts`. Config `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME`, `MAIL_DAILY_LIMIT`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` (docker-compose, `.env.example`, deploy.md "Email codes").
+- Client: the auth dialog continues to a code step after sign-up, offers "Forgot password?" on log in, with resend countdowns; honeypot and Turnstile on forms that send email.
+- Tests: `server/modules/auth/emailCodes.test.ts` (account only after the right code, hash-only storage, tries and expiry, resend replaces, honeypot, Turnstile, per-inbox cooldown/hour/day caps, per-address cap, daily budget 503, reset without account discovery, sessions ended on reset, GitHub-only accounts, purposes kept apart, mailer off). Pre-existing failure untouched: `transport.test.ts` avenue corridor.
+
 ## 2026-11-03: Server-side guest trial and a new gate (D-083)
 - `server/modules/guests/` (schemas → routes → service → repository, plus `fingerprint.ts`), migration 5 (`guests`: id, keyed fingerprint, play seconds, last seen, claimed by). `POST /api/guest/heartbeat`; hourly prune of guests unseen for 90 days. Config `GUEST_SECRET` (required in production), `GUEST_NUDGE_MINUTES`, `GUEST_LIMIT_MINUTES`; passed through docker-compose, in `.env.example` and deploy.md.
 - Client: heartbeats every 30 s while visible, id copied to localStorage, 5-minute offline grace then a "Reconnecting…" pause; off in dev unless `VITE_GUEST_TRIAL=on`.

@@ -10,8 +10,10 @@ import { authRoutes } from './modules/auth/auth.routes.ts';
 import { AnalyticsRepository } from './modules/analytics/analytics.repository.ts';
 import { analyticsRoutes } from './modules/analytics/analytics.routes.ts';
 import { AnalyticsService } from './modules/analytics/analytics.service.ts';
-import { AuthLimiter } from './modules/auth/auth.limits.ts';
+import { AUTH_LIMITS, AuthLimiter, DAY } from './modules/auth/auth.limits.ts';
 import { AuthService } from './modules/auth/auth.service.ts';
+import type { HumanCheck } from './modules/auth/humanCheck.ts';
+import type { Mailer } from './modules/email/mailer.ts';
 import { healthRoutes } from './modules/health/health.routes.ts';
 import type { GithubApi } from './modules/oauth/github.api.ts';
 import { githubRoutes } from './modules/oauth/oauth.routes.ts';
@@ -38,14 +40,31 @@ export interface AppOptions {
   /** Login and signup limits (tests pass their own clock or rules). */
   readonly authLimits?: AuthLimiter;
   /** Sign in with GitHub, when configured (config GITHUB_*; tests pass a fake API). */
-  readonly github?: { readonly clientId: string; readonly publicUrl: string; readonly api: GithubApi };
+  readonly github?: {
+    readonly clientId: string;
+    readonly publicUrl: string;
+    readonly api: GithubApi;
+  };
+  /**
+   * Email codes for sign-up and password reset (D-084): the mailer and the server's daily email
+   * budget. Without it, sign-up signs in at once and there is no reset.
+   */
+  readonly email?: { readonly mailer: Mailer; readonly dailyLimit: number };
+  /** Bot check (Turnstile) for the forms that send email. */
+  readonly human?: { readonly check: HumanCheck; readonly siteKey: string };
   /** Guest trial rules (config GUEST_*); tests may also pass a clock. */
   readonly guests?: GuestRules;
   readonly guestClock?: () => number;
 }
 
 export function createApp(db: Db, opts: AppOptions): express.Express & { auth: AuthService; guests: GuestsService } {
-  const auth = new AuthService(db);
+  const auth = new AuthService(db, opts.email?.mailer ?? null);
+  const authLimits =
+    opts.authLimits ??
+    new AuthLimiter({
+      ...AUTH_LIMITS,
+      codeDaily: { max: opts.email?.dailyLimit ?? AUTH_LIMITS.codeDaily.max, windowMs: DAY },
+    });
   const saves = new SavesService(new SavesRepository(db));
   const analytics = new AnalyticsService(new AnalyticsRepository(db));
   const tour = new TourService(new TourRepository(db));
@@ -68,8 +87,23 @@ export function createApp(db: Db, opts: AppOptions): express.Express & { auth: A
   });
   api.use('/health', healthRoutes(db));
   api.use(loadUser((token) => auth.userForToken(token)));
-  if (opts.github) api.use('/auth/github', githubRoutes(new OAuthService(db, auth), { ...opts.github, secureCookies: opts.secureCookies }));
-  api.use('/auth', authRoutes(auth, opts.secureCookies, opts.authLimits, { github: !!opts.github }));
+  if (opts.github)
+    api.use(
+      '/auth/github',
+      githubRoutes(new OAuthService(db, auth), {
+        ...opts.github,
+        secureCookies: opts.secureCookies,
+      }),
+    );
+  api.use(
+    '/auth',
+    authRoutes(auth, {
+      secureCookies: opts.secureCookies,
+      limits: authLimits,
+      github: !!opts.github,
+      human: opts.human,
+    }),
+  );
   api.use('/saves', savesRoutes(saves));
   api.use('/tour', tourRoutes(tour));
   api.use('/guest', guestsRoutes(guests, opts.secureCookies));

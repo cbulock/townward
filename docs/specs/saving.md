@@ -17,6 +17,9 @@ account so they follow the player to any browser. Design decisions: D-034, D-062
 - A loaded city opens with the camera over what the player built (roads and buildings).
 - **Account button** (start screen header and top bar): *Log in* / *Sign up* dialog with
   email and password (8+ characters). Once logged in it shows the email and *Log out*.
+  When the server sends email (D-084), sign-up continues to *Check your email*: a 6-digit
+  code creates the account. *Forgot password?* under the log-in password emails a code that
+  sets a new password and signs out other devices.
 - **Guest → account:** a guest's cities live on this device. After logging in, the open
   city moves into the account on its next save, and the list offers *Upload* for the
   others. Nothing is lost by signing up later.

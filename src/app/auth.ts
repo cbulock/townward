@@ -1,5 +1,6 @@
 import { useAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
+import type { HumanProof } from '../shared/api';
 import { api, ApiError } from '../save/api';
 import { authAtom, authDialogAtom, authNoticeAtom, authProvidersAtom, type AuthState } from './atoms';
 import { guestAtom, setChoseGuest } from './screens/landing/guest';
@@ -43,7 +44,12 @@ export interface AuthActions {
   readonly auth: AuthState;
   /** Resolve on success; reject with an ApiError whose message is ready to show. */
   login(email: string, password: string): Promise<void>;
-  signup(email: string, password: string): Promise<void>;
+  /** 'verify' when the server emailed a code to confirm first (D-084). */
+  signup(email: string, password: string, human?: HumanProof): Promise<'done' | 'verify'>;
+  /** Finish a sign-up with the emailed code. */
+  verifySignup(email: string, code: string): Promise<void>;
+  /** Set a new password with the emailed code; signs in. */
+  resetPassword(email: string, code: string, password: string): Promise<void>;
   logout(): Promise<void>;
 }
 
@@ -55,7 +61,20 @@ export function useAuth(): AuthActions {
     [setAuth],
   );
   const signup = useCallback(
-    async (email: string, password: string) => setAuth({ status: 'user', user: await api.signup(email, password) }),
+    async (email: string, password: string, human?: HumanProof) => {
+      const r = await api.signup(email, password, human);
+      if (r.kind === 'verify') return 'verify';
+      setAuth({ status: 'user', user: r.user });
+      return 'done';
+    },
+    [setAuth],
+  );
+  const verifySignup = useCallback(
+    async (email: string, code: string) => setAuth({ status: 'user', user: await api.verifySignup(email, code) }),
+    [setAuth],
+  );
+  const resetPassword = useCallback(
+    async (email: string, code: string, password: string) => setAuth({ status: 'user', user: await api.resetPassword(email, code, password) }),
     [setAuth],
   );
   const logout = useCallback(async () => {
@@ -68,5 +87,5 @@ export function useAuth(): AuthActions {
     setChoseGuest(false);
     setGuest(false);
   }, [setAuth, setGuest]);
-  return { auth, login, signup, logout };
+  return { auth, login, signup, verifySignup, resetPassword, logout };
 }

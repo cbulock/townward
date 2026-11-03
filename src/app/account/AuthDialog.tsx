@@ -1,13 +1,20 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../save/api';
+import { API_LIMITS } from '../../shared/api';
 import { authDialogAtom, authNoticeAtom, authProvidersAtom } from '../atoms';
 import { useAuth } from '../auth';
 import { clock, passwordStrength, validate, type AuthFields, type AuthMode } from './authForm';
+import { CodeStep, ForgotStep } from './CodeSteps';
 import { PasswordField } from './PasswordField';
+import { Honeypot, Turnstile } from './Turnstile';
 
 const EMPTY: AuthFields = { email: '', password: '', confirm: '' };
 type Touched = Partial<Record<keyof AuthFields, boolean>>;
+
+/** Where the dialog is: the log in / sign up form, or one of the emailed-code steps (D-084). */
+type Step = { readonly kind: 'form' } | { readonly kind: 'verify'; readonly email: string } | { readonly kind: 'forgot' } | { readonly kind: 'reset'; readonly email: string };
+const FORM: Step = { kind: 'form' };
 
 /** Small iso city mark for the dialog header. */
 function Mark() {
@@ -46,7 +53,8 @@ export function signInWithGithub() {
 /**
  * Log in / sign up, as a modal over either screen. Fields are checked as you go (after you leave
  * a field, or on submit), sign up asks for the password twice and shows its strength, and when
- * the server asks us to wait (429) the button counts down instead of failing again.
+ * the server asks us to wait (429) the button counts down instead of failing again. With email
+ * codes on, sign-up continues to a code step, and log in offers "Forgot password?".
  */
 export function AuthDialog() {
   const [mode, setMode] = useAtom(authDialogAtom);
@@ -55,6 +63,11 @@ export function AuthDialog() {
   const [notice, setNotice] = useAtom(authNoticeAtom);
   const [leaving, setLeaving] = useState(false);
   const { login, signup } = useAuth();
+  const [step, setStep] = useState<Step>(FORM);
+  /** Bot check for sign-up: Turnstile token (single-use, so a new round per attempt) and honeypot. */
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaRound, setCaptchaRound] = useState(0);
+  const [website, setWebsite] = useState('');
   const [fields, setFields] = useState<AuthFields>(EMPTY);
   const [touched, setTouched] = useState<Touched>({});
   /** The server's answer; a "wait" message hides itself once the countdown ends. */
@@ -71,11 +84,19 @@ export function AuthDialog() {
       setNotice(null);
       setTouched({});
       setFields((f) => ({ ...f, password: '', confirm: '' }));
+      setStep(FORM);
       setMode(next);
     },
     [setMode, setNotice],
   );
   const close = useCallback(() => switchTo(null), [switchTo]);
+
+  // Closed from elsewhere (signed in by another tab, the guest gate…): start over next time.
+  const [openMode, setOpenMode] = useState(mode);
+  if (openMode !== mode) {
+    setOpenMode(mode);
+    if (!mode) setStep(FORM);
+  }
 
   useEffect(() => {
     if (!mode) return;
@@ -109,19 +130,42 @@ export function AuthDialog() {
   const submit = async () => {
     setTouched({ email: true, password: true, confirm: true });
     if (Object.keys(errors).length > 0 || waiting) return;
+    if (isSignup && providers.turnstileSiteKey && !captcha) {
+      setServerError({ text: 'One moment: checking you’re not a robot…', wait: false });
+      return;
+    }
     setBusy(true);
     setServerError(null);
     try {
-      await (isSignup ? signup : login)(fields.email.trim(), fields.password);
+      const email = fields.email.trim();
+      if (isSignup) {
+        const result = await signup(email, fields.password, {
+          captcha: captcha ?? undefined,
+          website: website || undefined,
+        });
+        if (result === 'verify') {
+          setStep({ kind: 'verify', email });
+          return;
+        }
+      } else {
+        await login(email, fields.password);
+      }
       setFields(EMPTY);
       close();
     } catch (err) {
+      if (isSignup) {
+        setCaptcha(null);
+        setCaptchaRound((n) => n + 1);
+      }
       if (err instanceof ApiError && err.status === 429 && err.retryAfter) {
         setWaitUntil(Date.now() + err.retryAfter * 1000);
         setNow(Date.now());
       }
       const wait = err instanceof ApiError && err.status === 429;
-      setServerError({ text: err instanceof Error ? err.message : 'Something went wrong. Please try again.', wait });
+      setServerError({
+        text: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+        wait,
+      });
       // A wrong password is retyped; the email stays.
       if (err instanceof ApiError && err.status === 401) setFields((f) => ({ ...f, password: '' }));
     } finally {
@@ -129,21 +173,24 @@ export function AuthDialog() {
     }
   };
 
+  const titles: Record<Step['kind'], [string, string]> = {
+    form: isSignup ? ['Join Openpolis', 'Keep your cities safe and play them from any browser.'] : ['Welcome back, mayor', 'Log in to open the cities in your account.'],
+    verify: ['Check your email', `We sent a ${API_LIMITS.codeLength}-digit code to ${step.kind === 'verify' ? step.email : ''}.`],
+    forgot: ['Reset your password', 'Enter your account’s email and we’ll send you a code.'],
+    reset: ['Check your email', `If ${step.kind === 'reset' ? step.email : 'that email'} has an account, a code is on its way.`],
+  };
+  const [title, lead] = titles[step.kind];
+  const backToLogin = () => switchTo('login');
+  const done = () => {
+    setFields(EMPTY);
+    close();
+  };
+
   const label = waiting ? `Try again in ${clock((waitUntil - now) / 1000)}` : busy ? (isSignup ? 'Creating your account…' : 'Logging in…') : isSignup ? 'Create account' : 'Log in';
 
   return (
     <div className="modal-backdrop auth-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <form
-        className="panel auth-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auth-title"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit();
-        }}
-      >
+      <div className="panel auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button type="button" className="auth-close" aria-label="Close" onClick={close}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -151,118 +198,148 @@ export function AuthDialog() {
         </button>
         <header className="auth-head">
           <Mark />
-          <h2 id="auth-title">{isSignup ? 'Join Openpolis' : 'Welcome back, mayor'}</h2>
-          <p className="auth-lead">{isSignup ? 'Keep your cities safe and play them from any browser.' : 'Log in to open the cities in your account.'}</p>
+          <h2 id="auth-title">{title}</h2>
+          <p className="auth-lead">{lead}</p>
         </header>
 
-        <div className="auth-tabs" role="tablist" aria-label="Account">
-          {(['login', 'signup'] as const).map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} className={`auth-tab ${mode === m ? 'is-active' : ''}`} onClick={() => mode !== m && switchTo(m)}>
-              {m === 'login' ? 'Log in' : 'Sign up'}
-            </button>
-          ))}
-        </div>
-
-        {providers.github && (
-          <>
-            <button
-              type="button"
-              className="auth-provider"
-              disabled={leaving}
-              onClick={() => {
-                setLeaving(true);
-                signInWithGithub();
-              }}
-            >
-              <GithubMark />
-              {leaving ? 'Opening GitHub…' : isSignup ? 'Sign up with GitHub' : 'Continue with GitHub'}
-            </button>
-            <div className="auth-divider" role="separator">
-              <span>or with email</span>
-            </div>
-          </>
+        {step.kind === 'verify' && <CodeStep purpose="signup" email={step.email} onDone={done} onBack={() => setStep(FORM)} />}
+        {step.kind === 'reset' && <CodeStep purpose="reset" email={step.email} onDone={done} onBack={backToLogin} />}
+        {step.kind === 'forgot' && (
+          <ForgotStep initialEmail={fields.email.trim()} siteKey={providers.turnstileSiteKey} onSent={(email) => setStep({ kind: 'reset', email })} onBack={backToLogin} />
         )}
-
-        <div className={`auth-field ${shown('email') ? 'has-error' : ''}`}>
-          <label className="auth-label" htmlFor="auth-email">
-            Email
-          </label>
-          <input
-            ref={emailRef}
-            id="auth-email"
-            className="auth-input"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={fields.email}
-            aria-invalid={!!shown('email')}
-            onChange={(e) => set('email')(e.target.value)}
-            onBlur={touch('email')}
-          />
-          {shown('email') && (
-            <span className="auth-note is-error" role="alert">
-              {shown('email')}
-            </span>
-          )}
-        </div>
-
-        <PasswordField
-          id="auth-password"
-          label="Password"
-          value={fields.password}
-          onChange={set('password')}
-          onBlur={touch('password')}
-          autoComplete={isSignup ? 'new-password' : 'current-password'}
-          error={shown('password')}
-        />
-        {isSignup && fields.password && (
-          <div className={`auth-strength is-${strength.score}`} aria-live="polite">
-            <span className="auth-strength-bars" aria-hidden="true">
-              {[1, 2, 3, 4].map((k) => (
-                <i key={k} className={k <= strength.score ? 'is-on' : ''} />
+        {step.kind === 'form' && (
+          <form
+            className="auth-form"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
+          >
+            <div className="auth-tabs" role="tablist" aria-label="Account">
+              {(['login', 'signup'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m}
+                  className={`auth-tab ${mode === m ? 'is-active' : ''}`}
+                  onClick={() => mode !== m && switchTo(m)}
+                >
+                  {m === 'login' ? 'Log in' : 'Sign up'}
+                </button>
               ))}
-            </span>
-            <span className="auth-strength-label">{strength.label}</span>
-          </div>
-        )}
-        {isSignup && (
-          <PasswordField
-            id="auth-confirm"
-            label="Confirm password"
-            value={fields.confirm}
-            onChange={set('confirm')}
-            onBlur={touch('confirm')}
-            autoComplete="new-password"
-            error={shown('confirm')}
-            valid={!!fields.confirm && fields.confirm === fields.password}
-          />
-        )}
+            </div>
 
-        {(notice || (serverError && (!serverError.wait || waiting))) && (
-          <p className={`auth-banner ${serverError?.wait ? 'is-wait' : ''}`} role="alert">
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M8 4.6v4.2M8 11.2v.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            <span>{serverError?.text ?? notice}</span>
-          </p>
-        )}
+            {providers.github && (
+              <>
+                <button
+                  type="button"
+                  className="auth-provider"
+                  disabled={leaving}
+                  onClick={() => {
+                    setLeaving(true);
+                    signInWithGithub();
+                  }}
+                >
+                  <GithubMark />
+                  {leaving ? 'Opening GitHub…' : isSignup ? 'Sign up with GitHub' : 'Continue with GitHub'}
+                </button>
+                <div className="auth-divider" role="separator">
+                  <span>or with email</span>
+                </div>
+              </>
+            )}
 
-        <button type="submit" className="auth-submit" disabled={busy || waiting} aria-busy={busy}>
-          {busy && <span className="auth-spinner" aria-hidden="true" />}
-          {label}
-        </button>
+            <div className={`auth-field ${shown('email') ? 'has-error' : ''}`}>
+              <label className="auth-label" htmlFor="auth-email">
+                Email
+              </label>
+              <input
+                ref={emailRef}
+                id="auth-email"
+                className="auth-input"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={fields.email}
+                aria-invalid={!!shown('email')}
+                onChange={(e) => set('email')(e.target.value)}
+                onBlur={touch('email')}
+              />
+              {shown('email') && (
+                <span className="auth-note is-error" role="alert">
+                  {shown('email')}
+                </span>
+              )}
+            </div>
 
-        {isSignup ? (
-          <ul className="auth-perks">
-            <li>Your cities on every device</li>
-            <li>Saved to the cloud as you play</li>
-          </ul>
-        ) : (
-          <p className="auth-foot">Playing as a guest? Cities on this device stay here, and you can move them into your account after logging in.</p>
+            <PasswordField
+              id="auth-password"
+              label="Password"
+              value={fields.password}
+              onChange={set('password')}
+              onBlur={touch('password')}
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              error={shown('password')}
+            />
+            {!isSignup && providers.emailCodes && (
+              <button type="button" className="auth-link auth-forgot" onClick={() => setStep({ kind: 'forgot' })}>
+                Forgot password?
+              </button>
+            )}
+            {isSignup && fields.password && (
+              <div className={`auth-strength is-${strength.score}`} aria-live="polite">
+                <span className="auth-strength-bars" aria-hidden="true">
+                  {[1, 2, 3, 4].map((k) => (
+                    <i key={k} className={k <= strength.score ? 'is-on' : ''} />
+                  ))}
+                </span>
+                <span className="auth-strength-label">{strength.label}</span>
+              </div>
+            )}
+            {isSignup && (
+              <PasswordField
+                id="auth-confirm"
+                label="Confirm password"
+                value={fields.confirm}
+                onChange={set('confirm')}
+                onBlur={touch('confirm')}
+                autoComplete="new-password"
+                error={shown('confirm')}
+                valid={!!fields.confirm && fields.confirm === fields.password}
+              />
+            )}
+            {isSignup && providers.emailCodes && <Honeypot value={website} onChange={setWebsite} />}
+            {isSignup && providers.turnstileSiteKey && <Turnstile key={captchaRound} siteKey={providers.turnstileSiteKey} onToken={setCaptcha} />}
+
+            {(notice || (serverError && (!serverError.wait || waiting))) && (
+              <p className={`auth-banner ${serverError?.wait ? 'is-wait' : ''}`} role="alert">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M8 4.6v4.2M8 11.2v.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+                <span>{serverError?.text ?? notice}</span>
+              </p>
+            )}
+
+            <button type="submit" className="auth-submit" disabled={busy || waiting} aria-busy={busy}>
+              {busy && <span className="auth-spinner" aria-hidden="true" />}
+              {label}
+            </button>
+
+            {isSignup ? (
+              <ul className="auth-perks">
+                <li>Your cities on every device</li>
+                <li>Saved to the cloud as you play</li>
+              </ul>
+            ) : (
+              <p className="auth-foot">Playing as a guest? Cities on this device stay here, and you can move them into your account after logging in.</p>
+            )}
+          </form>
         )}
-      </form>
+      </div>
     </div>
   );
 }

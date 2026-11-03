@@ -11,7 +11,7 @@ const mode = new URLSearchParams(location.search).get('mode') === 'signup' ? 'si
 store.set(authDialogAtom, mode);
 if (new URLSearchParams(location.search).get('github') === '1') {
   // Re-applied after startup, which reads the real server's settings.
-  const on = () => store.set(authProvidersAtom, { github: true });
+  const on = () => store.set(authProvidersAtom, { github: true, emailCodes: true, turnstileSiteKey: null });
   on();
   setTimeout(on, 1500);
 }

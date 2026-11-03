@@ -77,6 +77,10 @@ Bun 1.4 (it runs the server's TypeScript directly).
 | `GUEST_SECRET` | — | **Required in production** (the server won't start without it). Key for guest fingerprints (D-083), 32+ random characters: `openssl rand -base64 48`. Changing it starts every guest's trial over. |
 | `GUEST_NUDGE_MINUTES` | `10` | Guest play before the "back up your city" reminder. |
 | `GUEST_LIMIT_MINUTES` | `30` | Guest play before play pauses until sign-up or log-in. |
+| `BREVO_API_KEY`, `MAIL_FROM` | — | Email codes for sign-up and password reset (below). Without them, production signs up without confirming the email and has no reset; development prints codes to the server console. |
+| `MAIL_FROM_NAME` | `Openpolis` | Sender name on code emails. |
+| `MAIL_DAILY_LIMIT` | `250` | Most code emails per day for the whole server (Brevo's free plan sends 300). |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | — | Cloudflare Turnstile bot check on sign-up and "Forgot password" (below). Optional. |
 
 ## Checklist
 
@@ -106,6 +110,37 @@ Off until configured; the GitHub button only appears when the server has its key
 For local development, make a second OAuth App with callback
 `http://localhost:5173/api/auth/github/callback` and run the server with
 `PUBLIC_URL=http://localhost:5173` plus that app's ID and secret.
+
+## Email codes (Brevo)
+
+Sign-up confirms the email with a 6-digit code, and log in gets "Forgot password?" (D-084).
+Brevo's free plan sends 300 emails a day.
+
+1. Sign up at [brevo.com](https://www.brevo.com) (free plan).
+2. **Authenticate the domain:** Settings → **Senders, Domains & Dedicated IPs** → **Domains** →
+   *Add a domain* → `openpolis.space`. Add the DNS records Brevo shows (a `brevo-code` TXT, DKIM
+   CNAMEs or TXT, and a DMARC TXT such as `v=DMARC1; p=none;` on `_dmarc`) at your DNS provider,
+   then press *Verify*. Without this, codes land in spam.
+3. **Add the sender:** same page → **Senders** → *Add a sender*: name `Openpolis`, email
+   `noreply@openpolis.space`.
+4. **Create an API key:** top-right menu → **SMTP & API** → **API Keys** → *Generate a new API key*.
+   Copy it (`xkeysib-…`); it is shown once. Use the API key, not the SMTP key.
+5. If Brevo has **IP restrictions** on (Security → Authorised IPs), add your VPS's IP, or calls fail with 401.
+6. Add to `.env` on the server:
+   ```
+   BREVO_API_KEY=xkeysib-…
+   MAIL_FROM=noreply@openpolis.space
+   ```
+7. `docker compose --profile app up -d` and check the logs say `Email codes on (Brevo, …)`.
+   Failed sends are logged as `Brevo answered <status>: …`.
+
+**Bot check (optional, free):** in the Cloudflare dashboard → **Turnstile** → *Add widget*,
+hostname `openpolis.space` (and `localhost` for testing), mode *Managed*. The domain doesn't need
+to be on Cloudflare. Put the keys in `.env` as `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.
+
+**Limits on code emails** (in memory, per server process): one per inbox per minute, 3 per hour
+and 6 per day to one inbox; 6 per hour requested from one address; `MAIL_DAILY_LIMIT` for the
+whole server. A code works for 10 minutes and for 5 guesses.
 
 ## Usage numbers
 
