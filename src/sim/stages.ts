@@ -45,6 +45,7 @@ const UNLOCKS: Readonly<Partial<Record<BuildingId, Stage>>> = {
   shopping_complex: Stage.Town,
   university: Stage.City,
   incinerator: Stage.City,
+  research_centre: Stage.Metropolis,
 };
 
 export function unlockStage(id: BuildingId): Stage {

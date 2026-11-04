@@ -137,6 +137,18 @@ export const BALANCE = {
   /** The Town Hall's chest holds this many months of taxes; the toast warns from chestWarnMonths. */
   chestMonths: 6,
   chestWarnMonths: 3,
+  /** Construction materials (docs/specs/evolution.md, E6): tons per $ of a building's price … */
+  materialsPerCost: 0.01,
+  /** … made per industrial worker a day; imported at most this much a day at this price; exported at this. */
+  materialsPerWorker: 0.15,
+  materialsImportPerDay: 6,
+  materialsImportPrice: 25,
+  materialsExportPrice: 6,
+  /** Storage: a base yard plus this much per warehouse. */
+  materialsStorage: 300,
+  /** A new city's yard starts with this many tons. */
+  materialsStarting: 60,
+  materialsPerWarehouse: 400,
   /** Income per ton a recycling centre sells. */
   recyclePrice: 0.5,
 } as const;

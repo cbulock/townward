@@ -1,5 +1,6 @@
 import type { BuildingInstance, Lifestyle } from '../buildings/catalog';
 import type { Stage } from '../stages';
+import type { TechDef } from '../research';
 import type { BudgetReport } from '../systems/budget';
 import type { TileArea } from '../systems/growth';
 
@@ -43,8 +44,10 @@ export interface DayOutcome {
   stage: Stage | null;
   /** A lifestyle tier the city's first homes reached today. */
   lifestyle: Lifestyle | null;
+  /** A research project finished today (sim/research.ts). */
+  research: TechDef | null;
 }
 
 export function emptyOutcome(): DayOutcome {
-  return { changed: [], started: [], completed: [], burned: [], abandoned: [], recovered: [], budget: null, stage: null, lifestyle: null };
+  return { changed: [], started: [], completed: [], burned: [], abandoned: [], recovered: [], budget: null, stage: null, lifestyle: null, research: null };
 }

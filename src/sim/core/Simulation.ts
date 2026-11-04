@@ -10,8 +10,10 @@ import { CoverageSystem, updateCoverage } from '../systems/coverage';
 import { AirSystem } from '../systems/air';
 import { FireSystem } from '../systems/fire';
 import { GarbageSystem } from '../systems/garbage';
+import { MaterialsSystem } from '../systems/materials';
 import { LifestyleSystem } from '../systems/lifestyle';
 import { stageRequirements } from '../progression';
+import { researchDay, techEffects } from '../research';
 import { nextStage, stageFor } from '../stages';
 import { GrowthSystem } from '../systems/growth';
 import { cityStats, PopulationSystem } from '../systems/population';
@@ -30,7 +32,7 @@ const SALT = { growth: 0x6077, fire: 0xf12e } as const;
 /**
  * The simulation core (D-058): owns the systems and runs them in a fixed order.
  *   - after an edit:  access → utilities → coverage → commute (if roads changed) → air → needs → traffic
- *   - each day:       stage → growth → fire → (the edit refresh) → garbage → commute → air → needs → lifestyle → population → traffic,
+ *   - each day:       stage → materials → growth → fire → (the edit refresh) → garbage → commute → air → needs → lifestyle → population → traffic,
  *                     plus budget (then the garbage month reset) at month end
  *   - each frame:     the clock and traffic
  * The game layer only calls these entry points and shows the outcome.
@@ -48,6 +50,7 @@ export class Simulation {
   readonly traffic: TrafficSystem;
   readonly garbage: GarbageSystem;
   readonly air: AirSystem;
+  readonly materials: MaterialsSystem;
   readonly lifestyle: LifestyleSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
@@ -62,16 +65,18 @@ export class Simulation {
     const world = city.world;
     this.access = new AccessSystem(world);
     this.utilities = new UtilitiesSystem(world, () => ({ hour: Math.floor(city.hour), day: city.day, seed: world.seed, step: false }));
-    this.coverage = new CoverageSystem(world);
+    this.coverage = new CoverageSystem(world, () => techEffects(city).careReach);
     // Mixing in the day means a loaded city doesn't replay the events of day 0 (identical for new cities).
     const seed = world.seed ^ city.day;
     this.streams = { growth: new RandomStream(subSeed(seed, SALT.growth)), fire: new RandomStream(subSeed(seed, SALT.fire)) };
     this.growth = new GrowthSystem(city, this.streams.growth.next);
+    this.materials = new MaterialsSystem(city);
+    this.growth.stock = () => this.materials.stock;
     this.fire = new FireSystem(world, this.streams.fire.next);
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
     this.commute = new CommuteSystem(world);
-    this.air = new AirSystem(world, this.commute);
+    this.air = new AirSystem(world, this.commute, () => techEffects(city));
     this.needs = new NeedsSystem(world, this.commute, () => city.stage, this.air);
     this.traffic = new TrafficSystem(world, this.commute);
     this.garbage = new GarbageSystem(city);
@@ -96,7 +101,9 @@ export class Simulation {
     const t = this.timings;
     this.city.day++;
     this.climbStage(out);
+    t.run('materials.day', () => this.materials.onDay());
     t.run('growth.day', () => this.growth.onDay(out));
+    this.materials.afterGrowth();
     t.run('fire.day', () => this.fire.onDay(out));
     t.run('utilities.day', () => this.utilities.onDay?.());
     this.worldChanged({ roads: false });
@@ -107,6 +114,9 @@ export class Simulation {
     t.run('lifestyle.day', () => this.lifestyle.onDay(out));
     t.run('population.day', () => this.population.onDay());
     t.run('traffic.day', () => this.traffic.onDay());
+    t.run('research.day', () => {
+      out.research = researchDay(this.city);
+    });
     if (this.city.day % BALANCE.daysPerMonth === 0) {
       t.run('budget.month', () => this.budget.onMonth(out));
       t.run('garbage.month', () => this.garbage.onMonth());

@@ -5,6 +5,7 @@ import { Simulation } from './core/Simulation';
 import { BridgeAxis, RoadType } from './roads';
 import { PAVEMENTS, roadSpec } from './roadTypes';
 import { isStage, Stage } from './stages';
+import { TECHS } from './research';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
 import { Decor, Terrain } from './terrain/types';
@@ -62,6 +63,11 @@ export interface SavedCity {
   /** Taxes collected by hand at the Town Hall, and what's waiting there (docs/specs/evolution.md, E5). */
   readonly collectsTaxes?: boolean;
   readonly uncollected?: number;
+  /** Growth uses construction materials, and the stock (E6). */
+  readonly needsMaterials?: boolean;
+  readonly materials?: number;
+  /** Research progress (E7). */
+  readonly research?: { readonly points: number; readonly done: number };
 }
 
 /** Run-length encoded, base64 typed-array layers (one byte per tile). */
@@ -175,7 +181,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
     gen: GENERATOR_VERSION,
     name,
     terrain: { ...terrain },
-    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate, stage: city.stage, locked: city.locked, collectsTaxes: city.collectsTaxes, uncollected: city.uncollected },
+    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate, stage: city.stage, locked: city.locked, collectsTaxes: city.collectsTaxes, uncollected: city.uncollected, needsMaterials: city.needsMaterials, materials: city.materials, research: { ...city.research } },
     layers: {
       road: encodeLayer(w.road),
       bridge: encodeLayer(w.bridge),
@@ -257,6 +263,9 @@ export function deserialize(data: SaveData): City {
   city.locked = data.city.locked ?? false;
   city.collectsTaxes = data.city.collectsTaxes ?? false;
   city.uncollected = Math.max(0, data.city.uncollected ?? 0);
+  city.needsMaterials = data.city.needsMaterials ?? false;
+  city.materials = Math.max(0, data.city.materials ?? 0);
+  if (data.city.research) city.research = { points: Math.max(0, data.city.research.points), done: Math.max(0, Math.min(TECHS.length, Math.floor(data.city.research.done))) };
   city.stage = data.city.stage !== undefined && isStage(data.city.stage) ? data.city.stage : Stage.Hamlet;
   return city;
 }
@@ -467,6 +476,9 @@ export function parseSave(json: unknown): SaveData {
       ...(typeof c.locked === 'boolean' && { locked: c.locked }),
       ...(typeof c.collectsTaxes === 'boolean' && { collectsTaxes: c.collectsTaxes }),
       ...(isFiniteNumber(c.uncollected) && { uncollected: c.uncollected }),
+      ...(typeof c.needsMaterials === 'boolean' && { needsMaterials: c.needsMaterials }),
+      ...(isFiniteNumber(c.materials) && { materials: c.materials }),
+      ...(isObj(c.research) && isFiniteNumber(c.research.points) && isFiniteNumber(c.research.done) && { research: { points: c.research.points, done: c.research.done } }),
     },
     layers: {
       road: str(l, 'road'),

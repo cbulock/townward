@@ -3,6 +3,7 @@ import { BUILDINGS, buildingDef, type BuildingDef, type BuildingInstance } from 
 import type { City } from '../City';
 import type { SimSystem } from '../core/System';
 import { Stage } from '../stages';
+import { techEffects } from '../research';
 import { isActive } from './access';
 import { isWorking, roadIslands } from './utilities';
 
@@ -75,7 +76,7 @@ export function garbageDay(city: City, collectedBy?: Map<number, number>): Garba
       const near = bins
         .filter((n) => n.island === island && n.b.garbage > 0 && (n.x - c.x) ** 2 + (n.y - c.y) ** 2 <= r2)
         .sort((a, b) => (a.x - c.x) ** 2 + (a.y - c.y) ** 2 - ((b.x - c.x) ** 2 + (b.y - c.y) ** 2));
-      let left = spec.trucks;
+      let left = spec.trucks * techEffects(city).garbageTrucks;
       if (spec.holds !== undefined) left = Math.min(left, spec.holds - f.filled);
       let taken = 0;
       for (const n of near) {

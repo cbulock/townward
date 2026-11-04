@@ -25,7 +25,7 @@ unlocks buildings and brings a new problem (D-086).
 | **Village** | 500 | police, fire, clinic, school, **landfill**, riverside market, central park | **garbage** starts piling up |
 | **Town** | 2,500 | **hospital**, **recycling centre**, gas plant, solar farm, battery bank, botanical garden, shopping complex | homes become *Comfortable* and want a hospital |
 | **City** | 10,000 | **university**, **incinerator** (later: trauma centre, trains) | homes become *Prosperous* and want a university |
-| **Metropolis** | 30,000 | (later: research centre, research tree) | — |
+| **Metropolis** | 30,000 | research centre (automatic research, E7) | — |
 
 - **Locking** is a `City` setting (`locked`): on for new player cities, off for `/demo`, tests,
   the harness and **cities saved before stages existed** (user call: existing players aren't
@@ -230,6 +230,57 @@ automatic taxes, so nobody is disturbed), taxes no longer land in the funds by t
 - A gold coin badge bobs over the Town Hall while there is money to collect.
 - Saved as `city.uncollected` and `city.collectsTaxes` (absent: 0 and automatic).
 
+## E6: Construction materials (`sim/systems/materials.ts`)
+
+In new player cities (`City.needsMaterials`, with `locked`; saved cities and /demo build
+freely), every zoned building that grows or upgrades needs **materials**: tons equal to 1% of
+its price (a cottage 1.2 t, an apartment block 24 t, an office tower 65 t). The city keeps one
+stock (`City.materials`).
+
+- **Industry makes them:** 0.15 t a day per industrial worker (a full workshop 1.5 t, warehouse
+  6 t, factory 18 t).
+- **Imports fill gaps, at a price:** when the stock can't cover today's construction, up to
+  6 t a day is bought in at $25 a ton. A new town without industry still grows, slowly and at
+  a cost; industry makes it fast and free.
+- **Storage:** 300 t, plus 400 t for each warehouse. Anything over is exported at $6 a ton.
+- **Construction waits** when there's not enough: new lots and upgrades only start when their
+  materials are in stock (an upgrade checks *before* it clears the old buildings).
+- **Showing it:** the budget panel's Materials line (stock / storage, made, imported, used and
+  exported today); the R/C/O demand tooltip notes when growth is waiting for materials; a
+  toast at most once a month: "Construction is waiting for materials: zone industry".
+- Saved as `city.materials` and `city.needsMaterials` (absent: 0 and building freely). New
+  cities start with 60 t in the yard.
+- Checked on a fresh town over 120 days: with an industrial zone it grows exactly as fast as one
+  that builds freely (its yard fills to 300 t); without industry it imports a little (34 t) and
+  never stalls at that size. Materials bite in bigger cities short of industry.
+
+## E7: Research (`sim/research.ts`)
+
+User choices (D-090): the **Research Centre** unlocks at **Metropolis** (30,000), and research
+runs **automatically** through a fixed order; there is nothing to pick.
+
+- **Research Centre** (Civic → Services, 2×2, $30,000, $500/month, 80 jobs).
+- **Points per day:** each working Research Centre 3 (×1.5 when a university reaches it), each
+  working University 1. Points carry over between projects.
+- **The order** (each finished project is permanent, with a milestone toast):
+
+| # | Project | Points | Effect |
+|---|---|---|---|
+| 1 | Cleaner coal | 90 | coal and gas plants make 40% less smoke |
+| 2 | Efficient garbage trucks | 120 | every garbage facility collects 30% more a day |
+| 3 | Modern construction | 150 | buildings need 30% fewer materials |
+| 4 | Wider care | 200 | clinics and hospitals reach 25% further |
+| 5 | Green industry | 250 | industry makes 40% less smoke |
+| 6 | Rapid transit | 300 | unlocks rail track and train stations (E7b) |
+
+- **Showing it:** the stage menu shows the project under way with its progress and points a
+  day, and the finished ones; the Research Centre's info panel shows the same.
+- Saved as `city.research` (`points`, `done`: how many projects are finished).
+
+## E7b: Trains (planned next; user choice: rail, stations and commuting)
+
+See "Trains" below; unlocked by the Rapid transit project.
+
 ## Planned steps (user requests, 2026-11-04)
 
 Each gets its spec section before code.
@@ -242,12 +293,10 @@ Each gets its spec section before code.
   heading there. The trauma centre (City) joins here.
 - **E4 Air quality index (AQI):** built, see "E4: Air quality" below.
 - **E5 Taxes collected at the Town Hall:** built, see "E5: Taxes at the Town Hall" below.
-- **E6 Industry makes construction materials:** industry produces materials; new buildings
-  and upgrades consume them, so a city without industry (or imports) builds slowly.
+- **E6 Industry makes construction materials:** built, see "E6: Construction materials" below.
 - **Shops and industry ahead of workers:** to decide: whether zones may grow beyond demand,
   with businesses that can't find workers complaining and, in time, abandoning.
-- **E7 Research centre** (Metropolis, needs a university in reach) and the research tree;
-  **trains** (below).
+- **E7 Research and trains:** research built, see "E7: Research" below; trains are E7b (below).
 - **Power made understandable:** a short "how power works" explainer and a power view on the map.
 - **Server-run cities (D-085):** the server ticks each open city with `src/sim`; the browser
   sends commands and renders state. Its own spec and phase.

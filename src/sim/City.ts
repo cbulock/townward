@@ -1,5 +1,6 @@
 import { BALANCE } from '../shared/balance';
 import { SIM_TICK_HZ } from '../shared/constants';
+import type { ResearchState } from './research';
 import { Stage } from './stages';
 import type { World } from './World';
 
@@ -26,6 +27,15 @@ export class City {
   collectsTaxes = false;
   /** Taxes waiting in the Town Hall's chest. */
   uncollected = 0;
+  /**
+   * Growth uses construction materials (docs/specs/evolution.md, E6). On for new player cities,
+   * with `locked`; saved cities and /demo build freely.
+   */
+  needsMaterials = false;
+  /** Construction materials in stock, in tons. */
+  materials = 0;
+  /** Research progress (sim/research.ts): points toward the current project, projects finished. */
+  research: ResearchState = { points: 0, done: 0 };
 
   readonly world: World;
 

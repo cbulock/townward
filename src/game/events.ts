@@ -10,6 +10,7 @@ import type { ServiceKind } from '../sim/buildings/catalog';
 import type { StageRequirement } from '../sim/progression';
 import type { Stage } from '../sim/stages';
 import type { AirReport } from '../sim/systems/air';
+import type { MaterialsReport } from '../sim/systems/materials';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -81,6 +82,8 @@ export interface ProgressInfo {
   next: { name: string; requirements: readonly StageRequirement[] } | null;
   /** Residents per lifestyle tier: Basic, Comfortable, Prosperous. */
   residents: readonly [number, number, number];
+  /** Research (E7): the project under way, finished ones, and points a day; null before any research. */
+  research: { current: { name: string; effect: string; points: number; needed: number } | null; done: readonly string[]; rate: number } | null;
 }
 
 export interface BudgetInfo {
@@ -97,6 +100,8 @@ export interface BudgetInfo {
   hour: number;
   /** Cities that collect taxes by hand: what's waiting at the Town Hall (docs/specs/evolution.md, E5). */
   taxes: { waiting: number; hasTownHall: boolean } | null;
+  /** Cities that build with materials: today's stock and flows (E6). */
+  materials: MaterialsReport | null;
 }
 
 /** What a civic building provides (shown in the info panel). */

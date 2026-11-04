@@ -19,6 +19,7 @@ import { findEntrance } from '../sim/systems/access';
 import { nextStage, STAGES, unlockedAt, unlockStage } from '../sim/stages';
 import { stageRequirements } from '../sim/progression';
 import { lifestyleReport } from '../sim/systems/lifestyle';
+import { currentTech, researchRate, TECHS } from '../sim/research';
 import { collectTaxes, townHall } from '../sim/systems/budget';
 import { inspectInfo } from './inspect';
 import { aqiBand } from '../sim/systems/air';
@@ -141,6 +142,8 @@ export class Game {
   private brownoutDay = -1;
   private recentRoadTool: RoadToolId = 'road';
   /** The Move tool's picked-up building (id), if any. */
+  /** Day of the last "waiting for materials" notice. */
+  private materialsNoticeDay = -Infinity;
   private carrying: number | null = null;
   private pavementChoice = 0;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
@@ -188,6 +191,9 @@ export class Game {
       city.locked = !opts.demo;
       // ... and collect their taxes by hand at the Town Hall (docs/specs/evolution.md, E5).
       city.collectsTaxes = !opts.demo;
+      // ... and build with materials their industry makes (E6), starting with a small yard.
+      city.needsMaterials = !opts.demo;
+      city.materials = BALANCE.materialsStarting;
       demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
       sim = new Simulation(city);
       if (demo) sim.worldChanged({ roads: true });
@@ -499,6 +505,7 @@ export class Game {
 
   private newDay(out: DayOutcome) {
     this.showDay(out);
+    this.explainMaterials();
     this.showMilestones(out);
     this.explainWaitingZones();
     // Congestion changes every day, even when no buildings did.
@@ -534,6 +541,10 @@ export class Game {
       const unlocked = this.city.locked ? unlockedAt(out.stage).map((id) => buildingDef(id).name) : [];
       this.sound.play('build');
       this.notify('milestone', `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim());
+    }
+    if (out.research) {
+      this.sound.play('coin');
+      this.notify('milestone', `Research finished: ${out.research.name}. ${out.research.effect}.`);
     }
     if (out.lifestyle === Lifestyle.Comfortable) {
       this.notify('milestone', 'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.');
@@ -770,7 +781,16 @@ export class Game {
       water: u.water,
       hour: Math.floor(this.city.hour),
       taxes: this.city.collectsTaxes ? { waiting: Math.round(this.city.uncollected), hasTownHall: townHall(this.world) !== null } : null,
+      materials: this.city.needsMaterials ? { ...this.sim.materials.report, stock: this.city.materials } : null,
     });
+  }
+
+  /** Construction stalled for want of materials: say so, at most once a month (E6). */
+  private explainMaterials() {
+    const r = this.sim.materials.report;
+    if (r.waiting === 0 || this.city.day - this.materialsNoticeDay < BALANCE.daysPerMonth) return;
+    this.materialsNoticeDay = this.city.day;
+    this.notify('error', 'Construction is waiting for materials: zone industry to make them (imports only cover a little each day)');
   }
 
   /**
@@ -838,6 +858,19 @@ export class Game {
       locked: this.city.locked,
       next: next === null ? null : { name: STAGES[next].name, requirements: stageRequirements(this.world, next) },
       residents: lifestyleReport(this.city).residents,
+      research: this.researchInfo(),
+    };
+  }
+
+  private researchInfo(): ProgressInfo['research'] {
+    const rate = researchRate(this.city);
+    const r = this.city.research;
+    if (rate === 0 && r.done === 0 && r.points === 0) return null;
+    const tech = currentTech(this.city);
+    return {
+      current: tech ? { name: tech.name, effect: tech.effect, points: Math.floor(r.points), needed: tech.points } : null,
+      done: TECHS.slice(0, r.done).map((t) => t.name),
+      rate,
     };
   }
 

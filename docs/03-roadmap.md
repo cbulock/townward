@@ -215,9 +215,10 @@ We focus on **one** terrain and make it look great before adding presets or menu
   - [x] Info panel redesign, Move from the selected building, sticky "Citizens say"
   - [ ] E3 Incidents that work together: fires, theft and illness dispatched to fire, police and hospital, with burning buildings and theft markers on the map; trauma centre
   - [x] E4 Air quality index (AQI) per area and for the city, from industry, power, traffic and incinerators; AQI view (`O`), top-bar AQI, clean-air need reads it
-  - [ ] E5 Taxes collected by hand at the Town Hall
-  - [ ] E6 Industry makes construction materials that new buildings and upgrades consume
-  - [ ] E7 Research centre and research tree; trains (rail, stations, mode choice)
+  - [x] E5 Taxes collected by hand at the Town Hall (new cities): six-month chest, coin badge, collect buttons
+  - [x] E6 Industry makes construction materials that new buildings and upgrades consume (new cities): imports at a price, warehouse storage, export of surplus
+  - [x] E7 Research (D-090): Research Centre at Metropolis, automatic projects (cleaner coal, garbage trucks, modern construction, wider care, green industry, rapid transit)
+  - [ ] E7b Trains: rail track, stations, visible trains, commuters switching from car to train (unlocked by Rapid transit)
   - [ ] Power made understandable (a "how power works" explainer, power view on the map)
   - [ ] Server-run cities (D-085): the server ticks each open city, the browser sends commands
 - [ ] **D + E. Transport** → [specs/transport.md](specs/transport.md) (D-069), steps T1–T7:

@@ -4474,3 +4474,12 @@ summary {
   color: #fde68a;
   border-color: rgba(245, 197, 24, 0.45);
 }
+
+/* Budget panel: materials (E6). */
+.budget-line.dim {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.warn-text {
+  color: #fca5a5;
+}

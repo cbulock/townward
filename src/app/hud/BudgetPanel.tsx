@@ -116,6 +116,26 @@ export function BudgetPanel() {
         </p>
       )}
 
+      {info.materials && (
+        <>
+          <h3 className="budget-heading">Construction materials</h3>
+          <div className="budget-line">
+            <span>In stock</span>
+            <strong>
+              {Math.round(info.materials.stock).toLocaleString()} / {info.materials.storage.toLocaleString()} t
+            </strong>
+          </div>
+          <div className="budget-line dim">
+            <span>Today: made · imported · used</span>
+            <span>
+              {info.materials.made.toFixed(1)} · {info.materials.imported.toFixed(1)} · {info.materials.used.toFixed(1)} t
+            </span>
+          </div>
+          {info.materials.waiting > 0 && <span className="tax-hint warn-text">{info.materials.waiting} construction{info.materials.waiting === 1 ? '' : 's'} waiting for materials: industry makes them.</span>}
+          <span className="tax-hint">Every new building and upgrade needs materials. Industry makes them; imports cover a little a day at $25/t; warehouses add storage.</span>
+        </>
+      )}
+
       <h3 className="budget-heading">Utilities</h3>
       <EnergyMix power={info.power} hour={info.hour} />
       <Supply label="💧 Water" t={info.water} />

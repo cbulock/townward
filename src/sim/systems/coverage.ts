@@ -20,7 +20,7 @@ export function serviceScore(b: BuildingInstance): number {
 
 
 /** Recompute which services cover each building. Call after building or road changes. */
-export function updateCoverage(world: World) {
+export function updateCoverage(world: World, careReach = 1) {
   const buildings = [...world.buildings.values()];
 
   // Coverage: a circle of `radius` tiles around each working service building's footprint centre.
@@ -28,7 +28,9 @@ export function updateCoverage(world: World) {
   for (const b of buildings) {
     const d: BuildingDef = BUILDINGS[b.def];
     if (!d.service || !d.radius || !isWorking(b)) continue;
-    coverage.get(d.service)?.push({ x: b.x + d.size.w / 2, y: b.y + d.size.h / 2, r2: d.radius * d.radius });
+    // Wider care research stretches clinics and hospitals (sim/research.ts).
+    const r = d.service === 'health' || d.service === 'hospital' ? d.radius * careReach : d.radius;
+    coverage.get(d.service)?.push({ x: b.x + d.size.w / 2, y: b.y + d.size.h / 2, r2: r * r });
   }
   for (const b of buildings) {
     const d: BuildingDef = BUILDINGS[b.def];
@@ -48,10 +50,12 @@ export function updateCoverage(world: World) {
 export class CoverageSystem implements SimSystem {
   readonly name = 'coverage';
   private readonly world: World;
-  constructor(world: World) {
+  private readonly careReach: () => number;
+  constructor(world: World, careReach: () => number = () => 1) {
     this.world = world;
+    this.careReach = careReach;
   }
   onWorldChanged() {
-    updateCoverage(this.world);
+    updateCoverage(this.world, this.careReach());
   }
 }

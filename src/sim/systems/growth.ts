@@ -21,6 +21,7 @@ import type { World } from '../World';
 import { isZoned, ZONE_DENSITY, ZONE_LETTER, ZONED_TYPES, zoneOf, type ZonedType } from '../zones';
 import type { City } from '../City';
 import type { DayOutcome, SimSystem } from '../core/System';
+import { materialsFor, UNLIMITED, type MaterialStock } from './materials';
 
 /**
  * Zoned growth: demand, new lots, construction and levelling up. Runs once per in-game day.
@@ -230,7 +231,11 @@ function areaOf(b: BuildingInstance): TileArea {
 }
 
 /** One day of growth. Mutates the world; the caller refreshes rendering and road access. */
-export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTaxRate): GrowthResult {
+/**
+ * One day of growth. `stock` supplies construction materials (sim/systems/materials.ts): a new
+ * lot or upgrade only starts when its materials can be had today.
+ */
+export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTaxRate, stock: MaterialStock = UNLIMITED): GrowthResult {
   const changed: TileArea[] = [];
   const started: number[] = [];
   const completed: number[] = [];
@@ -297,7 +302,10 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
     }
     const ids = eligibleBuildings(zonedBuildings(ZONE_LETTER[z], ZONE_DENSITY[z], startLevel(ZONE_LETTER[z], ZONE_DENSITY[z]), 1), confidence);
     if (ids.length === 0) continue;
-    for (const t of sample(empty.get(z) ?? [], Math.ceil(d * BALANCE.growthPerDay), rng)) build(pick(ids, rng), t.x, t.y);
+    for (const t of sample(empty.get(z) ?? [], Math.ceil(d * BALANCE.growthPerDay), rng)) {
+      const id = pick(ids, rng);
+      if (stock.take(materialsFor(id))) build(id, t.x, t.y);
+    }
   }
 
   // 3. Thriving grown buildings level up, in place or by merging a 2×2 block.
@@ -322,7 +330,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
       if (budget === 0) break;
       // An earlier merge today may already have absorbed this building.
       if (world.buildings.get(b.id) !== b) continue;
-      if (upgrade(world, b, z, rng, build, confidence)) budget--;
+      if (upgrade(world, b, z, rng, build, confidence, stock)) budget--;
     }
   }
 
@@ -331,12 +339,14 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
 
 type Build = (def: BuildingId, x: number, y: number, occupants?: number, lifestyle?: Lifestyle) => void;
 
-function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build, confidence: number): boolean {
+function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build, confidence: number, stock: MaterialStock): boolean {
   const def: BuildingDef = BUILDINGS[b.def];
   const letter = ZONE_LETTER[zone];
   const density = ZONE_DENSITY[zone];
   const next = def.level + 1;
-  const replace = (olds: readonly BuildingInstance[], x: number, y: number, id: BuildingId) => {
+  /** Rebuild as `id`; false (nothing touched) when its materials can't be had today. */
+  const replace = (olds: readonly BuildingInstance[], x: number, y: number, id: BuildingId): boolean => {
+    if (!stock.take(materialsFor(id))) return false;
     let occupants = 0;
     // People bring their lifestyle; a merged block takes the lowest tier among its homes.
     let lifestyle: Lifestyle = Lifestyle.Prosperous;
@@ -347,13 +357,13 @@ function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, b
       world.removeBuilding(o.id, s.w, s.h);
     }
     build(id, x, y, occupants, lifestyle);
+    return true;
   };
 
   if (def.size.w === 2) {
     const two = eligibleBuildings(zonedBuildings(letter, density, next, 2), confidence);
     if (two.length === 0) return false;
-    replace([b], b.x, b.y, pick(two, rng));
-    return true;
+    return replace([b], b.x, b.y, pick(two, rng));
   }
 
   const one = eligibleBuildings(zonedBuildings(letter, density, next, 1), confidence);
@@ -362,14 +372,12 @@ function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, b
     if (two.length === 0) return false;
     const square = findMergeSquare(world, b, zone, def.level, rng);
     if (!square) return false;
-    replace(square.buildings, square.x, square.y, pick(two, rng));
-    return true;
+    return replace(square.buildings, square.x, square.y, pick(two, rng));
   };
   // Merge when there's no 1×1 option, otherwise half the time (falling back to in place).
   if ((one.length === 0 || rng() < 0.5) && tryMerge()) return true;
   if (one.length === 0) return false;
-  replace([b], b.x, b.y, pick(one, rng));
-  return true;
+  return replace([b], b.x, b.y, pick(one, rng));
 }
 
 /**
@@ -423,6 +431,8 @@ export class GrowthSystem implements SimSystem {
   readonly name = 'growth';
   private readonly city: City;
   private readonly rng: Rng;
+  /** Where construction materials come from (set by the Simulation; unlimited otherwise). */
+  stock: () => MaterialStock = () => UNLIMITED;
   /** Today's empty zoned lots held back by low demand (for the "why isn't it growing" notice). */
   waiting: ZoneDemand = { r: 0, c: 0, o: 0, i: 0 };
   constructor(city: City, rng: Rng) {
@@ -430,7 +440,7 @@ export class GrowthSystem implements SimSystem {
     this.rng = rng;
   }
   onDay(out: DayOutcome) {
-    const g = growDay(this.city.world, this.rng, this.city.taxRate);
+    const g = growDay(this.city.world, this.rng, this.city.taxRate, this.stock());
     out.changed.push(...g.changed);
     out.started.push(...g.started);
     out.completed.push(...g.completed);

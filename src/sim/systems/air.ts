@@ -3,6 +3,7 @@ import type { SimSystem } from '../core/System';
 import { RoadType } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
+import { NO_TECH, type TechEffects } from '../research';
 
 /**
  * Air quality (docs/specs/evolution.md, E4): a coarse field, one cell per CELL × CELL tiles,
@@ -74,11 +75,14 @@ export class AirSystem implements SimSystem {
   private readonly world: World;
   private readonly traffic: TrafficVolume | null;
   private readonly field: Float32Array;
+  /** Research that cleans the air (sim/research.ts). */
+  private readonly effects: () => TechEffects;
   private readonly scratch: Float32Array;
 
-  constructor(world: World, traffic: TrafficVolume | null = null) {
+  constructor(world: World, traffic: TrafficVolume | null = null, effects: () => TechEffects = () => NO_TECH) {
     this.world = world;
     this.traffic = traffic;
+    this.effects = effects;
     this.cols = Math.ceil(world.width / AIR_CELL);
     this.rows = Math.ceil(world.height / AIR_CELL);
     this.aqi = new Float32Array(this.cols * this.rows).fill(BACKGROUND);
@@ -111,6 +115,7 @@ export class AirSystem implements SimSystem {
     const w = this.world;
     const f = this.field;
     f.fill(0);
+    const fx = this.effects();
     const cell = (x: number, y: number) => Math.floor(y / AIR_CELL) * this.cols + Math.floor(x / AIR_CELL);
 
     for (const b of w.buildings.values()) {
@@ -119,7 +124,8 @@ export class AirSystem implements SimSystem {
       const d: BuildingDef = BUILDINGS[b.def];
       // Industry pollutes more the busier it is; plants and dumps run regardless.
       const busy = d.category === 'industrial' ? 0.4 + 0.6 * (d.capacity === 0 ? 0 : Math.min(1, b.occupants / d.capacity)) : 1;
-      const perTile = (base * busy) / (d.size.w * d.size.h);
+      const cleaner = d.category === 'industrial' ? fx.industrySmoke : b.def === 'power_plant' || b.def === 'gas_plant' ? fx.fossilSmoke : 1;
+      const perTile = (base * busy * cleaner) / (d.size.w * d.size.h);
       for (let y = b.y; y < b.y + d.size.h; y++) for (let x = b.x; x < b.x + d.size.w; x++) f[cell(x, y)] += perTile;
     }
     if (this.traffic) {

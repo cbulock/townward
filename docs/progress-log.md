@@ -2,6 +2,18 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04 (later): E7 Research (D-090)
+- `sim/research.ts`: Research Centre (Metropolis, 2×2) makes 3 points a day (4.5 with a university in reach), universities 1; projects finish automatically in order: cleaner coal (−40% fossil smoke), efficient garbage trucks (+30% collection), modern construction (−30% materials), wider care (+25% clinic and hospital reach), green industry (−40% industry smoke), rapid transit (unlocks trains, E7b). Effects reach air, garbage, materials and coverage through `techEffects`; nothing changes for cities without research.
+- HUD: research progress, points a day and finished projects in the stage menu; a milestone toast with a chime when a project finishes. Saved as `city.research`. Tests: points and order, effects, save. 240 pass.
+
+## 2026-11-04 (later): E6 Construction materials
+- `systems/materials.ts`: industry makes 0.15 t per worker a day; every grown building and upgrade needs 1% of its price in tons; up to 6 t a day imported at $25/t when short; storage 300 t + 400 t per warehouse, surplus exported at $6/t. Upgrades check materials before clearing the old buildings. Only in new cities (`City.needsMaterials`); others build freely and replay identically.
+- HUD: Construction materials in the budget panel (stock, today's made / imported / used, waiting constructions); a monthly toast when construction waits. Tests: production, storage and export; imports and the daily cap; stalled upgrades keep their buildings (and do upgrade with materials); save round trip. 237 pass.
+
+## 2026-11-04 (later): E5 Taxes at the Town Hall
+- New player cities (`City.collectsTaxes`) pay upkeep at month end but bank taxes in the Town Hall's chest (`City.uncollected`, six months at most; the month toast warns from three and says what was lost). `collectTaxes` needs a working Town Hall. Saved and old cities collect automatically.
+- HUD: "Collect $X" on the Town Hall's info panel and a chest section in the budget panel; a gold coin badge over the Town Hall while money waits; a coin sound. Tests: chest and collection, six-month cap, automatic cities unchanged, save round trip. 233 pass.
+
 ## 2026-11-04 (later): E4 Air quality (AQI)
 - `systems/air.ts`: a 4×4-tile field rebuilt daily and after edits from industry (by how busy), coal and gas plants, incinerators, landfills and road traffic; two 3×3 blur passes; AQI = 15 + 260 × concentration (0–500) with the six usual bands. No memory, so nothing new to save.
 - The clean-air need reads the AQI where a building stands (1 up to 50, 0 at 200) less highway noise, replacing the 6-tile radius check; "The air is making us sick" above AQI 150, with the AQI in the complaint.

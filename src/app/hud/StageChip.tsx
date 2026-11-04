@@ -81,6 +81,25 @@ export function StageChip() {
           ) : (
             <span className="stage-menu-sub">The highest stage. Congratulations, mayor!</span>
           )}
+          {p.research && (
+            <span className="stage-life">
+              <span>Research · {p.research.rate.toFixed(1)} points a day</span>
+              {p.research.current ? (
+                <>
+                  <span className="stage-req-label">
+                    {p.research.current.name}: {p.research.current.points} / {p.research.current.needed}
+                  </span>
+                  <span className="meter">
+                    <span className="meter-fill" style={{ width: `${Math.round((p.research.current.points / p.research.current.needed) * 100)}%` }} />
+                  </span>
+                  <span className="stage-life-legend">{p.research.current.effect}</span>
+                </>
+              ) : (
+                <span className="stage-life-legend">Every project is finished.</span>
+              )}
+              {p.research.done.length > 0 && <span className="stage-life-legend">Done: {p.research.done.join(' · ')}</span>}
+            </span>
+          )}
           {residents > 0 && (
             <span className="stage-life">
               <span>Lifestyle</span>
