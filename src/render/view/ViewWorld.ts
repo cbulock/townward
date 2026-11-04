@@ -46,6 +46,9 @@ export class ViewWorld extends World {
         this.pave[vi] = world.pave[wi];
         this.zone[vi] = world.zone[wi];
         this.rail[vi] = world.rail[wi];
+        // Flyover decks: the axis turns with the view (x and y swap on odd quarter turns).
+        this.over[vi] = world.over[wi];
+        this.overAxis[vi] = world.overAxis[wi] === 0 || v.r % 2 === 0 ? world.overAxis[wi] : 3 - world.overAxis[wi];
         this.building[vi] = world.building[wi];
       }
     }

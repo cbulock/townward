@@ -5,6 +5,7 @@ import type { RailCarPose } from '../../sim/systems/trains';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
 import { OVERPASS_LIFT } from '../atlas/rail';
+import { DECK_LIFT } from '../atlas/roadArt';
 import { STOP_ANCHOR } from '../atlas/stopArt';
 import type { TerrainTextures } from '../atlas/tiles';
 import { tileToWorld } from '../iso';
@@ -56,12 +57,16 @@ export class AgentRenderer {
         const p = liftView(this.viewRef.ground, vp.x, vp.y);
         if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
 
+        // On a flyover deck (driving along it), a car rides up there: lifted, and drawn over the deck.
+        const tile = a.t < 0.5 ? a.path[a.seg] : a.path[Math.min(a.seg + 1, a.path.length - 1)];
+        const onDeck = !isPerson && world.over[tile] !== 0 && world.overAxis[tile] === (pose.dir % 2 === 1 ? 1 : 2);
         let s = this.pool[used];
         if (!s) {
           s = new Sprite();
           this.pool.push(s);
-          this.container.addChild(s);
         }
+        const layer = onDeck ? this.raised : this.container;
+        if (s.parent !== layer) layer.addChild(s);
         used++;
         if (a.kind === 'person') {
           s.texture = this.tex.people[a.variant % this.tex.people.length][Math.floor(a.age / STEP_TIME) % 2];
@@ -70,7 +75,7 @@ export class AgentRenderer {
           s.texture = this.tex.vehicles[a.kind][a.variant % 6][vt.dir(pose.dir)];
           s.anchor.set(0.5, VEHICLE_ANCHOR_Y);
         }
-        s.position.set(p.x, p.y);
+        s.position.set(p.x, p.y - (onDeck ? DECK_LIFT : 0));
         s.zIndex = vp.x + vp.y;
         s.visible = true;
       }

@@ -22,6 +22,8 @@ export const BALANCE = {
   railCost: 60,
   railBridgeCost: 150,
   railUpkeep: 0.8,
+  /** A flyover deck over a crossing road, on top of the road's own price (docs/specs/transport.md, TX2). */
+  flyoverCost: 400,
   /** Moving a building costs this share of its price (plus clearing the new lot). */
   moveCostShare: 0.2,
   /** Bridges replace the per-tile road cost while over water. */

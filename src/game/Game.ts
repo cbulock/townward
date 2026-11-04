@@ -145,6 +145,8 @@ export class Game {
   /** The Move tool's picked-up building (id), if any. */
   /** Day of the last "waiting for materials" notice. */
   private materialsNoticeDay = -Infinity;
+  /** Road tools carry the new road over crossings (flyovers) instead of joining them. */
+  private flyoverMode = false;
   private carrying: number | null = null;
   private pavementChoice = 0;
   /** Player edits so far (roads, zones, buildings, taxes), for save dirty tracking. */
@@ -250,7 +252,7 @@ export class Game {
   }
 
   private plan(drag: ToolDrag | null, hovered: TilePos | null) {
-    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice, this.carrying);
+    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice, this.carrying, this.flyoverMode);
   }
 
   // ---------------------------------------------------------------- tools
@@ -263,6 +265,18 @@ export class Game {
   /** Footpath style for new roads (0 = each road type's default; else PAVEMENTS index + 1). */
   get pavement(): number {
     return this.pavementChoice;
+  }
+
+  /** Road tools: build flyovers over the roads a drag crosses (docs/specs/transport.md, TX2). */
+  setFlyover(on: boolean) {
+    this.flyoverMode = on;
+    this.sound.play('tool');
+    this.events.emit('flyover', on);
+    this.updatePreview();
+  }
+
+  get flyover(): boolean {
+    return this.flyoverMode;
   }
 
   setPavement(pave: number) {

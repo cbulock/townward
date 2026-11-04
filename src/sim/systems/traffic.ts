@@ -2,7 +2,7 @@ import { mulberry32 } from '../../shared/rng';
 import { BUILDINGS, buildingDef } from '../buildings/catalog';
 import { isActive } from './access';
 import { speedFactor, type CommuteTrip } from './commute';
-import { DIRS as DIR_STEP, roadMask, RoadType, stepAllowed } from '../roads';
+import { DIRS as DIR_STEP, nodeEntering, nodeMayLeave, roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
 import { roadSpec } from '../roadTypes';
@@ -203,33 +203,37 @@ function drivable(world: World, tile: number): boolean {
 export function findRoute(world: World, from: number, to: number, scratch?: Int32Array): Int32Array | null {
   if (world.road[from] === RoadType.None || world.road[to] === RoadType.None) return null;
   if (from === to) return Int32Array.of(from);
+  // Nodes: one per tile, plus a deck node (n + tile) on flyovers (docs/specs/transport.md, TX2).
   const n = world.width * world.height;
-  const prev = scratch && scratch.length >= n ? scratch : new Int32Array(n);
+  const nodes = 2 * n;
+  const prev = scratch && scratch.length >= nodes ? scratch : new Int32Array(nodes);
   prev.fill(-1);
   prev[from] = from;
-  const queue = new Int32Array(n);
+  const queue = new Int32Array(nodes);
   let head = 0;
   let tail = 0;
   queue[tail++] = from;
   while (head < tail) {
-    const i = queue[head++];
-    if (i === to) break;
+    const u = queue[head++];
+    if (u === to) break;
+    const i = u >= n ? u - n : u;
     const x = i % world.width;
     const y = (i - x) / world.width;
     const mask = roadMask(world, x, y);
     for (let d = 0; d < 4; d++) {
-      if (!(mask & (1 << d))) continue;
+      if (!(mask & (1 << d)) || !nodeMayLeave(world, u, d)) continue;
       const j = world.index(x + DIRS[d][0], y + DIRS[d][1]);
-      if (prev[j] !== -1) continue;
+      const v = nodeEntering(world, j, d);
+      if (prev[v] !== -1) continue;
       // Cars keep to roads they may drive, and never against a one-way carriageway.
-      if (!stepAllowed(world, i, j, d) || (j !== to && !drivable(world, j))) continue;
-      prev[j] = i;
-      queue[tail++] = j;
+      if (!stepAllowed(world, i, j, d) || (v !== to && !drivable(world, j))) continue;
+      prev[v] = u;
+      queue[tail++] = v;
     }
   }
   if (prev[to] === -1) return null;
   const out: number[] = [];
-  for (let i = to; i !== from; i = prev[i]) out.push(i);
+  for (let v = to; v !== from; v = prev[v]) out.push(v >= n ? v - n : v);
   out.push(from);
   return Int32Array.from(out.reverse());
 }
@@ -390,7 +394,8 @@ export class Traffic {
     this.world = world;
     this.commute = commute;
     this.rng = mulberry32(seed);
-    this.scratch = new Int32Array(world.width * world.height);
+    // Route nodes: tiles plus flyover decks (findRoute).
+    this.scratch = new Int32Array(2 * world.width * world.height);
     this.junction = new Uint8Array(world.width * world.height);
     this.control = new Uint8Array(world.width * world.height);
     this.major = new Uint8Array(world.width * world.height);
@@ -411,8 +416,10 @@ export class Traffic {
         const m = carsMay(w.road[i]) ? roadMask(w, x, y) : 0;
         let links = 0;
         for (let d = 0; d < 4; d++) if (m & (1 << d) && carsMay(w.road[w.index(x + DIR_STEP[d][0], y + DIR_STEP[d][1])])) links++;
-        this.junction[i] = links >= 3 ? 1 : 0;
-        if (links >= 3) {
+        // A flyover's two roads pass over each other: no junction, no lights.
+        const isJunction = links >= 3 && w.over[i] === 0;
+        this.junction[i] = isJunction ? 1 : 0;
+        if (isJunction) {
           this.junctions.push(i);
           this.major[i] = this.majorAxis(x, y);
           // New junctions start from today's load; without a commute model they all get lights.

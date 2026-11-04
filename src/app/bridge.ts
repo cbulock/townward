@@ -4,6 +4,7 @@ import {
   activeToolAtom,
   buildingChoiceAtom,
   pavementAtom,
+  flyoverAtom,
   cityAtom,
   debugStatsAtom,
   fundsAtom,
@@ -43,6 +44,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
   store.set(mutedAtom, game.muted);
   store.set(buildingChoiceAtom, game.building);
   store.set(pavementAtom, game.pavement);
+  store.set(flyoverAtom, game.flyover);
   store.set(rotationAtom, game.rotation);
   store.set(dayNightAtom, game.dayNight);
 
@@ -54,6 +56,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('tool', (t) => store.set(activeToolAtom, t)),
     game.events.on('building', (b) => store.set(buildingChoiceAtom, b)),
     game.events.on('pavement', (p) => store.set(pavementAtom, p)),
+    game.events.on('flyover', (on) => store.set(flyoverAtom, on)),
     game.events.on('funds', (f) => store.set(fundsAtom, f)),
     game.events.on('muted', (m) => store.set(mutedAtom, m)),
     game.events.on('rotation', (r) => store.set(rotationAtom, r)),

@@ -100,7 +100,14 @@ function links(world: World, x: number, y: number, d: number): boolean {
   if (!world.inBounds(nx, ny)) return false;
   const i = world.index(x, y);
   const j = world.index(nx, ny);
-  if (world.road[j] === RoadType.None || !accessOk(world.road[i], world.road[j])) return false;
+  if (world.road[j] === RoadType.None) return false;
+  // Along a flyover's deck, the deck's road type is the one that joins (docs/specs/transport.md, TX2).
+  const axis = d % 2 === 1 ? 1 : 2;
+  const deckI = world.over[i] !== 0 && world.overAxis[i] === axis;
+  const deckJ = world.over[j] !== 0 && world.overAxis[j] === axis;
+  if (!accessOk(deckI ? world.over[i] : world.road[i], deckJ ? world.over[j] : world.road[j])) return false;
+  // Decks run both ways: the one-way rules below are for the ground carriageways.
+  if (deckI || deckJ) return true;
   // Bridges only connect along their axis.
   const along = d % 2 === 0 ? BridgeAxis.Y : BridgeAxis.X;
   if (world.bridge[j] !== BridgeAxis.None && world.bridge[j] !== along) return false;
@@ -175,4 +182,41 @@ export function rectTiles(a: TilePos, b: TilePos): TilePos[] {
     for (let x = Math.min(a.x, b.x); x <= Math.max(a.x, b.x); x++) tiles.push({ x, y });
   }
   return tiles;
+}
+
+/**
+ * Flyovers (docs/specs/transport.md, TX2). A flyover tile carries two roads that never meet:
+ * the ground road along one axis and a raised one along the other. Route graphs give it two
+ * nodes: the tile index for the ground road and `n + tile` for the deck (n = tiles on the map);
+ * each node only goes straight through, along its own axis.
+ */
+export const OverAxis = { None: 0, X: 1, Y: 2 } as const;
+
+/** The axis a step in mask direction d runs along: 1 for x (bits 1, 3), 2 for y (bits 0, 2). */
+export function stepAxis(d: number): 1 | 2 {
+  return d % 2 === 1 ? 1 : 2;
+}
+
+export function isFlyover(world: World, i: number): boolean {
+  return world.over[i] !== 0;
+}
+
+/** The route-graph node a step in direction d arrives at on tile i (its deck when the step runs along it). */
+export function nodeEntering(world: World, i: number, d: number): number {
+  return world.over[i] !== 0 && world.overAxis[i] === stepAxis(d) ? world.width * world.height + i : i;
+}
+
+/** Whether a route-graph node may leave in direction d: flyover nodes only straight along their axis. */
+export function nodeMayLeave(world: World, node: number, d: number): boolean {
+  const n = world.width * world.height;
+  const i = node >= n ? node - n : node;
+  if (world.over[i] === 0) return true;
+  const deckAxis = world.overAxis[i];
+  return node >= n ? stepAxis(d) === deckAxis : stepAxis(d) !== deckAxis;
+}
+
+/** The road type a route-graph node drives on (the deck's, for a flyover's upper node). */
+export function nodeRoad(world: World, node: number): number {
+  const n = world.width * world.height;
+  return node >= n ? world.over[node - n] : world.road[node];
 }

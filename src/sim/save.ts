@@ -89,6 +89,9 @@ export interface SavedLayers {
   readonly elev?: string;
   /** Rail track (docs/specs/evolution.md, E7b); absent in older saves. */
   readonly rail?: string;
+  /** Flyover decks: road type and axis (docs/specs/transport.md, TX2); absent in older saves. */
+  readonly over?: string;
+  readonly overAxis?: string;
 }
 
 /**
@@ -195,6 +198,8 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       ground: encodeLayer(w.terrain),
       elev: encodeLayer(w.elevation),
       rail: encodeLayer(w.rail),
+      over: encodeLayer(w.over),
+      overAxis: encodeLayer(w.overAxis),
     },
     buildings,
     buildingTiles,
@@ -239,6 +244,8 @@ export function deserialize(data: SaveData): City {
   const lane = data.layers.lane ? decodeLayer(data.layers.lane, n) : null;
   const pave = data.layers.pave ? decodeLayer(data.layers.pave, n) : null;
   const rail = data.layers.rail ? decodeLayer(data.layers.rail, n) : null;
+  const over = data.layers.over ? decodeLayer(data.layers.over, n) : null;
+  const overAxis = data.layers.overAxis ? decodeLayer(data.layers.overAxis, n) : null;
   if (data.layers.ground && data.layers.elev) {
     const ground = decodeLayer(data.layers.ground, n);
     for (let i = 0; i < n; i++) if (TERRAIN_VALUES.has(ground[i])) world.terrain[i] = ground[i];
@@ -252,6 +259,10 @@ export function deserialize(data: SaveData): City {
     world.lane[i] = lane && world.road[i] !== RoadType.None && lane[i] <= 4 && roadSpec(world.road[i])?.width === 2 ? lane[i] : 0;
     world.pave[i] = pave && world.road[i] !== RoadType.None && pave[i] <= PAVEMENTS.length ? pave[i] : 0;
     world.rail[i] = rail && rail[i] <= Rail.Bridge ? rail[i] : Rail.None;
+    // A deck only over a road, with a known road type and axis.
+    const deckOk = over && overAxis && world.road[i] !== RoadType.None && ROAD_VALUES.has(over[i]) && over[i] !== RoadType.None && (overAxis[i] === 1 || overAxis[i] === 2);
+    world.over[i] = deckOk ? over[i] : 0;
+    world.overAxis[i] = deckOk ? overAxis[i] : 0;
     if (cleared[i] === 1) {
       world.tree[i] = 0;
       world.decor[i] = Decor.None;
@@ -495,6 +506,7 @@ export function parseSave(json: unknown): SaveData {
       ...(typeof l.pave === 'string' && { pave: l.pave }),
       ...(typeof l.ground === 'string' && typeof l.elev === 'string' && { ground: l.ground, elev: l.elev }),
       ...(typeof l.rail === 'string' && { rail: l.rail }),
+      ...(typeof l.over === 'string' && typeof l.overAxis === 'string' && { over: l.over, overAxis: l.overAxis }),
     },
     buildings,
     ...(buildingTiles && { buildingTiles }),

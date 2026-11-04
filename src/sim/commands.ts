@@ -25,6 +25,8 @@ export interface PlannedTile extends TilePos {
   lane?: number;
   /** Rail tiles: track on land or on a bridge (sim/rail.ts Rail). */
   rail?: RailId;
+  /** Flyover tiles (TX2): the new road crosses over the existing one on a deck along this axis (1 x, 2 y). */
+  overAxis?: 1 | 2;
 }
 
 export interface Plan {
@@ -100,9 +102,9 @@ function bridgeRunValid(world: World, path: readonly TilePos[], k: number): bool
  * carries traffic in the drag's direction, the row on its left the other way (we drive on the
  * right). A step is built only where both rows can be, so no half carriageways are left.
  */
-export function planRoad(world: World, path: readonly TilePos[], type: BuildableRoad): Plan {
+export function planRoad(world: World, path: readonly TilePos[], type: BuildableRoad, opts: { flyover?: boolean } = {}): Plan {
   const spec = ROAD_SPECS[type];
-  if (spec.width === 1) return planRow(world, path, type, -1);
+  if (spec.width === 1) return planRow(world, path, type, -1, opts.flyover === true);
   const a = path[0];
   const b = path[path.length - 1];
   const d = path.length < 2 ? 1 : b.x > a.x ? 1 : b.x < a.x ? 3 : b.y > a.y ? 2 : 0;
@@ -134,7 +136,7 @@ export function planRoad(world: World, path: readonly TilePos[], type: Buildable
 }
 
 /** One row of road tiles (see planRoad). `lane` is the travel direction for one-way rows, −1 otherwise. */
-function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, lane: number): Plan {
+function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, lane: number, flyover = false): Plan {
   const tiles: PlannedTile[] = [];
   let cost = 0;
   let count = 0;
@@ -164,6 +166,16 @@ function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, la
     }
 
     const existing = roadSpec(world.road[i]);
+    // Flyover mode: crossing another road at right angles, carry this one over it on a deck (TX2).
+    if (flyover && existing && !water && world.bridge[i] === BridgeAxis.None && world.over[i] === 0 && !isRail(world, i) && crossesAtRightAngle(roadMask(world, p.x, p.y), path, k)) {
+      const a = path[Math.max(0, k - 1)];
+      const b = path[Math.min(path.length - 1, k + 1)];
+      const c = BALANCE.flyoverCost + spec.cost;
+      tiles.push({ ...p, valid: true, cost: c, overAxis: a.x !== b.x ? 1 : 2 });
+      cost += c;
+      count++;
+      continue;
+    }
     if (existing && existing.rank >= spec.rank) {
       tiles.push({ ...p, valid: true, cost: 0, ...(water && { bridge }) });
       continue;
@@ -186,6 +198,12 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad, pave = 0)
   if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
   for (const t of real) {
     const i = w.index(t.x, t.y);
+    if (t.overAxis) {
+      // A flyover deck: the road underneath stays as it is.
+      w.over[i] = type;
+      w.overAxis[i] = t.overAxis;
+      continue;
+    }
     w.road[i] = type;
     w.bridge[i] = t.bridge ?? BridgeAxis.None;
     w.lane[i] = t.lane === undefined ? 0 : t.lane + 1;
@@ -296,6 +314,8 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
     w.lane[i] = 0;
     w.pave[i] = 0;
     w.rail[i] = Rail.None;
+    w.over[i] = 0;
+    w.overAxis[i] = 0;
     // Clear is the one "remove" tool: zones go too (there's no separate Dezone, D-051).
     w.zone[i] = ZoneType.None;
     // Selecting any tile of a building removes the whole building.

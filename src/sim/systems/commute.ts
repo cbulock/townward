@@ -1,7 +1,7 @@
 import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, buildingDef } from '../buildings/catalog';
 import type { SimSystem, WorldChange } from '../core/System';
-import { roadMask, RoadType, stepAllowed } from '../roads';
+import { nodeEntering, nodeMayLeave, nodeRoad, roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
 import { isActive } from './access';
 import { hasUtilities } from './utilities';
@@ -139,6 +139,9 @@ export class CommuteSystem implements SimSystem {
   readonly volume: Float32Array;
   /** volume ÷ capacity per road tile. */
   readonly congestion: Float32Array;
+  /** The same for flyover decks (docs/specs/transport.md, TX2), per tile. */
+  readonly deckVolume: Float32Array;
+  readonly deckCongestion: Float32Array;
   /** Average commute (minutes) per home building id. */
   readonly commuteMinutes = new Map<number, number>();
   trips: CommuteTrip[] = [];
@@ -174,16 +177,20 @@ export class CommuteSystem implements SimSystem {
   constructor(world: World) {
     this.world = world;
     const n = world.width * world.height;
+    // Route-graph nodes: one per tile, plus one per tile for flyover decks (n + tile).
+    const nodes = 2 * n;
     this.volume = new Float32Array(n);
     this.congestion = new Float32Array(n);
-    this.dist = new Float64Array(n);
-    this.prev = new Int32Array(n);
-    this.seen = new Int32Array(n);
-    this.done = new Int32Array(n);
-    this.load = new Float64Array(n);
+    this.deckVolume = new Float32Array(n);
+    this.deckCongestion = new Float32Array(n);
+    this.dist = new Float64Array(nodes);
+    this.prev = new Int32Array(nodes);
+    this.seen = new Int32Array(nodes);
+    this.done = new Int32Array(nodes);
+    this.load = new Float64Array(nodes);
     this.heap = new Heap(this.dist);
-    this.first = new Int32Array(n + 1);
-    this.enter = new Float64Array(n);
+    this.first = new Int32Array(nodes + 1);
+    this.enter = new Float64Array(nodes);
   }
 
   onWorldChanged(change: WorldChange) {
@@ -211,10 +218,11 @@ export class CommuteSystem implements SimSystem {
     this.compute();
   }
 
-  /** Free-flow minutes to cross a tile, slowed by its current congestion. */
-  private tileMinutes(i: number): number {
-    const base = roadSpec(this.world.road[i])?.minutes ?? COMMUTE.roadMinutes;
-    return base / speedFactor(this.congestion[i]);
+  /** Free-flow minutes to cross a route-graph node (a tile, or a flyover deck), slowed by its congestion. */
+  private tileMinutes(node: number): number {
+    const n = this.world.width * this.world.height;
+    const base = roadSpec(nodeRoad(this.world, node))?.minutes ?? COMMUTE.roadMinutes;
+    return base / speedFactor(node >= n ? this.deckCongestion[node - n] : this.congestion[node]);
   }
 
   private capacity(i: number): number {
@@ -278,7 +286,7 @@ export class CommuteSystem implements SimSystem {
     this.busStationRiders.clear();
     let busRiders = 0;
     const picked = new Uint8Array(jobTile.length);
-    const fresh = new Float64Array(n);
+    const fresh = new Float64Array(2 * n);
     const trips: CommuteTrip[] = [];
     let commuters = 0;
     let minutesSum = 0;
@@ -379,6 +387,16 @@ export class CommuteSystem implements SimSystem {
       this.congestion[i] = this.volume[i] / this.capacity(i);
       if (this.congestion[i] > 1) jammed++;
     }
+    // Flyover decks keep their own traffic (TX2).
+    for (let i = 0; i < n; i++) {
+      if (w.over[i] === 0) {
+        this.deckVolume[i] = 0;
+        this.deckCongestion[i] = 0;
+        continue;
+      }
+      this.deckVolume[i] = this.computed ? this.deckVolume[i] * (1 - COMMUTE.smoothing) + fresh[n + i] * COMMUTE.smoothing : fresh[n + i];
+      this.deckCongestion[i] = this.deckVolume[i] / (roadSpec(w.over[i])?.capacity ?? COMMUTE.roadCapacity);
+    }
     this.computed = true;
     trips.sort((a, b) => b.weight - a.weight);
     this.trips = trips.slice(0, COMMUTE.maxTrips);
@@ -404,29 +422,34 @@ export class CommuteSystem implements SimSystem {
   private buildGraph() {
     const w = this.world;
     const n = w.width * w.height;
+    const nodes = 2 * n;
     let edges = 0;
     const scratch: number[] = [];
-    for (let i = 0; i < n; i++) {
-      this.first[i] = edges;
-      if (w.road[i] === RoadType.None) continue;
-      this.enter[i] = this.tileMinutes(i);
+    for (let u = 0; u < nodes; u++) {
+      this.first[u] = edges;
+      const i = u < n ? u : u - n;
+      // A deck node exists only on flyover tiles.
+      if (u < n ? w.road[i] === RoadType.None : w.over[i] === 0) continue;
+      this.enter[u] = this.tileMinutes(u);
       const x = i % w.width;
       const y = (i - x) / w.width;
       const m = roadMask(w, x, y);
       for (let k = 0; k < DIRS.length; k++) {
         const [bit, dx, dy] = DIRS[k];
         if (!(m & bit)) continue;
+        // On a flyover each level only goes straight through, along its own axis.
+        if (!nodeMayLeave(w, u, k)) continue;
         const j = w.index(x + dx, y + dy);
         // Never against a one-way carriageway (DIRS here is in mask-bit order, like sim/roads.ts).
         if (!stepAllowed(w, i, j, k)) continue;
-        scratch.push(j);
+        scratch.push(nodeEntering(w, j, k));
         edges++;
       }
     }
-    this.first[n] = edges;
+    this.first[nodes] = edges;
     if (this.next.length < edges) this.next = new Int32Array(edges);
     this.next.set(scratch);
-    if (this.order.length < n) this.order = new Int32Array(n);
+    if (this.order.length < nodes) this.order = new Int32Array(nodes);
   }
 
   /** Dijkstra from a road tile over today's graph; fills `order` with tiles as they settle and returns how many. */
@@ -458,9 +481,11 @@ export class CommuteSystem implements SimSystem {
     return settled;
   }
 
+  /** The route to `tile` as tiles (a flyover deck node maps back to its tile). */
   private pathTo(origin: number, tile: number): Int32Array {
+    const n = this.world.width * this.world.height;
     const out: number[] = [];
-    for (let v = tile; v !== origin; v = this.prev[v]) out.push(v);
+    for (let v = tile; v !== origin; v = this.prev[v]) out.push(v >= n ? v - n : v);
     out.push(origin);
     return Int32Array.from(out.reverse());
   }

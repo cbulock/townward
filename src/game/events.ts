@@ -23,6 +23,8 @@ export interface GameEventMap {
   building: BuildingId;
   /** Footpath style for new roads (0 = default, else PAVEMENTS index + 1). */
   pavement: number;
+  /** Road tools build flyovers over the roads they cross. */
+  flyover: boolean;
   funds: number;
   /** Live cost label for an in-progress drag; null when there's nothing to show. */
   toolPreview: ToolPreviewInfo | null;

@@ -19,6 +19,7 @@ import { isZoned } from '../sim/zones';
 import { siteHeadroom } from './atlas/constructionArt';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { OVERPASS_LIFT } from './atlas/rail';
+import { DECK_LIFT } from './atlas/roadArt';
 import { FURNITURE_HEADROOM } from './atlas/streetArt';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/theme/palette';
@@ -235,7 +236,10 @@ export class ChunkRenderer {
         if (!bridge) {
           const shade = shadeColor(1);
           const variant = roadVariant(type as BuildableRoad, w.lane[w.index(x, y)], w.pave[w.index(x, y)]);
-          const texture = roadTexture(this.tex, type as BuildableRoad, roadMask(w, x, y), variant);
+          // Under a flyover the ground road runs straight across: its own axis only, no junction.
+          const i = w.index(x, y);
+          const mask = w.over[i] === 0 ? roadMask(w, x, y) : roadMask(w, x, y) & (w.overAxis[i] === 1 ? 0b0101 : 0b1010);
+          const texture = roadTexture(this.tex, type as BuildableRoad, mask, variant);
           roads.add({ texture, points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
           continue;
         }
@@ -354,6 +358,16 @@ export class ChunkRenderer {
     const bid = w.building[i];
     if (bid !== -1) {
       this.buildBuilding(x, y, bid, c);
+      return;
+    }
+    if (w.over[i] !== 0) {
+      // A flyover deck, drawn with the objects so the traffic underneath passes below it (TX2).
+      const p = tileToWorld(x, y);
+      const deck = this.tex.decks[w.over[i] as BuildableRoad][w.overAxis[i] === 1 ? 0 : 1];
+      const s = new Sprite(deck);
+      s.x = p.x - HALF_W - GROUND_PAD;
+      s.y = p.y - GROUND_PAD - DECK_LIFT - tileLift(this.world, x, y);
+      this.addObject(c, s);
       return;
     }
     if (w.rail[i] !== Rail.None && w.road[i] !== RoadType.None) {

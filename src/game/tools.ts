@@ -3,6 +3,7 @@ import { buildingHeadroom } from '../render/atlas/buildings';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
 import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from '../render/atlas/tiles';
 import { roadVariant } from '../render/atlas/roads';
+import { DECK_LIFT } from '../render/atlas/roadArt';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
 import { planClear, planMove, planPlace, planRail, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
@@ -143,6 +144,8 @@ export function planTool(
   building: BuildingId,
   /** The Move tool: the building picked up (id), if any. */
   carrying: number | null = null,
+  /** Road tools: carry the new road over the roads it crosses instead of joining them (TX2). */
+  flyover = false,
 ): ToolPlan | null {
   if (tool === 'select') return null;
   if (tool === 'move') {
@@ -157,7 +160,7 @@ export function planTool(
     // Two-tile roads are laid in straight runs (docs/specs/transport.md).
     const straight = anchor.straight || ROAD_SPECS[roadType].width === 2;
     const path = roadPath(anchor.start, anchor.current, straight);
-    return { kind: 'road', tool, plan: planRoad(world, path, roadType), roadType };
+    return { kind: 'road', tool, plan: planRoad(world, path, roadType, { flyover }), roadType };
   }
   switch (tool) {
     case 'rail':
@@ -292,16 +295,20 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
     // The look the renderer will use: the direction turned into the view, or the pavement.
     const viewLane = t.lane === undefined ? 0 : Math.log2(view.mask(1 << t.lane)) + 1;
     const variant = roadVariant(roadType, viewLane, pave);
+    // A flyover deck shows as the raised deck, its axis turned into the view.
+    const deckAxis = t.overAxis === undefined ? 0 : view.r % 2 === 0 ? t.overAxis : 3 - t.overAxis;
     const texture = !t.valid
       ? tex.selection
-      : t.bridge
-        ? bridgeTexture(tex, roadType, view.bridgeAxis(t.bridge), variant)
-        : roadTexture(tex, roadType, view.mask(mask), variant);
+      : deckAxis
+        ? tex.decks[roadType][deckAxis - 1]
+        : t.bridge
+          ? bridgeTexture(tex, roadType, view.bridgeAxis(t.bridge), variant)
+          : roadTexture(tex, roadType, view.mask(mask), variant);
     return {
       x: t.x,
       y: t.y,
       texture,
-      offsetY: t.valid && t.bridge ? BRIDGE_HEADROOM : 0,
+      offsetY: t.valid && t.bridge ? BRIDGE_HEADROOM : t.valid && deckAxis ? DECK_LIFT : 0,
       tint: t.valid ? TINT_VALID : TINT_INVALID,
       alpha: t.valid ? 0.85 : 0.6,
     };

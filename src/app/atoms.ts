@@ -36,6 +36,7 @@ export const mutedAtom = atom(false);
 export const buildingChoiceAtom = atom<BuildingId>('park');
 /** Footpath style picked in the road tool (0 = each road's default). */
 export const pavementAtom = atom(0);
+export const flyoverAtom = atom(false);
 export const cityAtom = atom<CityInfo | null>(null);
 export const inspectAtom = atom<InspectInfo | null>(null);
 export const dayNightAtom = atom<DayNightMode>('cycle');

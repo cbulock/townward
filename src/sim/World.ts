@@ -24,6 +24,12 @@ export class World {
   readonly zone: Uint8Array;
   /** Rail track (sim/rail.ts): 0 none, 1 track on land, 2 track on a bridge over water. */
   readonly rail: Uint8Array;
+  /**
+   * Flyovers (docs/specs/transport.md, TX2): the road type carried over this tile on a raised
+   * deck (0 none), and the axis it runs along (1 x, 2 y). The ground road (`road`) runs across it.
+   */
+  readonly over: Uint8Array;
+  readonly overAxis: Uint8Array;
   /** Building instance id covering each tile, −1 if none. */
   readonly building: Int32Array;
   readonly buildings = new Map<number, BuildingInstance>();
@@ -45,6 +51,8 @@ export class World {
     this.pave = new Uint8Array(n);
     this.zone = new Uint8Array(n);
     this.rail = new Uint8Array(n);
+    this.over = new Uint8Array(n);
+    this.overAxis = new Uint8Array(n);
     this.building = new Int32Array(n).fill(-1);
   }
 

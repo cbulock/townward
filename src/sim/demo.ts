@@ -72,6 +72,13 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
     }
   }
 
+  // The two central highways cross on a flyover: the north–south one rides over (TX2).
+  const centre = w.index(x0 + BLOCKS * PITCH, y0 + BLOCKS * PITCH);
+  if (w.road[centre] === RoadType.Highway) {
+    w.over[centre] = RoadType.Highway;
+    w.overAxis[centre] = 2;
+  }
+
   // What each block is for, by ring (distance from the centre in blocks).
   const uses: BlockUse[][] = [];
   for (let by = 0; by < 2 * BLOCKS; by++) {

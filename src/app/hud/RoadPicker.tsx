@@ -9,7 +9,7 @@ import {
   type RoadToolId,
 } from '../../game/tools';
 import { PAVEMENTS, ROAD_SPECS, type PavementStyle } from '../../sim/roadTypes';
-import { activeToolAtom, gameAtom, pavementAtom } from '../atoms';
+import { activeToolAtom, gameAtom, pavementAtom, flyoverAtom } from '../atoms';
 
 /** One line under each road's name (docs/specs/transport.md). */
 const BLURB: Readonly<Record<RoadToolId, string>> = {
@@ -162,6 +162,7 @@ export function RoadPicker() {
   const game = useAtomValue(gameAtom);
   const tool = useAtomValue(activeToolAtom);
   const pavement = useAtomValue(pavementAtom);
+  const flyover = useAtomValue(flyoverAtom);
   if (!isRoadTool(tool) && tool !== 'rail') return null;
   const spec = isRoadTool(tool) ? ROAD_SPECS[ROAD_TOOLS[tool]] : null;
 
@@ -222,6 +223,24 @@ export function RoadPicker() {
           </span>
         </button>
       </div>
+      {spec && spec.width === 1 && spec.cars && (
+        <div className="pavement-row" role="radiogroup" aria-label="Where this road crosses another">
+          <span className="pavement-label">At crossings</span>
+          <button type="button" role="radio" aria-checked={!flyover} className={`pavement-chip ${!flyover ? 'is-active' : ''}`} onClick={() => game?.setFlyover(false)}>
+            Junction
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={flyover}
+            className={`pavement-chip ${flyover ? 'is-active' : ''}`}
+            onClick={() => game?.setFlyover(true)}
+            title={`Carry this road over the roads it crosses at right angles: no lights, no waiting. +$${BALANCE.flyoverCost} a crossing`}
+          >
+            Flyover
+          </button>
+        </div>
+      )}
       {spec?.pavement && (
         <div className="pavement-row" role="radiogroup" aria-label="Footpath paving">
           <span className="pavement-label">Paving</span>

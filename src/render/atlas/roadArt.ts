@@ -92,3 +92,45 @@ export function paintBridge(ctx: CanvasRenderingContext2D, type: BuildableRoad, 
     false,
   );
 }
+
+/** How far a flyover deck rides above the road under it, in px (its frame is this much taller). */
+export const DECK_LIFT = 8;
+
+/**
+ * A flyover deck (docs/specs/transport.md, TX2): the road straight along one axis, LIFT px up,
+ * on concrete piers at both ends of the span, with the deck's side face and parapets. Drawn
+ * with the objects, so the traffic underneath passes below it.
+ */
+export function paintDeck(ctx: CanvasRenderingContext2D, type: BuildableRoad, axis: 1 | 2) {
+  const mask = axis === 1 ? 0b1010 : 0b0101;
+  const edge = ROAD_ART[type].deckEdge;
+  const fill = (color: string, paint: () => void) => {
+    ctx.fillStyle = color;
+    paint();
+  };
+  // Piers at the span's two ends, then the deck's thickness, then the road on top.
+  for (let px = 0; px <= DECK_LIFT; px++) {
+    inTileSpace(
+      ctx,
+      () => fill(px === DECK_LIFT ? '#c9cdd2' : '#8e949b', () => {
+        for (const b of bits(mask)) armQuad(ctx, b, 0.38, 0.5, -edge + 0.04, edge - 0.04);
+      }),
+      DECK_LIFT - px,
+      false,
+    );
+  }
+  for (let px = 1; px < DECK_LIFT; px++) inTileSpace(ctx, () => body(ctx, mask, edge + 0.02, '#6f757c'), DECK_LIFT - px, false);
+  inTileSpace(ctx, () => ROAD_ART[type].paint(ctx, mask, 0), 0, false);
+  // Parapets along both sides.
+  inTileSpace(
+    ctx,
+    () => fill('#e4e1da', () => {
+      for (const b of bits(mask)) {
+        armQuad(ctx, b, -0.02, 0.52, edge - 0.03, edge);
+        armQuad(ctx, b, -0.02, 0.52, -edge, -edge + 0.03);
+      }
+    }),
+    0,
+    false,
+  );
+}
