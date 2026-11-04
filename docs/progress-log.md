@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-05: Transport overhaul TX2: flyovers (D-094)
+- Map layers `over`/`overAxis` (saved); route-graph helpers in `sim/roads.ts` (deck nodes n + tile, straight-through only); commute Dijkstra and the cars' BFS on the two-level graph; deck traffic counted apart; no junctions on flyovers; road links use the deck's type along the deck.
+- Road tool: At crossings → Junction / Flyover in the road picker; planner turns right-angle crossings into decks (+$400); clearing removes decks; deck ghost in the preview.
+- Art: raised deck with piers and parapets drawn with the objects; ground road straight under it; cars on the deck lifted into the raised layer. /demo: the central highways cross on a flyover.
+- Tests (`tests/flyover.test.ts`, 5): deck placement, no turning between levels, no lights and deck traffic, clearing, saving. 265 pass.
+
 ## 2026-11-05: Transport overhaul TX1: multi-lane traffic and street frontage
 - `systems/traffic.ts`: cars carry a lane; lane queues keyed per lane; lane choice by room on every segment (buses and trucks outer); junction exits judged by the lane the car would take; lane changes eased. Test: a busy boulevard uses 2+ lanes (it used one queue per direction before).
 - `systems/access.ts`: entrances prefer roads with a pavement; highways and expressways only as a fallback. Test: a home between a highway and a street uses the street.

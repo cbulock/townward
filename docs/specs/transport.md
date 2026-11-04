@@ -30,7 +30,7 @@ Goal: traffic that flows, grade-separated crossings, and a metro that takes peop
 | Step | Content | Status |
 |---|---|---|
 | **TX1** | Multi-lane traffic: each car has a lane and queues only behind its lane; it takes the lane with the most room on each segment (buses and trucks keep right); a junction only holds a car back when the lane it would take beyond is full. Frontage: buildings take access from roads with a pavement, falling back to a highway or expressway only when nothing else is in reach. Bus stops never on highways. | **done** |
-| **TX2** | Flyovers: a road carried over another road (or track) with no junction, ramps up and down; wide roads on bridges; the commute model and cars treat the two levels as separate. | next |
+| **TX2** | Flyovers: with **At crossings → Flyover** in the road picker, a street, avenue or highway dragged straight across another road (any type) rides over it on a raised deck (`World.over`, `World.overAxis`, saved), +$400 a crossing. The two roads never meet: route graphs give a flyover tile two nodes (ground and deck, `sim/roads.ts`), each straight through only; no junction or lights; the deck keeps its own traffic (`deckVolume`). Cars on the deck ride raised above it; the ground road under it draws straight. /demo's central highways cross on one. Not yet: wide roads on decks, multi-tile ramps. | **done** |
 | **TX3** | Metro: underground lines (tunnels with surface station entrances) and elevated lines (a viaduct on pillars over streets), metro stations with a wider walk-in reach than train stations, mode choice like trains, visible metro trains on the viaduct. | planned |
 | TX4 | Adaptive lights and roundabouts; transit share rising with congestion. | planned |
 
