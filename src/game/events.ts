@@ -158,6 +158,8 @@ export interface InspectInfo {
   aqi: number;
   /** The Town Hall in a city that collects by hand: taxes waiting there. */
   taxesWaiting: number | null;
+  /** Train stations: riders a day boarding or leaving here (E7b), and whether it has track beside it. */
+  station: { riders: number; onTrack: boolean } | null;
 }
 
 export interface ToolPreviewInfo {

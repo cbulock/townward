@@ -24,6 +24,9 @@ import {
   VEHICLE_FRAME_H,
   VEHICLE_KINDS,
   VEHICLE_VARIANTS,
+  paintRailCar,
+  RAIL_CAR_PARTS,
+  type RailCarPart,
 } from './agentArt';
 import type { AgentKind } from '../../sim/systems/traffic';
 import { BUILDING_IDS, type BuildingId } from '../../sim/buildings/catalog';
@@ -102,6 +105,8 @@ export interface TerrainTextures {
   ambient: AmbientTextures;
   /** Vehicles, indexed by kind, then variant, then direction (0 NE, 1 SE, 2 SW, 3 NW). */
   vehicles: Readonly<Record<Exclude<AgentKind, 'person'>, Texture[][]>>;
+  /** Trains: locomotive and carriage, by direction (render/atlas/agentArt.ts paintRailCar). */
+  trains: Readonly<Record<RailCarPart, Texture[]>>;
   /** Pedestrians, indexed by variant then walk frame (0/1). */
   people: Texture[][];
   /** Bus stop shelters, indexed by view side (0 −y, 1 +x, 2 +y, 3 −x). */
@@ -404,6 +409,7 @@ export function buildTerrainTextures(): TerrainTextures {
       for (let d = 0; d < 4; d++) b.add(`veh_${k}_${v}_${d}`, W, VEHICLE_FRAME_H, (ctx) => paintVehicle(ctx, k, v, d));
     }
   }
+  for (const part of RAIL_CAR_PARTS) for (let d = 0; d < 4; d++) b.add(`train_${part}_${d}`, W, VEHICLE_FRAME_H, (ctx) => paintRailCar(ctx, part, d));
   for (let v = 0; v < PERSON_VARIANTS; v++) {
     for (let f = 0; f < 2; f++) b.add(`person_${v}_${f}`, PERSON_W, PERSON_H, (ctx) => paintPerson(ctx, v, f));
   }
@@ -482,6 +488,7 @@ export function buildTerrainTextures(): TerrainTextures {
       VEHICLE_KINDS.map((k) => [k, range(VEHICLE_VARIANTS, (v) => range(4, (d) => get(`veh_${k}_${v}_${d}`)))]),
     ) as Record<Exclude<AgentKind, 'person'>, Texture[][]>,
     people: range(PERSON_VARIANTS, (v) => range(2, (f) => get(`person_${v}_${f}`))),
+    trains: { engine: range(4, (d) => get(`train_engine_${d}`)), carriage: range(4, (d) => get(`train_carriage_${d}`)) },
     busStops: range(4, (side) => get(`stop_${side}`)),
     warnRoad: get('warn_road'),
     rail: {

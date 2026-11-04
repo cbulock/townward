@@ -11,6 +11,7 @@ import { AirSystem } from '../systems/air';
 import { FireSystem } from '../systems/fire';
 import { GarbageSystem } from '../systems/garbage';
 import { MaterialsSystem } from '../systems/materials';
+import { TrainSystem } from '../systems/trains';
 import { LifestyleSystem } from '../systems/lifestyle';
 import { stageRequirements } from '../progression';
 import { researchDay, techEffects } from '../research';
@@ -51,6 +52,7 @@ export class Simulation {
   readonly garbage: GarbageSystem;
   readonly air: AirSystem;
   readonly materials: MaterialsSystem;
+  readonly trains: TrainSystem;
   readonly lifestyle: LifestyleSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
@@ -83,7 +85,8 @@ export class Simulation {
     this.lifestyle = new LifestyleSystem(city);
     // An unlocked city opens at its stage straight away (the /demo city, old saves), with no toast.
     if (!city.locked) this.followPopulation();
-    this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.air, this.needs, this.traffic];
+    this.trains = new TrainSystem(world, this.commute);
+    this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.air, this.needs, this.traffic, this.trains];
   }
 
   get world(): World {
@@ -114,6 +117,7 @@ export class Simulation {
     t.run('lifestyle.day', () => this.lifestyle.onDay(out));
     t.run('population.day', () => this.population.onDay());
     t.run('traffic.day', () => this.traffic.onDay());
+    t.run('trains.day', () => this.trains.onDay());
     t.run('research.day', () => {
       out.research = researchDay(this.city);
     });
@@ -169,6 +173,7 @@ export class Simulation {
   /** Every frame, for the visible agents only: `dt` in sim seconds, already scaled by game speed. */
   frame(dt: number) {
     this.timings.run('traffic.frame', () => this.traffic.onFrame(dt, this.city.hour));
+    this.trains.onFrame(dt);
   }
 }
 

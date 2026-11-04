@@ -224,6 +224,22 @@ export function InfoPanel() {
         </section>
       )}
 
+      {info.station && (
+        <section className="info-section">
+          <h3 className="info-section-title">Trains</h3>
+          <div className="info-row">
+            <span>Riders a day</span>
+            <strong>{info.station.riders.toLocaleString()}</strong>
+          </div>
+          <p className="info-note">
+            {!info.station.onTrack
+              ? 'The track beside it is gone: lay rail next to the station.'
+              : info.station.riders === 0
+                ? 'No riders yet: it needs another station on the same track, with homes or jobs within 8 tiles of each.'
+                : 'Homes and jobs within 8 tiles of a station take the train when it beats driving.'}
+          </p>
+        </section>
+      )}
       {(info.provides || info.facility || info.condition !== null) && (
         <section className="info-section">
           <h3 className="info-section-title">Provides</h3>

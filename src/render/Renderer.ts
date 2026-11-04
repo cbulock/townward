@@ -1,5 +1,6 @@
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import type { Agent, BusStop, TrafficLight } from '../sim/systems/traffic';
+import type { RailCarPose } from '../sim/systems/trains';
 import { QuadBatch, tintColor } from './ground/TileMesh';
 import { tileQuadPoints } from './view/lift';
 import type { World } from '../sim/World';
@@ -106,6 +107,7 @@ export class Renderer {
   private agentSource: () => readonly Agent[] = () => [];
   private stopSource: () => readonly BusStop[] = () => [];
   private lightSource: () => readonly TrafficLight[] = () => [];
+  private trainSource: () => readonly RailCarPose[] = () => [];
   private needsSource: () => ReadonlyMap<number, BuildingNeeds> = () => new Map();
   bubbles!: Bubbles;
   /** Traffic overlay: road tiles tinted by congestion (null = off). */
@@ -158,10 +160,16 @@ export class Renderer {
   }
 
   /** Where the agent layer reads cars, people and bus stops from each frame. */
-  setAgentSource(source: () => readonly Agent[], stops: () => readonly BusStop[], lights: () => readonly TrafficLight[]) {
+  setAgentSource(
+    source: () => readonly Agent[],
+    stops: () => readonly BusStop[],
+    lights: () => readonly TrafficLight[],
+    trains: () => readonly RailCarPose[] = () => [],
+  ) {
     this.agentSource = source;
     this.stopSource = stops;
     this.lightSource = lights;
+    this.trainSource = trains;
   }
 
   /** Where the complaint bubbles read each building's needs from. */
@@ -420,7 +428,7 @@ export class Renderer {
     this.ground.animate(dt, cam.zoom);
     this.border.cull(viewRect);
     this.border.update(dt);
-    this.agents.update(this.world, this.agentSource(), this.stopSource(), this.lightSource(), viewRect, cam.zoom);
+    this.agents.update(this.world, this.agentSource(), this.stopSource(), this.lightSource(), viewRect, cam.zoom, this.trainSource());
     this.ground.update(dt);
     this.hover.update(dt);
     this.toolPreview.update(dt);

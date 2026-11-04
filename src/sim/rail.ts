@@ -136,3 +136,33 @@ export function servingStation(net: RailNetwork, world: World, tile: number): { 
   }
   return best === -1 ? null : { station: best, walk: bestD * RAIL.walkMinutes };
 }
+
+/** Track tiles from one platform to another (breadth-first, so the shortest run), or null if not joined. */
+export function railPath(world: World, from: number, to: number): Int32Array | null {
+  const prev = new Int32Array(world.width * world.height).fill(-1);
+  const queue = new Int32Array(world.width * world.height);
+  let head = 0;
+  let tail = 0;
+  queue[tail++] = from;
+  prev[from] = from;
+  while (head < tail) {
+    const i = queue[head++];
+    if (i === to) break;
+    const x = i % world.width;
+    const y = (i - x) / world.width;
+    for (const [dx, dy] of STEPS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!world.inBounds(nx, ny)) continue;
+      const j = world.index(nx, ny);
+      if (prev[j] !== -1 || !isRail(world, j)) continue;
+      prev[j] = i;
+      queue[tail++] = j;
+    }
+  }
+  if (prev[to] === -1) return null;
+  const out: number[] = [];
+  for (let v = to; v !== from; v = prev[v]) out.push(v);
+  out.push(from);
+  return Int32Array.from(out.reverse());
+}

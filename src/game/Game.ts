@@ -169,6 +169,7 @@ export class Game {
       () => this.traffic.agents,
       () => this.traffic.stops,
       () => this.traffic.lights(),
+      () => this.sim.trains.poses(),
     );
     renderer.setNeedsSource(() => this.sim.needs.byBuilding);
     // Blades turn with the day's wind, faster at higher game speeds, and stop when paused.

@@ -108,3 +108,30 @@ describe('commuting by train', () => {
     expect(after.commuters - after.trainRiders).toBeLessThan(before.commuters);
   });
 });
+
+describe('visible trains', () => {
+  it('a train runs along the track between two busy stations and turns round at the ends', () => {
+    const { w, city } = flat();
+    road(city, { x: 2, y: 10 }, { x: 37, y: 10 });
+    rail(city, { x: 2, y: 15 }, { x: 37, y: 15 });
+    applyPlace(city, planPlace(w, 'train_station', 5, 13), 0);
+    applyPlace(city, planPlace(w, 'train_station', 33, 13), 0);
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    const ids = [...w.buildings.values()].filter((b) => b.def === 'train_station').map((b) => b.id);
+    sim.commute.railTrips = [{ from: ids[0], to: ids[1], riders: 100 }];
+    sim.trains.refresh();
+    const start = sim.trains.poses();
+    expect(start).toHaveLength(4); // engine and three carriages
+    expect(start[0].part).toBe('engine');
+    for (const c of start) expect(Math.floor(c.y)).toBe(15); // on the track row
+    sim.trains.onFrame(3); // the stop at the first platform
+    sim.trains.onFrame(2);
+    const later = sim.trains.poses();
+    expect(later[0].x).toBeGreaterThan(start[0].x);
+    for (let k = 0; k < 40; k++) sim.trains.onFrame(1);
+    // It has reached the far end and is heading back.
+    const back = sim.trains.poses()[0];
+    expect(back.dir).toBe(3);
+  });
+});

@@ -1,6 +1,7 @@
 import { Container, Sprite } from 'pixi.js';
 import { agentPose, type Agent, type BusStop, type TrafficLight } from '../../sim/systems/traffic';
 import type { World } from '../../sim/World';
+import type { RailCarPose } from '../../sim/systems/trains';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
 import { STOP_ANCHOR } from '../atlas/stopArt';
@@ -28,6 +29,7 @@ export class AgentRenderer {
   private readonly pool: Sprite[] = [];
   private readonly stopPool: Sprite[] = [];
   private readonly lampPool: Sprite[] = [];
+  private readonly trainPool: Sprite[] = [];
   visible = 0;
 
   constructor(
@@ -35,7 +37,8 @@ export class AgentRenderer {
     private readonly viewRef: ViewRef,
   ) {}
 
-  update(world: World, agents: readonly Agent[], stops: readonly BusStop[], lights: readonly TrafficLight[], view: Rect, zoom: number) {
+  update(world: World, agents: readonly Agent[], stops: readonly BusStop[], lights: readonly TrafficLight[], view: Rect, zoom: number, trains: readonly RailCarPose[] = []) {
+    this.drawTrains(zoom >= MIN_ZOOM_VEHICLES ? trains : [], view);
     this.drawStops(world, zoom >= MIN_ZOOM_VEHICLES ? stops : [], view);
     this.drawLights(world, zoom >= MIN_ZOOM_PEOPLE ? lights : [], view);
     let used = 0;
@@ -71,6 +74,30 @@ export class AgentRenderer {
     }
     for (let k = used; k < this.pool.length; k++) this.pool[k].visible = false;
     this.visible = used;
+  }
+
+  /** Train cars (sim/systems/trains.ts), sorted with everything else by depth. */
+  private drawTrains(cars: readonly RailCarPose[], view: Rect) {
+    const vt = this.viewRef.current;
+    let used = 0;
+    for (const c of cars) {
+      const vp = vt.pointToView(c.x, c.y);
+      const p = liftView(this.viewRef.ground, vp.x, vp.y);
+      if (p.x < view.minX - MARGIN || p.x > view.maxX + MARGIN || p.y < view.minY - MARGIN || p.y > view.maxY + MARGIN) continue;
+      let s = this.trainPool[used];
+      if (!s) {
+        s = new Sprite();
+        s.anchor.set(0.5, VEHICLE_ANCHOR_Y);
+        this.trainPool.push(s);
+        this.container.addChild(s);
+      }
+      used++;
+      s.texture = this.tex.trains[c.part][vt.dir(c.dir)];
+      s.position.set(p.x, p.y);
+      s.zIndex = vp.x + vp.y;
+      s.visible = true;
+    }
+    for (let k = used; k < this.trainPool.length; k++) this.trainPool[k].visible = false;
   }
 
   /**

@@ -135,7 +135,7 @@ export function Toolbar() {
   const game = useAtomValue(gameAtom);
   const active = useAtomValue(activeToolAtom);
   // Every road type lives behind the one Roads button.
-  const isActive = (id: ToolId) => (id === 'road' ? isRoadTool(active) : active === id);
+  const isActive = (id: ToolId) => (id === 'road' ? isRoadTool(active) || active === 'rail' : active === id);
 
   return (
     <div className="panel toolbar" role="toolbar" aria-label="Build tools">

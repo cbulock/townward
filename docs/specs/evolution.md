@@ -311,6 +311,15 @@ with the most riders, sampled like cars; the station's info panel shows riders a
 traffic view keeps showing roads only.
 
 **Done when** a line between a suburb and downtown takes 15%+ of car commutes off the roads.
+Built (2026-11-04): in the test layout (`tests/rail.test.ts`) the line carries 53% of commutes
+(113 of 214) and the roads carry fewer cars than before it opened. /demo has a line across its
+northern blocks with five stations: about 485 riders a day (3%, a compact downtown where driving
+is usually quick) and six visible trains. With no stations the commute model's results are
+byte-identical to before.
+
+Simplifications in this first version: stations on the same connected track form one network
+(no line tool or timetables yet); trains are a visual sample and don't block level crossings;
+track is straight runs and right-angle corners (diagonals come with curved roads, D-089).
 
 ## Planned steps (user requests, 2026-11-04)
 

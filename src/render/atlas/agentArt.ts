@@ -147,3 +147,48 @@ export function paintPerson(ctx: CanvasRenderingContext2D, variant: number, fram
   ctx.fillStyle = '#3a2a1e';
   ctx.fillRect(cx - 1.7, base - 12, 3.4, 1.1);
 }
+
+/** Parts of a train (docs/specs/evolution.md, E7b): one per tile along the track. */
+export const RAIL_CAR_PARTS = ['engine', 'carriage'] as const;
+export type RailCarPart = (typeof RAIL_CAR_PARTS)[number];
+
+/**
+ * One rail vehicle centred on the tile, facing `dir` (0 NE, 1 SE, 2 SW, 3 NW), nearly a tile
+ * long: a red-nosed locomotive or a silver carriage with a band of windows.
+ */
+export function paintRailCar(ctx: CanvasRenderingContext2D, part: RailCarPart, dir: number) {
+  const iso = new IsoFrame(ctx, GROUND_PAD + HALF_W, GROUND_PAD + VEHICLE_HEADROOM);
+  const len = 0.86;
+  const wid = 0.24;
+  const alongU = dir === 1 || dir === 3;
+  const a0 = 0.5 - len / 2;
+  const a1 = 0.5 + len / 2;
+  const b0 = 0.5 - wid / 2;
+  const b1 = 0.5 + wid / 2;
+  const box = (s0: number, s1: number, z0: number, z1: number, lit: string, dark: string, top: string) =>
+    alongU ? iso.box(s0, s1, b0, b1, z0, z1, lit, dark, top) : iso.box(b0, b1, s0, s1, z0, z1, lit, dark, top);
+  const sideFace = alongU ? 'sw' : 'se';
+  const endFace = alongU ? 'se' : 'sw';
+  const side = (s0: number, s1: number, z0: number, z1: number, fill: string) => iso.wall(sideFace, b1, s0, s1, z0, z1, fill);
+  const end = (c0: number, c1: number, z0: number, z1: number, fill: string) => iso.wall(endFace, a1, c0, c1, z0, z1, fill);
+  const forward = dir === 1 || dir === 2;
+
+  iso.floor(alongU ? a0 + 0.03 : b0 + 0.03, alongU ? a1 + 0.05 : b1 + 0.05, alongU ? b0 + 0.03 : a0 + 0.03, alongU ? b1 + 0.05 : a1 + 0.05, 0, 'rgba(0,0,0,0.3)');
+  if (part === 'engine') {
+    const body = '#c8382f';
+    box(a0, a1, 1.5, 10, body, shade(body, -0.28), shade(body, 0.18));
+    box(a0 + 0.1, a1 - 0.1, 10, 11.5, '#3a3f46', '#2a2e33', '#4b5158'); // roof gear
+    side(a0 + 0.05, a1 - 0.05, 3, 4, '#f2d24a'); // yellow stripe
+    side(forward ? a1 - 0.2 : a0 + 0.04, forward ? a1 - 0.04 : a0 + 0.2, 6, 8.5, GLASS);
+    end(b0 + 0.03, b1 - 0.03, 6, 8.5, GLASS);
+    end(b0 + 0.03, b0 + 0.07, 2.5, 4, forward ? HEADLIGHT : TAILLIGHT);
+    end(b1 - 0.07, b1 - 0.03, 2.5, 4, forward ? HEADLIGHT : TAILLIGHT);
+  } else {
+    const body = '#d9dee4';
+    box(a0, a1, 1.5, 10, body, shade(body, -0.2), shade(body, 0.08));
+    side(a0 + 0.04, a1 - 0.04, 5.5, 8.5, GLASS);
+    for (let s = a0 + 0.14; s < a1 - 0.06; s += 0.14) side(s, s + 0.015, 5.5, 8.5, body);
+    side(a0 + 0.04, a1 - 0.04, 3, 3.8, '#1f6fb2'); // blue band
+    end(b0 + 0.04, b1 - 0.04, 2, 9.5, shade(body, -0.12)); // gangway end
+  }
+}

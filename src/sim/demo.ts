@@ -4,7 +4,7 @@ import { BALANCE } from '../shared/balance';
 import { Decor } from './terrain/types';
 import type { City } from './City';
 import type { World } from './World';
-import { applyPlace, applyRoad, applyZone, planPlace, planRoad, planZone, type Plan } from './commands';
+import { applyPlace, applyRail, applyRoad, applyZone, planPlace, planRail, planRoad, planZone, type Plan } from './commands';
 import { growDay } from './systems/growth';
 import { refreshCity } from './core/Simulation';
 import { findEntrance } from './systems/access';
@@ -30,6 +30,8 @@ const DAYS = 640;
 const GROWTH_STEPS = 3;
 /** Days simulated after the empty lots are built out. */
 const SETTLE_DAYS = 40;
+/** The row of blocks the rail line runs through (north of the town hall). */
+const RAIL_ROW = 2;
 /** Power plants for this much more than the evening peak (the city keeps growing). */
 const POWER_HEADROOM = 1.4;
 
@@ -78,6 +80,15 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
 
   const utilitySlots: UtilitySlot[] = [];
   const place = (id: BuildingId, x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), Math.floor(rng() * ART_VARIANTS)).ok;
+
+  // A rail line across the city through the middle of one row of blocks (E7b), crossing the
+  // north–south streets at right angles, with a station in every other block along it.
+  const lineY = y0 + RAIL_ROW * PITCH + 3;
+  applyRail(city, planRail(w, roadPath({ x: x0 + 1, y: lineY }, { x: x0 + span - 1, y: lineY }, true)));
+  for (let bx = 0; bx < 2 * BLOCKS; bx += 2) {
+    const kind = uses[RAIL_ROW][bx].kind;
+    if (kind === 'zone' || kind === 'park') place('train_station', x0 + bx * PITCH + 2, lineY - 2);
+  }
   for (let by = 0; by < 2 * BLOCKS; by++) {
     for (let bx = 0; bx < 2 * BLOCKS; bx++) {
       const use = uses[by][bx];

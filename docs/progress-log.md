@@ -2,6 +2,14 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04 (later): E7b Trains
+- Sim: `World.rail` layer (saved), `sim/rail.ts` (track masks, platforms, station-to-station minutes by BFS, serving station within 8 tiles, track paths), `planRail` / `applyRail` (right-angle level crossings with single-width roads, straight bridges over water, Rapid transit research in locked cities), track upkeep $0.8/tile. Buildings, zones and moves stay off track; a station needs track beside it ("A station needs rail track right beside it").
+- Commute model: per home group and job, walk + 3 min wait + 0.3 min/tile + walk; when faster than driving the flow goes by train (nothing on the roads), counts riders per station and station pair; job attraction uses the faster mode. `commute.report.trainRiders`. No stations: byte-identical history.
+- Visible trains: `systems/trains.ts` runs one train (engine + 3 carriages) per busy station pair, shuttling with a stop at each platform; drawn by the agent renderer. Art: track, crossing and bridge pieces (`render/atlas/rail.ts`), locomotive and carriage (`agentArt.ts`), station recipe.
+- HUD: Rail card in the road picker (`Z`), station riders in the info panel, station lock label "Rapid transit" in the Civic picker, research-aware lock messages. /demo: a line with five stations.
+- Also: budget panel no longer runs over the toolbar; materials storage shows before the first day; empty maps read AQI 15, not 0; collecting at a Town Hall off the road says so.
+- Tests (`tests/rail.test.ts`, 7): crossings and no running along roads, bridges, station placement and network, research gate, save, the suburb–downtown line takes 53% of commutes, trains run and turn round. 247 pass.
+
 ## 2026-11-04 (later): E7 Research (D-090)
 - `sim/research.ts`: Research Centre (Metropolis, 2×2) makes 3 points a day (4.5 with a university in reach), universities 1; projects finish automatically in order: cleaner coal (−40% fossil smoke), efficient garbage trucks (+30% collection), modern construction (−30% materials), wider care (+25% clinic and hospital reach), green industry (−40% industry smoke), rapid transit (unlocks trains, E7b). Effects reach air, garbage, materials and coverage through `techEffects`; nothing changes for cities without research.
 - HUD: research progress, points a day and finished projects in the stage menu; a milestone toast with a chime when a project finishes. Saved as `city.research`. Tests: points and order, effects, save. 240 pass.
