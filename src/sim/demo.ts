@@ -102,6 +102,10 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
       // Power substations on a 12-tile grid (every other block's south corner, by the street):
       // every building is within a substation's 12-tile reach (docs/specs/energy.md).
       if (bx % 2 === 0 && by % 2 === 0) place('substation', ix + 4, iy + 4);
+      // Water towers on the same 12-tile grid: every building within a tower's 14-tile reach (D-093).
+      // Downtown's towers and offices drink far more, so its blocks each get their own tower too.
+      const ring = Math.max(Math.abs(bx - (BLOCKS - 0.5)), Math.abs(by - (BLOCKS - 0.5))) - 0.5;
+      if ((bx % 2 === 0 && by % 2 === 0) || ring <= 1) place('water_tower', ix, iy + 4);
       // A bus station whose fleet runs across town (it faces the street north-east of the block).
       if (bx === BUS_BLOCK.bx && by === BUS_BLOCK.by && use.kind === 'zone') place('bus_station', ix + 1, iy + 1);
       if (use.kind === 'zone') zone(ix, iy, ix + 4, iy + 4, use.zone);
@@ -264,10 +268,13 @@ function serveIslands(city: City, slots: UtilitySlot[], rng: () => number): bool
     }
     placeOnIsland(city, id, island, islands, rng);
   };
-  for (const [island, need] of lacking) {
-    if (need.power) supply('power_plant', island);
-    if (need.water) supply('water_tower', island);
-  }
+  for (const [island, need] of lacking) if (need.power) supply('power_plant', island);
+  // Water reaches by distance (D-093): put a tower right beside a building that's still dry.
+  const dry = [...w.buildings.values()].find((b) => {
+    const d: BuildingDef = BUILDINGS[b.def];
+    return b.entrance !== -1 && needsUtilities(d) && b.construction === 0 && !b.watered;
+  });
+  if (dry) placeNear(city, 'water_tower', dry.x, dry.y, rng);
   refreshCity(w);
   return true;
 }
@@ -307,6 +314,23 @@ function findCentreRoad(w: World): number {
     }
   }
   return 0;
+}
+
+/** Place `id` on the free spot with road access nearest to (x, y), within 8 tiles. */
+function placeNear(city: City, id: BuildingId, x: number, y: number, rng: () => number) {
+  const w = city.world;
+  for (let r = 1; r <= 8; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const tx = x + dx;
+        const ty = y + dy;
+        if (!w.inBounds(tx, ty) || findEntrance(w, tx, ty, 1, 1, 1) === -1) continue;
+        const plan = planPlace(w, id, tx, ty);
+        if (plan.ok && applyPlace(city, plan, Math.floor(rng() * ART_VARIANTS)).ok) return;
+      }
+    }
+  }
 }
 
 /** Place `id` on the first free spot whose entrance road is on `island`. */

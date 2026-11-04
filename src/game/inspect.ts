@@ -40,7 +40,7 @@ export function inspectInfo(sim: Simulation, b: BuildingInstance): InspectInfo {
         ? {
             kind: 'utility',
             ...d.supplies,
-            coverage: d.energy?.coverage ?? d.substation?.radius,
+            coverage: d.supplies?.water ? d.radius : (d.energy?.coverage ?? d.substation?.radius),
             condition: d.energy && d.energy.source !== 'battery' ? b.condition : undefined,
             repairCost: d.energy?.repairCost,
           }

@@ -65,7 +65,7 @@ function cardStat(d: BuildingDef): string {
   if (d.energy?.coverage) return `${d.energy.coverage}-tile reach`;
   if (d.substation) return `${d.substation.radius}-tile reach`;
   if (d.supplies?.power) return `${d.supplies.power} ⚡`;
-  if (d.supplies?.water) return `${d.supplies.water} 💧`;
+  if (d.supplies?.water) return `${d.radius ?? 0}-tile reach`;
   return `${d.size.w}×${d.size.h}`;
 }
 

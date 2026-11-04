@@ -32,6 +32,9 @@ function town(locked = false) {
   const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
   place('power_plant', 36, 21);
   place('water_tower', 35, 21);
+  // Water reaches 14 tiles (D-093): towers along the road for the homes at the west end too.
+  place('water_tower', 1, 21);
+  place('water_tower', 18, 21);
   return { w, city, place };
 }
 

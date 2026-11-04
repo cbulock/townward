@@ -105,11 +105,12 @@ const SERVICE_TINT: Readonly<Record<ServiceKind, number>> = {
   university: 0x9b8cff,
 };
 
-/** Coverage tint for a service or power building, used by placement and inspection previews. */
+/** Coverage tint for a service, water or power building, used by placement and inspection previews. */
 export function coveragePreviewTiles(world: World, tex: TerrainTextures, id: BuildingId, origin: TilePos): PreviewTile[] {
   const d: BuildingDef = BUILDINGS[id];
-  const radius = d.service ? d.radius : d.energy?.coverage ?? d.substation?.radius;
-  if ((!d.service && !d.energy && !d.substation) || !radius) return [];
+  const water = d.supplies?.water !== undefined;
+  const radius = d.service || water ? d.radius : (d.energy?.coverage ?? d.substation?.radius);
+  if ((!d.service && !water && !d.energy && !d.substation) || !radius) return [];
   const cx = origin.x + d.size.w / 2;
   const cy = origin.y + d.size.h / 2;
   const r = radius;
@@ -117,7 +118,8 @@ export function coveragePreviewTiles(world: World, tex: TerrainTextures, id: Bui
   for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       if (!world.inBounds(x, y) || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
-      out.push({ x, y, texture: tex.selection, tint: d.service ? SERVICE_TINT[d.service] : d.substation ? 0x55b7ff : 0xf2c94c, alpha: 0.32 });
+      const tint = d.service ? SERVICE_TINT[d.service] : water ? 0x3a9bf0 : d.substation ? 0x55b7ff : 0xf2c94c;
+      out.push({ x, y, texture: tex.selection, tint, alpha: 0.32 });
     }
   }
   return out;

@@ -19,6 +19,9 @@ function town() {
   const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
   for (const x of [40, 42, 44]) place('power_plant', x, 22);
   for (let x = 32; x < 39; x++) place('water_tower', x, 22);
+  // Water reaches 14 tiles (D-093): towers by the homes and by the offices.
+  for (const x of [6, 20]) place('water_tower', x, 22);
+  place('water_tower', 29, 10);
   for (let x = 2; x < 28; x++) for (const y of [18, 19]) place('walkup', x, y);
   for (let y = 4; y < 16; y += 2) place('office_tower', 32, y);
   return { w, city, place };

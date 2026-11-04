@@ -17,6 +17,9 @@ function town() {
   const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
   place('power_plant', 36, 21);
   place('water_tower', 35, 21);
+  // Water reaches 14 tiles (D-093): towers along the road for the homes at the west end too.
+  place('water_tower', 1, 21);
+  place('water_tower', 18, 21);
   const sim = new Simulation(city);
   return { w, city, sim, place };
 }
@@ -68,8 +71,8 @@ describe('needs and happiness', () => {
     for (let d = 0; d < BALANCE.abandonDays + 5; d++) sim.day();
     expect(factory.abandoned).toBe(true);
     expect(factory.occupants).toBe(0);
-    // Abandoned jobs don't count: only the power plant's and water tower's 50 remain.
-    expect(cityStats(w).jobs).toBe(50);
+    // Abandoned jobs don't count: only the power plant's and three water towers' 70 remain.
+    expect(cityStats(w).jobs).toBe(70);
     expect(sim.needs.byBuilding.get(factory.id)?.complaint).toBe('abandoned');
 
     // Services and a neighbourhood of workers fix it.

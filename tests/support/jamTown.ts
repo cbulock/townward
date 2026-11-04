@@ -24,8 +24,20 @@ export function jamTown(days = 150): Simulation {
   const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
   place('power_plant', 42, 11);
   place('power_plant', 42, 13);
-  place('water_tower', 41, 9);
-  place('water_tower', 42, 9);
+  // Water reaches 14 tiles (D-093): towers along both districts, off the zoned lots so the
+  // town keeps every home and job it had.
+  for (const [x, y] of [
+    [3, 9],
+    [3, 12],
+    [22, 12],
+    [34, 12],
+    [3, 48],
+    [3, 52],
+    [22, 48],
+    [34, 48],
+  ] as const) {
+    place('water_tower', x, y);
+  }
   place('police_station', 20, 11);
   place('fire_station', 21, 11);
   place('clinic', 22, 11);

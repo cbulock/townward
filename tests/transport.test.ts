@@ -22,6 +22,9 @@ function corridor(type: BuildableRoad) {
   applyPlace(city, planPlace(w, 'power_plant', 30, 6), 0);
   applyPlace(city, planPlace(w, 'water_tower', 32, 4), 0);
   applyPlace(city, planPlace(w, 'water_tower', 33, 4), 0);
+  // Water reaches 14 tiles (D-093): a tower by the homes and one by the offices.
+  applyPlace(city, planPlace(w, 'water_tower', 7, 2), 0);
+  applyPlace(city, planPlace(w, 'water_tower', 56, 2), 0);
   for (let x = 0; x < 14; x++) for (const y of [3, 4, 6, 7]) applyPlace(city, planPlace(w, 'walkup', x, y), 0);
   for (let x = 50; x < 64; x += 2) for (const y of [3, 6]) applyPlace(city, planPlace(w, 'office_tower', x, y), 0);
   const sim = new Simulation(city);

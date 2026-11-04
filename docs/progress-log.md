@@ -2,6 +2,12 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-05: Water by reach; bus stops off highways; police, fire and clinic from the start (D-093)
+- `systems/utilities.ts`: water towers serve buildings within 14 tiles (nearest tower with water left), replacing road-island pooling; reach preview, card stat, info panel and the no-water alert updated. /demo: towers on a 12-tile grid plus every downtown block (37, no dry buildings). Test towns given towers within reach.
+- `systems/traffic.ts`: bus stops only on roads with a pavement; test that a highway gets none (fails on the old code).
+- Stages: police, fire and clinic available from the Hamlet; Village at 150 people.
+- 258 tests pass.
+
 ## 2026-11-04 (later): Citizens ask for transport and a research centre
 - Needs `transit` (from Town: Comfortable/Prosperous homes and apartments; met by a bus station within 10 tiles or a train station within 8; weight 0.08) and `research` (from Metropolis: Prosperous homes; met by any research centre; weight 0.06). Content homes ask for any unmet expectation (hospital, university, transit, research). Labels, hints, colours and bubble icons (a bus, a flask). Tests: who expects transit and what meets it; research at Metropolis. /demo: 85% happiness, transit second among requests. 257 tests pass.
 

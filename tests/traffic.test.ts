@@ -118,3 +118,15 @@ describe('junction control (docs/specs/transport.md, "Junctions")', () => {
     expect(lights()).toBe(0);
   });
 });
+
+describe('bus stops', () => {
+  it('never go on a highway, where a stopped bus would block the road', () => {
+    const w = new World(30, 12, 3);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 5 }, { x: 29, y: 5 }, true), RoadType.Highway), RoadType.Highway);
+    for (let x = 2; x < 28; x += 2) applyPlace(city, planPlace(w, 'apartment_block', x, 3), 0);
+    updateRoadAccess(w);
+    expect(computeBusStops(w)).toHaveLength(0);
+  });
+});

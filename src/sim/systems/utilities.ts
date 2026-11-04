@@ -146,24 +146,38 @@ export function updateUtilities(world: World, at: GridHour | null = null): Utili
 
   const power = balancePower(buildings, powerIslandOf, needs, isWorking, at, powerConnected);
 
-  // Water: supply pooled per road island, handed out in building order.
-  const pool = new Map<number, number>();
+  // Water: each working tower serves the buildings within its reach (like police and fire,
+  // D-093), up to its capacity; a building draws from the nearest tower in reach with water left.
+  const towers: { x: number; y: number; r2: number; left: number }[] = [];
   for (const b of buildings) {
-    const supply = buildingDef(b.def).supplies?.water;
-    if (supply && isWorking(b)) pool.set(islandOf(b), (pool.get(islandOf(b)) ?? 0) + supply);
+    const d = buildingDef(b.def);
+    const supply = d.supplies?.water;
+    if (!supply || !isWorking(b)) continue;
+    const r = d.radius ?? 0;
+    towers.push({ x: b.x + d.size.w / 2, y: b.y + d.size.h / 2, r2: r * r, left: supply });
   }
-  const water: UtilityTotals = { supply: [...pool.values()].reduce((a, v) => a + v, 0), demand: 0, short: 0 };
+  const water: UtilityTotals = { supply: towers.reduce((n, t) => n + t.left, 0), demand: 0, short: 0 };
   for (const b of buildings) {
     if (!needs(b)) {
       b.watered = true;
       continue;
     }
-    const need = BUILDINGS[b.def].capacity;
+    const d = BUILDINGS[b.def];
+    const need = d.capacity;
     water.demand += need;
-    const island = islandOf(b);
-    const left = pool.get(island) ?? 0;
-    b.watered = island !== -1 && left >= need;
-    if (b.watered) pool.set(island, left - need);
+    const cx = b.x + d.size.w / 2;
+    const cy = b.y + d.size.h / 2;
+    let best: (typeof towers)[number] | null = null;
+    let bestD = Infinity;
+    for (const t of towers) {
+      const dist = (t.x - cx) ** 2 + (t.y - cy) ** 2;
+      if (dist <= t.r2 && t.left >= need && dist < bestD) {
+        best = t;
+        bestD = dist;
+      }
+    }
+    b.watered = best !== null;
+    if (best) best.left -= need;
     else water.short++;
   }
   return { power, water };

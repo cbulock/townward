@@ -78,7 +78,7 @@ function alertFor(info: InspectInfo): { tone: 'ok' | 'warn' | 'building'; title:
     };
   }
   if (info.needsUtilities && !info.watered) {
-    return { tone: 'warn', title: 'No water', body: 'Water also runs along roads: build a water tower on this road network.' };
+    return { tone: 'warn', title: 'No water', body: 'No water tower with water to spare within 14 tiles: build one closer, or another if they are all used up.' };
   }
   if (info.needs?.complaint) {
     const worst = [...info.needs.scores].sort((a, b) => a.score - b.score)[0];
@@ -293,7 +293,7 @@ export function InfoPanel() {
           )}
           {info.provides?.kind === 'utility' && (info.provides.power || info.provides.water) ? (
             <div className="info-row">
-              <span>Supplies its road network with</span>
+              <span>{info.provides.water && info.provides.coverage ? `Supplies buildings within ${info.provides.coverage} tiles with` : 'Supplies its road network with'}</span>
               <strong>
                 {[info.provides.power && `${info.provides.power.toLocaleString()} power`, info.provides.water && `${info.provides.water.toLocaleString()} water`]
                   .filter(Boolean)

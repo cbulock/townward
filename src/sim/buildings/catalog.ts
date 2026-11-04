@@ -638,10 +638,12 @@ export const BUILDINGS = {
     size: { w: 1, h: 1 },
     cost: 1200,
     capacity: 10,
-    description: 'Supplies water to every building connected to it by road, up to its capacity.',
+    description: 'Supplies water to every building within 14 tiles, like a fire or police station covers its area, up to its capacity.',
     group: 'utilities',
     upkeep: 80,
     supplies: { water: 2500 },
+    // Water reaches buildings by distance, like services (user call, D-093).
+    radius: 14,
   },
 } as const satisfies Record<string, BuildingDef>;
 

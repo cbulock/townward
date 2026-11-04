@@ -167,6 +167,10 @@ export function computeBusStops(world: World): BusStop[] {
     const mask = roadMask(world, x, y);
     // Straight road pieces only: 2 connections on one axis.
     if (world.bridge[c.tile] !== 0 || (mask !== 0b0101 && mask !== 0b1010)) continue;
+    // Only on streets with a pavement for the shelter: never on highways, expressways or ramps,
+    // where a bus standing in the lane jammed the whole road (user report, 2026-11-05).
+    const spec = roadSpec(world.road[c.tile]);
+    if (!spec || spec.footpath === null || !spec.cars) continue;
     if (stops.some((s) => Math.abs((s.tile % w) - x) + Math.abs(Math.floor(s.tile / w) - y) < TRAFFIC.stopSpacing)) continue;
     // The shelter goes on the side of the road facing the building.
     const dx = c.bx - (x + 0.5);

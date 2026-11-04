@@ -87,6 +87,7 @@ describe('commuting by train', () => {
     const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
     for (const x of [6, 7, 8]) place('power_plant', x * 2 - 6, 11);
     for (let x = 3; x < 13; x++) place('water_tower', x, 6);
+    place('water_tower', 66, 10); // downtown's offices (water reaches 14 tiles, D-093)
     for (let x = 2; x < 13; x++) for (const y of [9, 10]) place('walkup', x, y);
     for (let x = 60; x < 70; x += 2) place('office_tower', x, 6);
     const sim = new Simulation(city);
