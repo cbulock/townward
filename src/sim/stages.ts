@@ -20,7 +20,7 @@ export interface StageDef {
 
 export const STAGES: Readonly<Record<Stage, StageDef>> = {
   [Stage.Hamlet]: { name: 'Hamlet', population: 0, news: '' },
-  [Stage.Village]: { name: 'Village', population: 500, news: 'Garbage now needs collecting: build a landfill.' },
+  [Stage.Village]: { name: 'Village', population: 150, news: 'Garbage now needs collecting: build a landfill.' },
   [Stage.Town]: { name: 'Town', population: 2500, news: 'Residents can become Comfortable now, and they will want a hospital.' },
   [Stage.City]: { name: 'City', population: 10000, news: 'Residents can become Prosperous now, and they will want a university.' },
   [Stage.Metropolis]: { name: 'Metropolis', population: 30000, news: 'Your city is a metropolis.' },

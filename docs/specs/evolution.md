@@ -22,7 +22,7 @@ unlocks buildings and brings a new problem (D-086).
 | Stage | Population | Unlocks | New problem |
 |---|---|---|---|
 | **Hamlet** | 0 | roads, zones, coal plant, wind turbine, water tower, substation, park, town hall, police, fire, clinic | power, water, first jobs |
-| **Village** | 500 | school, **landfill**, riverside market, central park | **garbage** starts piling up |
+| **Village** | 150 | school, **landfill**, riverside market, central park | **garbage** starts piling up |
 | **Town** | 2,500 | **hospital**, **recycling centre**, gas plant, solar farm, battery bank, botanical garden, shopping complex | homes become *Comfortable* and want a hospital |
 | **City** | 10,000 | **university**, **incinerator** (later: trauma centre, trains) | homes become *Prosperous* and want a university |
 | **Metropolis** | 30,000 | research centre (automatic research, E7) | — |
@@ -38,7 +38,7 @@ next one: the population, and the basics of where it is now. Growth alone isn't 
 
 | To reach | Needs (share of occupied homes) |
 |---|---|
-| Village | 500 residents; power and water 90% |
+| Village | 150 residents; power and water 90% |
 | Town | 2,500; power and water 90%; police, fire, clinic and school 75% each; garbage collected 90% |
 | City | 10,000; all of the above; hospital 75% |
 | Metropolis | 30,000; all of the above; university 75% |

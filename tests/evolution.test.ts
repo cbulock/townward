@@ -43,8 +43,8 @@ const only = (w: World, def: string) => [...w.buildings.values()].find((b) => b.
 describe('city stages (docs/specs/evolution.md, E0)', () => {
   it('maps population to stages', () => {
     expect(stageFor(0)).toBe(Stage.Hamlet);
-    expect(stageFor(499)).toBe(Stage.Hamlet);
-    expect(stageFor(500)).toBe(Stage.Village);
+    expect(stageFor(149)).toBe(Stage.Hamlet);
+    expect(stageFor(150)).toBe(Stage.Village);
     expect(stageFor(10_000)).toBe(Stage.City);
     expect(stageFor(1e6)).toBe(Stage.Metropolis);
   });
