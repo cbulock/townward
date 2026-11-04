@@ -1,4 +1,5 @@
-import type { BuildingInstance } from '../buildings/catalog';
+import type { BuildingInstance, Lifestyle } from '../buildings/catalog';
+import type { Stage } from '../stages';
 import type { BudgetReport } from '../systems/budget';
 import type { TileArea } from '../systems/growth';
 
@@ -38,8 +39,12 @@ export interface DayOutcome {
   recovered: number[];
   /** Set on the last day of a month. */
   budget: BudgetReport | null;
+  /** The stage the city reached today, if it climbed one (docs/specs/evolution.md). */
+  stage: Stage | null;
+  /** A lifestyle tier the city's first homes reached today. */
+  lifestyle: Lifestyle | null;
 }
 
 export function emptyOutcome(): DayOutcome {
-  return { changed: [], started: [], completed: [], burned: [], abandoned: [], recovered: [], budget: null };
+  return { changed: [], started: [], completed: [], burned: [], abandoned: [], recovered: [], budget: null, stage: null, lifestyle: null };
 }

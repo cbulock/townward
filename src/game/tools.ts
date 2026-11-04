@@ -97,6 +97,8 @@ const SERVICE_TINT: Readonly<Record<ServiceKind, number>> = {
   fire: 0xff6a4d,
   health: 0xff8fb0,
   education: 0xffc94d,
+  hospital: 0xff5c7a,
+  university: 0x9b8cff,
 };
 
 /** Coverage tint for a service or power building, used by placement and inspection previews. */

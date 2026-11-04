@@ -1,8 +1,10 @@
-import { BUILDING_IDS, BUILDINGS, buildingDef, type BuildingId } from './buildings/catalog';
+import { BALANCE } from '../shared/balance';
+import { BUILDING_IDS, BUILDINGS, buildingDef, Lifestyle, type BuildingId } from './buildings/catalog';
 import { City } from './City';
 import { Simulation } from './core/Simulation';
 import { BridgeAxis, RoadType } from './roads';
 import { PAVEMENTS, roadSpec } from './roadTypes';
+import { isStage, Stage } from './stages';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
 import { Decor, Terrain } from './terrain/types';
@@ -31,11 +33,21 @@ type SavedBuildingCore = readonly [
   moodDays: number,
 ];
 
-/** The core fields, plus optional battery charge and power-plant maintenance state. */
+/** The core fields, plus optional battery charge, power-plant maintenance, then evolution state (docs/specs/evolution.md). */
 export type SavedBuilding =
   | SavedBuildingCore
   | readonly [...SavedBuildingCore, stored: number]
-  | readonly [...SavedBuildingCore, stored: number, condition: number, repairDays: number];
+  | readonly [...SavedBuildingCore, stored: number, condition: number, repairDays: number]
+  | readonly [
+      ...SavedBuildingCore,
+      stored: number,
+      condition: number,
+      repairDays: number,
+      lifestyle: number,
+      lifeDays: number,
+      garbage: number,
+      filled: number,
+    ];
 
 const FLAG = { grown: 1, abandoned: 2 } as const;
 
@@ -44,6 +56,9 @@ export interface SavedCity {
   readonly day: number;
   readonly clock: number;
   readonly taxRate: number;
+  /** Highest stage reached and whether stages lock buildings (D-086); absent in older saves. */
+  readonly stage?: number;
+  readonly locked?: boolean;
 }
 
 /** Run-length encoded, base64 typed-array layers (one byte per tile). */
@@ -131,12 +146,15 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       Math.round(b.happiness * 100),
       b.moodDays,
     ];
+    const evolved = b.lifestyle !== Lifestyle.Basic || b.lifeDays !== 0 || b.garbage > 0 || b.filled > 0;
     buildings.push(
-      b.condition < 1 || b.repairDays > 0
-        ? [...core, b.stored, b.condition, b.repairDays]
-        : b.stored > 0
-          ? [...core, b.stored]
-          : core,
+      evolved
+        ? [...core, b.stored, b.condition, b.repairDays, b.lifestyle, b.lifeDays, Math.round(b.garbage * 10) / 10, Math.round(b.filled)]
+        : b.condition < 1 || b.repairDays > 0
+          ? [...core, b.stored, b.condition, b.repairDays]
+          : b.stored > 0
+            ? [...core, b.stored]
+            : core,
     );
   }
   const buildingTiles: Record<string, number> = {};
@@ -154,7 +172,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
     gen: GENERATOR_VERSION,
     name,
     terrain: { ...terrain },
-    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate },
+    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate, stage: city.stage, locked: city.locked },
     layers: {
       road: encodeLayer(w.road),
       bridge: encodeLayer(w.bridge),
@@ -232,6 +250,9 @@ export function deserialize(data: SaveData): City {
   city.day = data.city.day;
   city.clock = data.city.clock;
   city.taxRate = data.city.taxRate;
+  // Older saves are player cities: they lock, and their stage catches up on the first day.
+  city.locked = data.city.locked ?? true;
+  city.stage = data.city.stage !== undefined && isStage(data.city.stage) ? data.city.stage : Stage.Hamlet;
   return city;
 }
 
@@ -279,7 +300,7 @@ const BRIDGE_VALUES: ReadonlySet<number> = new Set(Object.values(BridgeAxis));
 const ZONE_VALUES: ReadonlySet<number> = new Set(Object.values(ZoneType));
 
 function addSavedBuilding(world: World, s: SavedBuilding) {
-  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored = 0, condition = 1, repairDays = 0] = s;
+  const [def, x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored = 0, condition = 1, repairDays = 0, lifestyle = 0, lifeDays = 0, garbage = 0, filled = 0] = s;
   const { w, h } = BUILDINGS[def].size;
   if (!world.inBounds(x, y) || !world.inBounds(x + w - 1, y + h - 1)) return;
   for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) if (world.building[world.index(tx, ty)] !== -1) return;
@@ -291,6 +312,10 @@ function addSavedBuilding(world: World, s: SavedBuilding) {
   b.stored = Math.max(0, Math.min(stored, buildingDef(def).energy?.storage ?? 0));
   b.condition = Math.min(1, Math.max(0, condition));
   b.repairDays = Math.max(0, repairDays);
+  b.lifestyle = lifestyle >= Lifestyle.Prosperous ? Lifestyle.Prosperous : lifestyle >= Lifestyle.Comfortable ? Lifestyle.Comfortable : Lifestyle.Basic;
+  b.lifeDays = Math.max(-BALANCE.lifeDays, Math.min(BALANCE.lifeDays, Math.round(lifeDays)));
+  b.garbage = Math.max(0, garbage);
+  b.filled = Math.max(0, filled);
 }
 
 // ---------------------------------------------------------------- verify (before writing)
@@ -389,11 +414,11 @@ export function parseSave(json: unknown): SaveData {
   for (const item of list) {
     if (!Array.isArray(item)) continue;
     const fields: readonly unknown[] = item;
-    if (fields.length !== 10 && fields.length !== 11 && fields.length !== 13) continue;
+    if (fields.length !== 10 && fields.length !== 11 && fields.length !== 13 && fields.length !== 17) continue;
     const [def, ...rest] = fields;
     if (!isBuildingId(def)) continue;
     if (!rest.every(isFiniteNumber)) continue;
-    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored, condition, repairDays] = rest;
+    const [x, y, variant, flags, construction, fullDays, occupants, happiness, moodDays, stored, condition, repairDays, lifestyle, lifeDays, garbage, filled] = rest;
     // Position must be exact; counters are rounded rather than dropping the building
     // (a battery's charge is fractional, and dropping it once made whole cities unloadable).
     if (!isInt(x) || !isInt(y)) continue;
@@ -410,12 +435,16 @@ export function parseSave(json: unknown): SaveData {
       count(happiness),
       count(moodDays),
     ];
-    buildings.push(
+    const base: SavedBuilding =
       condition === undefined || repairDays === undefined
         ? stored === undefined
           ? core
           : [...core, stored]
-        : [...core, stored ?? 0, condition, count(repairDays)],
+        : [...core, stored ?? 0, condition, count(repairDays)];
+    buildings.push(
+      lifestyle === undefined || lifeDays === undefined || garbage === undefined || filled === undefined
+        ? base
+        : [...core, stored ?? 0, condition ?? 1, count(repairDays ?? 0), count(lifestyle), Math.round(lifeDays), Math.max(0, garbage), count(filled)],
     );
   }
   const buildingTiles = parseBuildingTiles(json.buildingTiles);
@@ -424,7 +453,14 @@ export function parseSave(json: unknown): SaveData {
     gen: num(json, 'gen'),
     name: str(json, 'name').slice(0, 64),
     terrain,
-    city: { funds: num(c, 'funds'), day: num(c, 'day', 0), clock: num(c, 'clock', 0), taxRate: num(c, 'taxRate', 0, 100) },
+    city: {
+      funds: num(c, 'funds'),
+      day: num(c, 'day', 0),
+      clock: num(c, 'clock', 0),
+      taxRate: num(c, 'taxRate', 0, 100),
+      ...(isFiniteNumber(c.stage) && isStage(c.stage) && { stage: c.stage }),
+      ...(typeof c.locked === 'boolean' && { locked: c.locked }),
+    },
     layers: {
       road: str(l, 'road'),
       bridge: str(l, 'bridge'),

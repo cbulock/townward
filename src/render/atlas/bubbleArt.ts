@@ -4,7 +4,7 @@ import type { ComplaintKind } from '../../sim/systems/needs';
 
 export const BUBBLE_W = 22;
 export const BUBBLE_H = 22;
-export const BUBBLE_KINDS: readonly ComplaintKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers', 'abandoned'];
+export const BUBBLE_KINDS: readonly ComplaintKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers', 'hospital', 'university', 'garbage', 'abandoned'];
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -134,6 +134,39 @@ export function paintBubble(ctx: CanvasRenderingContext2D, kind: ComplaintKind) 
         ctx.arc(x, y, 2.6, 0, Math.PI * 2);
         ctx.fill();
       }
+      break;
+    case 'hospital': // building with a red cross
+      fill('#e9edf2');
+      ctx.fillRect(5, 5, 11, 9.5);
+      fill('#9aa3ad');
+      ctx.fillRect(5, 13.5, 11, 1);
+      fill('#d23b5a');
+      ctx.fillRect(9.6, 6.5, 1.8, 6);
+      ctx.fillRect(7.5, 8.6, 6, 1.8);
+      break;
+    case 'university': // graduation cap
+      fill('#5b4fc4');
+      ctx.beginPath();
+      ctx.moveTo(10.5, 4.5);
+      ctx.lineTo(17, 8);
+      ctx.lineTo(10.5, 11.5);
+      ctx.lineTo(4, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(7, 9.5, 7, 3.5);
+      fill('#f2c94c');
+      ctx.fillRect(15.3, 8, 1, 4.5);
+      break;
+    case 'garbage': // bin with a lid
+      fill('#7d8a3a');
+      ctx.fillRect(6.5, 7, 8, 7.5);
+      fill('#5b6628');
+      ctx.fillRect(5.5, 5.5, 10, 1.8);
+      ctx.fillRect(9.3, 4.2, 2.4, 1.4);
+      fill('#a8b55a');
+      ctx.fillRect(8, 8.5, 1, 4.5);
+      ctx.fillRect(10, 8.5, 1, 4.5);
+      ctx.fillRect(12, 8.5, 1, 4.5);
       break;
     case 'abandoned': // boarded window
       fill('#5a4a3a');

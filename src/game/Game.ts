@@ -17,6 +17,7 @@ import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
 import { serviceBit } from '../sim/systems/coverage';
+import { STAGES, unlockStage } from '../sim/stages';
 import { windFactor } from '../sim/systems/energy';
 import { demandFor } from '../sim/systems/growth';
 import { PAVEMENTS, ROAD_SPECS } from '../sim/roadTypes';
@@ -180,6 +181,8 @@ export class Game {
       sim = loadSimulation(opts.save);
     } else {
       const city = new City(generateTerrain(opts.terrain), opts.funds);
+      // Player cities unlock buildings stage by stage (D-086); the /demo showcase has everything.
+      city.locked = !opts.demo;
       demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
       sim = new Simulation(city);
       if (demo) sim.worldChanged({ roads: true });
@@ -421,6 +424,10 @@ export class Game {
     } else if (result.reason === 'insufficient-funds') {
       this.sound.play('error');
       this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
+    } else if (result.reason === 'locked' && p.kind === 'place') {
+      const stage = STAGES[unlockStage(p.plan.building)];
+      this.sound.play('error');
+      this.notify('error', `${buildingDef(p.plan.building).name} unlocks at ${stage.name} (${stage.population.toLocaleString()} people)`);
     }
   }
 

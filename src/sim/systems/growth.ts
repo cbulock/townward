@@ -2,7 +2,8 @@ import { BALANCE } from '../../shared/balance';
 import {
   ART_VARIANTS,
   BUILDINGS,
-  SERVICE_KINDS,
+  BASIC_SERVICES,
+  Lifestyle,
   startLevel,
   zonedBuildings,
   type BuildingDef,
@@ -13,7 +14,7 @@ import {
 import { findEntrance } from './access';
 import { cityStats } from './population';
 import { hasUtilities } from './utilities';
-import { serviceScore } from './coverage';
+import { serviceBit, serviceScore } from './coverage';
 import { Decor } from '../terrain/types';
 import { isFlat } from '../terrain/elevation';
 import type { World } from '../World';
@@ -115,6 +116,8 @@ interface DemandInputs {
   wantI: number;
   /** Demand points taken off every bar by taxes above the base rate (negative: added). */
   tax: number;
+  /** University graduates in the city (docs/specs/evolution.md); each wants office work. */
+  graduates: number;
 }
 
 function demandInputs(world: World, taxRate: number): DemandInputs {
@@ -123,8 +126,13 @@ function demandInputs(world: World, taxRate: number): DemandInputs {
   let offices = 0;
   let industrial = 0;
   let civic = 0;
+  let graduates = 0;
+  const university = serviceBit('university');
   for (const b of world.buildings.values()) {
     const d: BuildingDef = BUILDINGS[b.def];
+    if (d.category === 'residential' && b.lifestyle > Lifestyle.Basic && b.services & university && !b.abandoned) {
+      graduates += b.occupants * BALANCE.graduateShare;
+    }
     if (d.category === 'residential') housing += d.capacity;
     else if (d.category === 'commercial') {
       if (d.density === 'high') offices += d.capacity;
@@ -142,9 +150,10 @@ function demandInputs(world: World, taxRate: number): DemandInputs {
     openJobs,
     wantR: (jobs / BALANCE.workforceShare) * BALANCE.housingSlack + BALANCE.seedHousing,
     wantShops: housing * BALANCE.shopJobsPerResident + BALANCE.seedCommercialJobs,
-    wantOffices: offices + openJobs * BALANCE.officeJobShare,
+    wantOffices: offices + openJobs * BALANCE.officeJobShare + graduates * BALANCE.graduateOfficeJobs,
     wantI: industrial + openJobs * (1 - BALANCE.officeJobShare) + BALANCE.seedIndustrialJobs,
     tax: (taxRate - BALANCE.baseTaxRate) * BALANCE.taxDemandStep,
+    graduates,
   };
 }
 
@@ -176,7 +185,10 @@ export function explainDemand(world: World, taxRate: number = BALANCE.baseTaxRat
       (x.wantShops > x.shops
         ? `Residents want about ${n(x.wantShops - x.shops)} more shop jobs nearby.`
         : `There are enough shops (${n(x.shops)} jobs) for your residents. More homes raise this.`) + taxNote,
-    o: (x.openJobs > 0 ? `Workers could fill about ${n(x.openJobs * BALANCE.officeJobShare)} more office jobs.` : tooManyJobs) + taxNote,
+    o:
+      (x.openJobs > 0 ? `Workers could fill about ${n(x.openJobs * BALANCE.officeJobShare)} more office jobs.` : tooManyJobs) +
+      (x.graduates >= 1 ? ` Graduates want about ${n(x.graduates * BALANCE.graduateOfficeJobs)} office jobs.` : '') +
+      taxNote,
     i: (x.openJobs > 0 ? `Workers could fill about ${n(x.openJobs * (1 - BALANCE.officeJobShare))} more industry jobs.` : tooManyJobs) + taxNote,
   };
 }
@@ -237,7 +249,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
 
   const demand = zoneDemand(world, taxRate);
   const confidence = investorScore(world);
-  const build = (def: BuildingId, x: number, y: number, occupants = 0) => {
+  const build = (def: BuildingId, x: number, y: number, occupants = 0, lifestyle: Lifestyle = Lifestyle.Basic) => {
     const { w, h } = BUILDINGS[def].size;
     for (let ty = y; ty < y + h; ty++) {
       for (let tx = x; tx < x + w; tx++) {
@@ -256,6 +268,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
         grown: true,
         construction: BALANCE.constructionDays,
         occupants: Math.min(capacity, occupants),
+        lifestyle,
       },
       w,
       h,
@@ -297,7 +310,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
     // Level 2 needs at least one service nearby and some happiness; level 3 needs all four
     // services and happy residents (and power and water).
     const toLevel3 = def.level + 1 >= 3;
-    if (!hasUtilities(b) || serviceScore(b) < (toLevel3 ? SERVICE_KINDS.length : 1)) continue;
+    if (!hasUtilities(b) || serviceScore(b) < (toLevel3 ? BASIC_SERVICES.length : 1)) continue;
     if (b.happiness < (toLevel3 ? BALANCE.happyLevel3 : BALANCE.happyLevel2)) continue;
     candidates.get(zoneOf(def.zone, def.density))?.push(b);
   }
@@ -316,7 +329,7 @@ export function growDay(world: World, rng: Rng, taxRate: number = BALANCE.baseTa
   return { changed, started, completed, waiting };
 }
 
-type Build = (def: BuildingId, x: number, y: number, occupants?: number) => void;
+type Build = (def: BuildingId, x: number, y: number, occupants?: number, lifestyle?: Lifestyle) => void;
 
 function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, build: Build, confidence: number): boolean {
   const def: BuildingDef = BUILDINGS[b.def];
@@ -325,12 +338,15 @@ function upgrade(world: World, b: BuildingInstance, zone: ZonedType, rng: Rng, b
   const next = def.level + 1;
   const replace = (olds: readonly BuildingInstance[], x: number, y: number, id: BuildingId) => {
     let occupants = 0;
+    // People bring their lifestyle; a merged block takes the lowest tier among its homes.
+    let lifestyle: Lifestyle = Lifestyle.Prosperous;
     for (const o of olds) {
       const s = BUILDINGS[o.def].size;
       occupants += o.occupants;
+      if (o.lifestyle < lifestyle) lifestyle = o.lifestyle;
       world.removeBuilding(o.id, s.w, s.h);
     }
-    build(id, x, y, occupants);
+    build(id, x, y, occupants, lifestyle);
   };
 
   if (def.size.w === 2) {

@@ -8,8 +8,11 @@ import { CommuteSystem } from '../systems/commute';
 import { NeedsSystem } from '../systems/needs';
 import { CoverageSystem, updateCoverage } from '../systems/coverage';
 import { FireSystem } from '../systems/fire';
+import { GarbageSystem } from '../systems/garbage';
+import { LifestyleSystem } from '../systems/lifestyle';
+import { stageFor } from '../stages';
 import { GrowthSystem } from '../systems/growth';
-import { PopulationSystem } from '../systems/population';
+import { cityStats, PopulationSystem } from '../systems/population';
 import { TrafficSystem } from '../systems/traffic';
 import { UtilitiesSystem, updateUtilities, type UtilityReport } from '../systems/utilities';
 import type { World } from '../World';
@@ -25,7 +28,8 @@ const SALT = { growth: 0x6077, fire: 0xf12e } as const;
 /**
  * The simulation core (D-058): owns the systems and runs them in a fixed order.
  *   - after an edit:  access → utilities → coverage → commute (if roads changed) → needs → traffic
- *   - each day:       growth → fire → (the edit refresh) → commute → needs → population → traffic, plus budget at month end
+ *   - each day:       stage → growth → fire → (the edit refresh) → garbage → commute → needs → lifestyle → population → traffic,
+ *                     plus budget (then the garbage month reset) at month end
  *   - each frame:     the clock and traffic
  * The game layer only calls these entry points and shows the outcome.
  */
@@ -40,6 +44,8 @@ export class Simulation {
   readonly commute: CommuteSystem;
   readonly needs: NeedsSystem;
   readonly traffic: TrafficSystem;
+  readonly garbage: GarbageSystem;
+  readonly lifestyle: LifestyleSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
   /** Random streams whose state is saved, so a loaded city continues exactly (sim/save.ts). */
@@ -62,8 +68,10 @@ export class Simulation {
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
     this.commute = new CommuteSystem(world);
-    this.needs = new NeedsSystem(world, this.commute);
+    this.needs = new NeedsSystem(world, this.commute, () => city.stage);
     this.traffic = new TrafficSystem(world, this.commute);
+    this.garbage = new GarbageSystem(city);
+    this.lifestyle = new LifestyleSystem(city);
     this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.needs, this.traffic];
   }
 
@@ -81,16 +89,30 @@ export class Simulation {
     const out = emptyOutcome();
     const t = this.timings;
     this.city.day++;
+    this.climbStage(out);
     t.run('growth.day', () => this.growth.onDay(out));
     t.run('fire.day', () => this.fire.onDay(out));
     t.run('utilities.day', () => this.utilities.onDay?.());
     this.worldChanged({ roads: false });
+    t.run('garbage.day', () => this.garbage.onDay());
     t.run('commute.day', () => this.commute.onDay());
     t.run('needs.day', () => this.needs.onDay(out));
+    t.run('lifestyle.day', () => this.lifestyle.onDay(out));
     t.run('population.day', () => this.population.onDay());
     t.run('traffic.day', () => this.traffic.onDay());
-    if (this.city.day % BALANCE.daysPerMonth === 0) t.run('budget.month', () => this.budget.onMonth(out));
+    if (this.city.day % BALANCE.daysPerMonth === 0) {
+      t.run('budget.month', () => this.budget.onMonth(out));
+      t.run('garbage.month', () => this.garbage.onMonth());
+    }
     return out;
+  }
+
+  /** The city reaches the stage its population allows; stages never go back down (D-086). */
+  private climbStage(out: DayOutcome) {
+    const reached = stageFor(cityStats(this.world).population);
+    if (reached <= this.city.stage) return;
+    this.city.stage = reached;
+    out.stage = reached;
   }
 
   /**

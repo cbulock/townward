@@ -1,10 +1,10 @@
-import { BUILDINGS, SERVICE_KINDS, type BuildingDef, type BuildingInstance, type ServiceKind } from '../buildings/catalog';
+import { BASIC_SERVICES, BUILDINGS, SERVICE_KINDS, type BuildingDef, type BuildingInstance, type ServiceKind } from '../buildings/catalog';
 import type { World } from '../World';
 import { isWorking } from './utilities';
 import type { SimSystem } from '../core/System';
 
 /**
- * Coverage system: each working service building (police, fire, clinic, school) covers a
+ * Coverage system: each working service building (police, fire, clinic, school, hospital, university) covers a
  * circle; every building records which services reach it (`services` bitmask).
  * See docs/specs/core.md and D-053.
  */
@@ -13,11 +13,9 @@ export function serviceBit(kind: ServiceKind): number {
   return 1 << SERVICE_KINDS.indexOf(kind);
 }
 
-/** How many services cover a building (0–4). */
+/** How many of the four basic services cover a building (0–4); hospital and university don't count. */
 export function serviceScore(b: BuildingInstance): number {
-  let n = 0;
-  for (let m = b.services; m; m >>= 1) n += m & 1;
-  return n;
+  return BASIC_SERVICES.filter((k) => b.services & serviceBit(k)).length;
 }
 
 
@@ -40,6 +38,8 @@ export function updateCoverage(world: World) {
     SERVICE_KINDS.forEach((k, bit) => {
       if (coverage.get(k)?.some((c) => (c.x - cx) ** 2 + (c.y - cy) ** 2 <= c.r2)) mask |= 1 << bit;
     });
+    // A hospital also does a clinic's job (docs/specs/evolution.md).
+    if (mask & serviceBit('hospital')) mask |= serviceBit('health');
     b.services = mask;
   }
 }

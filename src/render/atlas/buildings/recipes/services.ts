@@ -1,6 +1,9 @@
 import { one, variants, type BuildingArt, type RecipeId } from './types';
 
-/** Civic buildings drawn by the generic recipe painter: police, fire, clinic, school, substation. */
+/**
+ * Civic buildings drawn by the generic recipe painter: police, fire, clinic, school, hospital,
+ * university, substation, recycling centre and incinerator.
+ */
 export const SERVICES = {
   police_station: variants(
     {
@@ -74,6 +77,112 @@ export const SERVICES = {
     {},
     { wall: '#ead9b8', facade: 'punched', roof: 'gable', roofH: 10, roofColor: '#7a4a3a', signColor: '#2d5f8a' },
     { wall: '#e6ebef', facade: 'ribbon', roof: 'flat', roofColor: '#6a7076', extras: ['fence', 'solar'], signColor: '#c8602d' },
+  ),
+  // 3×2: a wide clinical podium with a ward tower, a red cross and a rooftop helipad.
+  hospital: variants(
+    {
+      floorH: 10,
+      masses: [
+        { floors: 2, box: { u0: 0.12, u1: 2.88, v0: 0.12, v1: 1.55 }, facade: 'lobby' },
+        { floors: 4, box: { u0: 0.55, u1: 2.3, v0: 0.22, v1: 1.3 } },
+      ],
+      wall: '#f3f5f7',
+      roof: 'flat',
+      roofColor: '#9aa3ab',
+      facade: 'ribbon',
+      ground: 'plaza',
+      extras: ['canopy', 'redcross', 'helipad', 'acunits'],
+      sign: 'HOSPITAL',
+      signColor: '#d23b3b',
+      trees: 2,
+    },
+    {},
+    { wall: '#e6eef2', facade: 'bands', glass: '#7fb6d8', extras: ['canopy', 'redcross', 'helipad', 'solar'] },
+    {
+      wall: '#efe9e0',
+      facade: 'grid',
+      masses: [
+        { floors: 1, box: { u0: 0.12, u1: 2.88, v0: 0.12, v1: 1.6 }, facade: 'lobby' },
+        { floors: 5, box: { u0: 0.8, u1: 2.2, v0: 0.25, v1: 1.25 } },
+      ],
+      ground: 'parking',
+      extras: ['redcross', 'helipad'],
+    },
+  ),
+  // 3×3: a brick campus hall on a lawn quad, with a clock tower rising from its middle.
+  university: variants(
+    {
+      floorH: 11,
+      masses: [
+        { floors: 3, box: { u0: 0.25, u1: 2.75, v0: 0.2, v1: 1.85 } },
+        { floors: 3, box: { u0: 1.2, u1: 1.8, v0: 0.7, v1: 1.3 }, facade: 'punched' },
+      ],
+      wall: '#b86a4b',
+      trim: '#f0e4cf',
+      roof: 'hip',
+      roofColor: '#4f5a63',
+      roofH: 10,
+      facade: 'brick',
+      ground: 'field',
+      extras: ['spire', 'fence'],
+      sign: 'UNIVERSITY',
+      signColor: '#5b4fc4',
+      trees: 4,
+    },
+    {},
+    { wall: '#e8dcc2', facade: 'punched', roofColor: '#6d4a3b', signColor: '#2f6d4a', ground: 'garden', trees: 5 },
+    {
+      wall: '#e9edf1',
+      facade: 'curtain',
+      glass: '#8cc4e8',
+      roof: 'flat',
+      roofColor: '#6a7076',
+      masses: [
+        { floors: 2, box: { u0: 0.25, u1: 2.75, v0: 0.2, v1: 1.85 } },
+        { floors: 5, box: { u0: 0.9, u1: 2.1, v0: 0.5, v1: 1.4 } },
+      ],
+      extras: ['roofgarden', 'solar'],
+      ground: 'plaza',
+    },
+  ),
+  // 2×2: a long sorting shed with sawtooth roof lights, bales and a loading dock.
+  recycling_centre: variants(
+    {
+      floorH: 9,
+      masses: [{ floors: 1, box: { u0: 0.12, u1: 1.88, v0: 0.12, v1: 1.3 } }],
+      wall: '#5f9d6a',
+      trim: '#e6efe2',
+      roof: 'sawtooth',
+      roofColor: '#3f6d48',
+      facade: 'industrial',
+      ground: 'paved',
+      extras: ['loadingdock', 'crates', 'solar'],
+      sign: 'RECYCLE',
+      signColor: '#3fa34d',
+    },
+    {},
+    { wall: '#4f86a8', roofColor: '#365c73', signColor: '#2d8fd8', extras: ['loadingdock', 'crates', 'tanks'] },
+  ),
+  // 2×2: a boiler hall with a tall stack (smoke comes from the stack sources).
+  incinerator: variants(
+    {
+      floorH: 10,
+      masses: [
+        { floors: 2, box: { u0: 0.12, u1: 1.88, v0: 0.12, v1: 1.35 } },
+        { floors: 1, box: { u0: 0.4, u1: 1.4, v0: 0.25, v1: 1.1 } },
+      ],
+      wall: '#8a8f96',
+      trim: '#c9cdd2',
+      roof: 'flat',
+      roofColor: '#4d5157',
+      facade: 'industrial',
+      ground: 'paved',
+      extras: ['smokestack', 'loadingdock', 'tanks'],
+      sign: 'ENERGY',
+      signColor: '#ef6c43',
+    },
+    {},
+    { wall: '#b2643f', facade: 'brick', extras: ['smokestacks', 'loadingdock'] },
   ),
   substation: variants(
     {

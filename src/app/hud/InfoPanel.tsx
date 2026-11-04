@@ -9,6 +9,9 @@ const NEED_LABEL: Readonly<Record<NeedKind, string>> = {
   safety: 'Safety',
   health: 'Health',
   education: 'Education',
+  hospital: 'Hospital',
+  university: 'University',
+  garbage: 'Garbage',
   commute: 'Commute',
   traffic: 'Traffic',
   air: 'Clean air',
@@ -22,6 +25,8 @@ const SERVICE_LABEL: Readonly<Record<ServiceKind, string>> = {
   fire: 'Fire',
   health: 'Clinic',
   education: 'School',
+  hospital: 'Hospital',
+  university: 'University',
 };
 
 const CATEGORY_LABEL: Readonly<Record<string, string>> = {

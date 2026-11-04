@@ -8,6 +8,7 @@ import { paintCentralPark } from './parks/centralPark';
 import { paintPark, PARK_VARIANTS } from './parks/park';
 import { paintTownHall } from './townHall';
 import { paintPowerPlant, powerPlantSmoke } from './utilities/powerPlant';
+import { paintLandfill } from './utilities/landfill';
 import { paintWaterTower } from './utilities/waterTower';
 
 /**
@@ -24,5 +25,6 @@ export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   town_hall: { variants: 3, headroom: () => 72, paint: paintTownHall },
   power_plant: { variants: 3, headroom: () => 92, paint: paintPowerPlant, smoke: powerPlantSmoke },
   water_tower: { variants: 3, headroom: (v) => (v === 0 ? 62 : v === 1 ? 56 : 30), paint: paintWaterTower },
+  landfill: { variants: 3, headroom: () => 34, paint: paintLandfill },
   ...ENERGY_ART,
 };

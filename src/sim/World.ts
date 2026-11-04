@@ -1,4 +1,4 @@
-import type { BuildingInstance, NewBuilding } from './buildings/catalog';
+import { Lifestyle, type BuildingInstance, type NewBuilding } from './buildings/catalog';
 
 /**
  * The whole map state as struct-of-arrays layers. Tile index is `y * width + x`.
@@ -64,6 +64,10 @@ export class World {
       happiness: 0.75,
       moodDays: 0,
       abandoned: false,
+      lifestyle: b.lifestyle ?? Lifestyle.Basic,
+      lifeDays: 0,
+      garbage: 0,
+      filled: 0,
       stored: 0,
       condition: 1,
       repairDays: 0,

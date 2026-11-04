@@ -112,4 +112,26 @@ export const BALANCE = {
   seedHousing: 40,
   seedCommercialJobs: 6,
   seedIndustrialJobs: 20,
+
+  // --- Evolution (docs/specs/evolution.md) ---
+  /** Lifestyle: days in a row at or above lifeUpLine to move up a tier, below lifeDownLine to move down. */
+  lifeDays: 30,
+  lifeUpLine: 0.75,
+  lifeDownLine: 0.45,
+  /** Tax per resident × this, by lifestyle tier (Basic, Comfortable, Prosperous). */
+  lifestyleTax: [1, 1.5, 2.2],
+  /** Share of Comfortable and Prosperous residents a university reaches who are graduates … */
+  graduateShare: 0.12,
+  /** … and the office jobs each graduate adds to office demand. */
+  graduateOfficeJobs: 0.6,
+  /** Homes ask for their tier's expectation when it scores below this. */
+  requestLine: 0.5,
+  /** Garbage made per day, in tons: per resident, per shop or office worker, per industrial worker. */
+  garbagePerResident: 0.02,
+  garbagePerWorker: 0.03,
+  garbagePerIndustrialWorker: 0.05,
+  /** The garbage need reaches 0 when the pile is this many days of a building's output. */
+  garbageDays: 6,
+  /** Income per ton a recycling centre sells. */
+  recyclePrice: 0.5,
 } as const;

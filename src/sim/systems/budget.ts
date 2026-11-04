@@ -7,7 +7,7 @@ import type { World } from '../World';
 import { cityStats } from './population';
 import type { DayOutcome, SimSystem } from '../core/System';
 
-/** Budget system: monthly taxes against road and civic upkeep (docs/specs/core.md, "Budget & Taxes"). */
+/** Budget system: monthly taxes (by lifestyle) and recycling sales against road and civic upkeep (docs/specs/core.md, "Budget & Taxes"). */
 
 export interface BudgetReport {
   income: number;
@@ -16,13 +16,27 @@ export interface BudgetReport {
   /** Tax rate (percent) the income was collected at. */
   taxRate: number;
   breakdown: { roads: number; services: number; utilities: number; parks: number };
+  /** Part of the income from materials recycling centres sold (docs/specs/evolution.md). */
+  recycling: number;
 }
 
 /** Taxes scale with the rate: the base rate gives the BALANCE per-resident and per-worker amounts. */
 export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRate): BudgetReport {
   const s = cityStats(world);
   const rate = taxRate / BALANCE.baseTaxRate;
-  const income = Math.round((s.population * BALANCE.taxPerResident + s.workers * BALANCE.taxPerWorker) * rate);
+  // Better-off residents pay more (docs/specs/evolution.md); cityStats' population is the same homes.
+  let residentTax = 0;
+  let recycled = 0;
+  for (const b of world.buildings.values()) {
+    const d: BuildingDef = BUILDINGS[b.def];
+    if (d.category === 'residential' && b.construction === 0 && !b.abandoned) {
+      residentTax += b.occupants * BALANCE.taxPerResident * BALANCE.lifestyleTax[b.lifestyle];
+    }
+    // Recycling centres count this month's tons in `filled` (sim/systems/garbage.ts).
+    if (d.garbage?.recycles) recycled += b.filled * d.garbage.recycles;
+  }
+  const recycling = Math.round(recycled * BALANCE.recyclePrice);
+  const income = Math.round((residentTax + s.workers * BALANCE.taxPerWorker) * rate) + recycling;
   let roads = 0;
   for (let i = 0; i < world.road.length; i++) {
     const r = world.road[i];
@@ -46,6 +60,7 @@ export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRat
     net: income - expenses,
     taxRate,
     breakdown: { roads: Math.round(roads), services, utilities, parks },
+    recycling,
   };
 }
 

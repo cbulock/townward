@@ -6,8 +6,14 @@ export type Density = 'low' | 'high';
 export type BuildingCategory = 'residential' | 'commercial' | 'industrial' | 'civic';
 export type WealthTier = 'everyday' | 'comfortable' | 'luxury';
 /** City services with a coverage area (docs/specs/core.md). */
-export type ServiceKind = 'police' | 'fire' | 'health' | 'education';
-export const SERVICE_KINDS: readonly ServiceKind[] = ['police', 'fire', 'health', 'education'];
+export type ServiceKind = 'police' | 'fire' | 'health' | 'education' | 'hospital' | 'university';
+export const SERVICE_KINDS: readonly ServiceKind[] = ['police', 'fire', 'health', 'education', 'hospital', 'university'];
+/** The four basic services every level-3 building needs (hospital and university are lifestyle expectations, docs/specs/evolution.md). */
+export const BASIC_SERVICES: readonly ServiceKind[] = ['police', 'fire', 'health', 'education'];
+/** A home's lifestyle tier (docs/specs/evolution.md): what its residents expect from the city. */
+export const Lifestyle = { Basic: 0, Comfortable: 1, Prosperous: 2 } as const;
+export type Lifestyle = (typeof Lifestyle)[keyof typeof Lifestyle];
+export const LIFESTYLE_NAMES: Readonly<Record<Lifestyle, string>> = { 0: 'Basic', 1: 'Comfortable', 2: 'Prosperous' };
 /** How a power building makes (or stores) its power (docs/specs/energy.md). */
 export type EnergySource = 'coal' | 'gas' | 'wind' | 'solar' | 'battery';
 export const ENERGY_SOURCES: readonly EnergySource[] = ['coal', 'gas', 'wind', 'solar', 'battery'];
@@ -52,6 +58,8 @@ export interface BuildingDef {
   supplies?: { power?: number; water?: number };
   /** Power buildings: what drives their output (sim/systems/energy.ts). */
   energy?: EnergyDef;
+  /** Garbage facilities (sim/systems/garbage.ts): tons collected per day, reach in tiles, and (landfills) how much it holds. */
+  garbage?: { readonly trucks: number; readonly reach: number; readonly holds?: number; readonly recycles?: number };
   /** Power corridor node: buildings on the same road island within this reach can connect. */
   substation?: { readonly radius: number; readonly capacity: number };
   /** Resident/customer profile this building attracts. */
@@ -416,6 +424,78 @@ export const BUILDINGS = {
     service: 'education',
     radius: 14,
   },
+  hospital: {
+    name: 'Hospital',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 3, h: 2 },
+    cost: 14000,
+    capacity: 140,
+    description: 'Wards, surgery and an emergency bay. Comfortable residents expect one; it also counts as a clinic.',
+    group: 'services',
+    upkeep: 320,
+    service: 'hospital',
+    radius: 24,
+  },
+  university: {
+    name: 'University',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 3, h: 3 },
+    cost: 22000,
+    capacity: 160,
+    description: 'A campus with a quad and a clock tower. Prosperous residents expect one; graduates want office jobs.',
+    group: 'services',
+    upkeep: 420,
+    service: 'university',
+    radius: 32,
+  },
+  landfill: {
+    name: 'Landfill',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 3, h: 3 },
+    cost: 3000,
+    capacity: 20,
+    description: 'Garbage trucks empty the bins in reach. It fills up over the years, and it smells.',
+    group: 'utilities',
+    upkeep: 60,
+    garbage: { trucks: 120, reach: 22, holds: 8000 },
+  },
+  recycling_centre: {
+    name: 'Recycling Centre',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 9000,
+    capacity: 45,
+    description: 'Sorts garbage into materials to sell. It never fills up.',
+    group: 'utilities',
+    upkeep: 200,
+    garbage: { trucks: 150, reach: 24, recycles: 0.4 },
+  },
+  incinerator: {
+    name: 'Incinerator',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 16000,
+    capacity: 35,
+    description: 'Burns a lot of garbage and never fills up, but its stack is smoky.',
+    group: 'utilities',
+    upkeep: 260,
+    garbage: { trucks: 300, reach: 28 },
+  },
   power_plant: {
     name: 'Coal Power Plant',
     category: 'civic',
@@ -582,6 +662,14 @@ export interface BuildingInstance {
   moodDays: number;
   /** Run-down and empty after a long unhappy spell (docs/specs/needs.md). */
   abandoned: boolean;
+  /** Homes: residents' lifestyle tier (sim/systems/lifestyle.ts); Basic for everything else. */
+  lifestyle: Lifestyle;
+  /** Homes: consecutive days toward the next tier (> 0) or down a tier (< 0). */
+  lifeDays: number;
+  /** Uncollected garbage piled up here, in tons (sim/systems/garbage.ts). */
+  garbage: number;
+  /** Landfills: tons buried so far. */
+  filled: number;
   /** Battery banks: power held right now (sim/systems/energy.ts); 0 for everything else. */
   stored: number;
   /** 0..1 health of a generating plant; non-generators remain at 1. */
@@ -596,6 +684,8 @@ export interface NewBuilding extends Pick<BuildingInstance, 'def' | 'x' | 'y' | 
   construction?: number;
   /** Residents or workers carried over from the lots an upgrade replaced. */
   occupants?: number;
+  /** Homes: lifestyle carried over from the homes an upgrade replaced. */
+  lifestyle?: Lifestyle;
 }
 
 /** Zoned buildings of a zone, density, level and square footprint size (1 or 2), in catalog order. */

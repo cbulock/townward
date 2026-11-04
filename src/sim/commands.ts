@@ -2,6 +2,7 @@ import { BALANCE } from '../shared/balance';
 import { BUILDINGS, footprintOrigin, type BuildingDef, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
+import { isUnlocked } from './stages';
 import { DIRS, BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
@@ -33,7 +34,7 @@ export interface Plan {
 
 export interface ApplyResult {
   ok: boolean;
-  reason?: 'nothing-to-do' | 'insufficient-funds';
+  reason?: 'nothing-to-do' | 'insufficient-funds' | 'locked';
   /** Bounding box of changed tiles, for render refresh. */
   changed?: { minX: number; minY: number; maxX: number; maxY: number };
   /** Tiles that changed, in plan order (drives build effects). */
@@ -292,6 +293,7 @@ export function planPlace(world: World, id: BuildingId, cx: number, cy: number):
 
 export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyResult {
   if (!plan.ok) return { ok: false, reason: 'nothing-to-do' };
+  if (!isUnlocked(city, plan.building)) return { ok: false, reason: 'locked' };
   if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
   const w = city.world;
   const { size } = BUILDINGS[plan.building];

@@ -1,5 +1,6 @@
 import { BALANCE } from '../shared/balance';
 import { SIM_TICK_HZ } from '../shared/constants';
+import { Stage } from './stages';
 import type { World } from './World';
 
 /** City-wide state that isn't per-tile: money and the calendar. */
@@ -14,6 +15,10 @@ export class City {
    * this integer, never from frame time, so every machine plays a city the same way (D-068).
    */
   ticks = 0;
+  /** Highest stage reached (sim/stages.ts); it never goes back down. */
+  stage: Stage = Stage.Hamlet;
+  /** Stages lock buildings (D-086): on for player cities, off for /demo, tests and the harness. */
+  locked = false;
 
   readonly world: World;
 
