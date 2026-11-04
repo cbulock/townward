@@ -10,7 +10,8 @@ import { CoverageSystem, updateCoverage } from '../systems/coverage';
 import { FireSystem } from '../systems/fire';
 import { GarbageSystem } from '../systems/garbage';
 import { LifestyleSystem } from '../systems/lifestyle';
-import { stageFor } from '../stages';
+import { stageRequirements } from '../progression';
+import { nextStage, stageFor } from '../stages';
 import { GrowthSystem } from '../systems/growth';
 import { cityStats, PopulationSystem } from '../systems/population';
 import { TrafficSystem } from '../systems/traffic';
@@ -107,12 +108,20 @@ export class Simulation {
     return out;
   }
 
-  /** The city reaches the stage its population allows; stages never go back down (D-086). */
+  /**
+   * The city moves up one stage when it meets every requirement of the next (its population
+   * and the basics of the current stage); stages never go back down (D-086). Unlocked cities
+   * (/demo, old saves) just follow their population.
+   */
   private climbStage(out: DayOutcome) {
-    const reached = stageFor(cityStats(this.world).population);
-    if (reached <= this.city.stage) return;
-    this.city.stage = reached;
-    out.stage = reached;
+    const next = nextStage(this.city.stage);
+    if (next === null) return;
+    const ready = this.city.locked
+      ? stageRequirements(this.world, next).every((r) => r.met)
+      : stageFor(cityStats(this.world).population) >= next;
+    if (!ready) return;
+    this.city.stage = next;
+    out.stage = next;
   }
 
   /**

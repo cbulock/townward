@@ -250,8 +250,8 @@ export function deserialize(data: SaveData): City {
   city.day = data.city.day;
   city.clock = data.city.clock;
   city.taxRate = data.city.taxRate;
-  // Older saves are player cities: they lock, and their stage catches up on the first day.
-  city.locked = data.city.locked ?? true;
+  // Cities saved before stages existed keep everything they could build (user call, D-086).
+  city.locked = data.city.locked ?? false;
   city.stage = data.city.stage !== undefined && isStage(data.city.stage) ? data.city.stage : Stage.Hamlet;
   return city;
 }

@@ -466,7 +466,7 @@ export const BUILDINGS = {
     description: 'Garbage trucks empty the bins in reach. It fills up over the years, and it smells.',
     group: 'utilities',
     upkeep: 60,
-    garbage: { trucks: 120, reach: 22, holds: 8000 },
+    garbage: { trucks: 120, reach: 22, holds: 60000 },
   },
   recycling_centre: {
     name: 'Recycling Centre',

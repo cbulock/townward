@@ -7,6 +7,7 @@ import { refreshCity, Simulation } from '../src/sim/core/Simulation';
 import { emptyOutcome } from '../src/sim/core/System';
 import { roadPath, RoadType } from '../src/sim/roads';
 import { deserialize, parseSave, serialize } from '../src/sim/save';
+import { stageRequirements } from '../src/sim/progression';
 import { Stage, stageFor } from '../src/sim/stages';
 import { monthlyBudget } from '../src/sim/systems/budget';
 import { garbageDay, garbageScore } from '../src/sim/systems/garbage';
@@ -45,6 +46,21 @@ describe('city stages (docs/specs/evolution.md, E0)', () => {
     city.stage = Stage.Town;
     expect(place('hospital', 14, 23).ok).toBe(true);
     expect(only(w, 'hospital')).toBeDefined();
+  });
+
+  it('a locked city needs its basics before it climbs past the Village', () => {
+    const { w, city, place } = town(true);
+    city.stage = Stage.Village;
+    // Eleven towers (2,860 people) on the road, but no police, fire, clinic or school.
+    for (let k = 0; k < 11; k++) place('condo_tower', 1 + k * 3, 18);
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    for (const b of w.buildings.values()) if (b.def === 'condo_tower') b.occupants = 260;
+    const gate = stageRequirements(w, Stage.Town);
+    expect(gate.find((r) => r.label === 'Residents')?.met).toBe(true);
+    expect(gate.find((r) => r.label === 'Police')?.met).toBe(false);
+    sim.day();
+    expect(city.stage).toBe(Stage.Village);
   });
 
   it('climbs with population on a new day and never drops back', () => {
@@ -157,7 +173,7 @@ describe('garbage (E2)', () => {
     place('landfill', 10, 22);
     refreshCity(w);
     only(w, 'walkup').occupants = 24;
-    only(w, 'landfill').filled = 8000;
+    only(w, 'landfill').filled = 60000;
     garbageDay(city);
     expect(only(w, 'walkup').garbage).toBeGreaterThan(0);
   });

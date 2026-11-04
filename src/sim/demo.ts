@@ -30,7 +30,13 @@ const GROWTH_STEPS = 3;
 /** Days simulated after the empty lots are built out. */
 const SETTLE_DAYS = 40;
 
-type BlockUse = { kind: 'zone'; zone: ZonedType } | { kind: 'park' } | { kind: 'services' } | { kind: 'utilities' } | { kind: 'hall' };
+type BlockUse =
+  | { kind: 'zone'; zone: ZonedType }
+  | { kind: 'park' }
+  | { kind: 'services' }
+  | { kind: 'utilities' }
+  | { kind: 'hall' }
+  | { kind: 'campus' };
 
 export interface DemoCity {
   /** Tile at the middle of the planned area (for the camera). */
@@ -82,11 +88,18 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
       else if (use.kind === 'hall') {
         place('town_hall', ix + 1, iy + 1);
         for (const [x, y] of ringOf(ix, iy)) place('park', x, y);
+      } else if (use.kind === 'campus') {
+        // Downtown hospital and university, the expectations of better-off residents.
+        place('hospital', ix + 1, iy);
+        place('university', ix + 1, iy + 3);
+        zone(ix, iy, ix + 4, iy + 4, ZoneType.CommercialHigh);
       } else if (use.kind === 'services') {
         place('police_station', ix, iy);
         place('fire_station', ix + 4, iy);
         place('clinic', ix, iy + 4);
         place('school', ix + 2, iy + 2);
+        // Garbage collection for the neighbourhood (docs/specs/evolution.md, E2).
+        place('recycling_centre', ix + 1, iy);
         // The rest of the block: apartments around the services (zoning skips their tiles).
         zone(ix, iy, ix + 4, iy + 4, ZoneType.ResidentialHigh);
       } else {
@@ -256,6 +269,7 @@ function blockUse(bx: number, by: number, rng: () => number): BlockUse {
   const c = BLOCKS - 0.5;
   const ring = Math.max(Math.abs(bx - c), Math.abs(by - c)) - 0.5;
   if (ring === 0 && bx === BLOCKS - 1 && by === BLOCKS - 1) return { kind: 'hall' };
+  if (ring === 0 && bx === BLOCKS && by === BLOCKS) return { kind: 'campus' };
   // A service block every three blocks keeps everything covered, the industrial corner included.
   if (bx % 3 === 1 && by % 3 === 1) return { kind: 'services' };
   // Industry and utilities in the far corner.

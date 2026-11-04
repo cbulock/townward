@@ -53,7 +53,7 @@ export function garbageDay(city: City, collectedBy?: Map<number, number>): Garba
   for (const b of all) {
     if (!isActive(b) || b.abandoned) continue;
     const t = garbageRate(b);
-    b.garbage += t;
+    b.garbage = Math.min(b.garbage + t, t * BALANCE.garbageMaxDays);
     report.made += t;
   }
 

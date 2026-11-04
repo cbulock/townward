@@ -116,7 +116,7 @@ export const BALANCE = {
   // --- Evolution (docs/specs/evolution.md) ---
   /** Lifestyle: days in a row at or above lifeUpLine to move up a tier, below lifeDownLine to move down. */
   lifeDays: 30,
-  lifeUpLine: 0.75,
+  lifeUpLine: 0.7,
   lifeDownLine: 0.45,
   /** Tax per resident × this, by lifestyle tier (Basic, Comfortable, Prosperous). */
   lifestyleTax: [1, 1.5, 2.2],
@@ -128,10 +128,12 @@ export const BALANCE = {
   requestLine: 0.5,
   /** Garbage made per day, in tons: per resident, per shop or office worker, per industrial worker. */
   garbagePerResident: 0.02,
-  garbagePerWorker: 0.03,
-  garbagePerIndustrialWorker: 0.05,
+  garbagePerWorker: 0.01,
+  garbagePerIndustrialWorker: 0.03,
   /** The garbage need reaches 0 when the pile is this many days of a building's output. */
   garbageDays: 6,
+  /** A pile stops growing at this many days of output (it is already as bad as it gets). */
+  garbageMaxDays: 30,
   /** Income per ton a recycling centre sells. */
   recyclePrice: 0.5,
 } as const;

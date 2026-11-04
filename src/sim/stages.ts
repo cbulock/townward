@@ -56,7 +56,7 @@ export function unlockedAt(stage: Stage): BuildingId[] {
   return BUILDING_IDS.filter((id) => UNLOCKS[id] === stage);
 }
 
-/** The highest stage a population reaches. */
+/** The highest stage a population reaches (population only; sim/progression.ts has the full gate). */
 export function stageFor(population: number): Stage {
   let s: Stage = Stage.Hamlet;
   for (const st of STAGE_ORDER) if (population >= STAGES[st].population) s = st;

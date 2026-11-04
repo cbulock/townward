@@ -27,8 +27,24 @@ unlocks buildings and brings a new problem (D-086).
 | **City** | 10,000 | **university**, **incinerator** (later: trauma centre, trains) | homes become *Prosperous* and want a university |
 | **Metropolis** | 30,000 | (later: research centre, research tree) | — |
 
-- **Locking** is a `City` setting (`locked`): on for player cities, off for `/demo`, tests and
-  the harness. `applyPlace` refuses a locked building (`reason: 'locked'`).
+- **Locking** is a `City` setting (`locked`): on for new player cities, off for `/demo`, tests,
+  the harness and **cities saved before stages existed** (user call: existing players aren't
+  disturbed). `applyPlace` refuses a locked building (`reason: 'locked'`).
+
+### Stage gates (`sim/progression.ts`)
+
+A locked city climbs **one stage at a time**, and only when it meets every requirement of the
+next one: the population, and the basics of where it is now. Growth alone isn't progress.
+
+| To reach | Needs (share of occupied homes) |
+|---|---|
+| Village | 500 residents; power and water 90% |
+| Town | 2,500; power and water 90%; police, fire, clinic and school 75% each; garbage collected 90% |
+| City | 10,000; all of the above; hospital 75% |
+| Metropolis | 30,000; all of the above; university 75% |
+
+The top bar shows the next stage's checklist with progress bars, so the player always knows
+what to build next. Unlocked cities follow their population only.
 - **The build picker** shows locked buildings greyed out with "Unlocks at Town (2,500 people)".
 - **Top bar:** the stage name next to the population, with progress to the next stage in its tooltip.
 - **Stage up:** a celebration toast with what's new ("Village! New: police, fire, clinic,
@@ -47,15 +63,16 @@ Every home has a **lifestyle tier**:
 
 ### Moving up and down
 
-- **Up one tier** after **30 days in a row** with happiness ≥ **0.75**, power and water, and:
+- **Up one tier** after **30 days in a row** with happiness ≥ **0.7**, power and water, and:
   - to Comfortable: the city is at least a **Town** (2,500 people, when the hospital unlocks);
   - to Prosperous: the city is at least a **City** (10,000, when the university unlocks), and both
     a **hospital** and a **school** reach the home.
+- (Moving up needs happiness ≥ **0.7**, the same line as level 3, so the two rules agree.)
 - **Down one tier** after **30 days in a row** with happiness < **0.45**.
 - Streaks reset when the condition breaks. Abandoned and unconnected homes keep their tier and
   stop counting. New homes start Basic. When an upgrade merges homes, the new building takes the
   lowest tier among them (people bring their lifestyle; nobody gets a free upgrade).
-- The 0.75 → 0.45 gap stops a home flipping back and forth when its new expectation drops its
+- The 0.7 → 0.45 gap stops a home flipping back and forth when its new expectation drops its
   happiness by one weight's worth.
 
 ### Needs by tier
@@ -121,7 +138,7 @@ coverage bits are not part of the "all four services" check.
 
 The building tuple gains optional trailing fields `lifestyle, lifeDays, garbage, filled` after
 `stored, condition, repairDays`. `city` gains `stage` and `locked`. Older saves load as Basic,
-with empty bins, at the stage their population reached (save version stays 1).
+with empty bins, unlocked (save version stays 1).
 
 ### Performance
 
@@ -130,20 +147,20 @@ under 0.5 ms a day on /demo.
 
 ## E2: Garbage (`sim/systems/garbage.ts`, daily, from Village)
 
-- **Every active building makes garbage** each day: 0.02 per resident, 0.03 per shop or office
-  worker, 0.05 per industrial worker (tons). It piles up on the building (`garbage`).
+- **Every active building makes garbage** each day: 0.02 per resident, 0.01 per shop or office
+  worker, 0.03 per industrial worker (tons). It piles up on the building (`garbage`).
 - **Collection:** each working garbage facility has a daily truck capacity and a reach (tiles,
   and the same road island as the building, like utilities). Each day it empties the buildings
   in reach, nearest first, until today's capacity runs out.
 
 | Building | Stage | Size | Cost | Upkeep | Trucks / day | Reach | Notes |
 |---|---|---|---|---|---|---|---|
-| **Landfill** | Village | 3×3 | $3,000 | $60 | 120 t | 22 | fills up (8,000 t); full landfills stop taking garbage; smells (pollution 0.5) |
+| **Landfill** | Village | 3×3 | $3,000 | $60 | 120 t | 22 | fills up (60,000 t: about 18 months at full trucks); full landfills stop taking garbage; smells (pollution 0.5) |
 | **Recycling centre** | Town | 2×2 | $9,000 | $200 | 150 t | 24 | never fills; 40% of what it takes back as income ($0.5/t) |
 | **Incinerator** | City | 2×2 | $16,000 | $260 | 300 t | 28 | never fills; heavy smoke (pollution 0.8) |
 
 - **Need "garbage"** (every zoned building, from Village): 1 with an empty bin, falling to 0 when
-  the pile reaches 6 days of its output. Weight 0.08 for homes, 0.1 for shops, offices and industry.
+  the pile reaches 6 days of its output. A pile stops growing at 30 days of output. Weight 0.08 for homes, 0.1 for shops, offices and industry.
 - Complaint: "Garbage is piling up on our street". The info panel shows a building's pile and,
   for facilities, the tons collected today and (landfills) how full it is.
 - Budget: recycling income appears under income.

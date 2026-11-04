@@ -16,6 +16,7 @@ import { Simulation } from '../src/sim/core/Simulation';
 import { SYSTEM_BUDGETS_MS, type SystemTiming } from '../src/sim/core/timings';
 import { buildDemoCity } from '../src/sim/demo';
 import { SAMPLE_COLUMNS, sampleCity, type CitySample } from '../src/sim/history';
+import { isStage, Stage, STAGES } from '../src/sim/stages';
 import { generateTerrain } from '../src/sim/terrain/generate';
 import { PRESET_IDS, presetSettings, type PresetId } from '../src/sim/terrain/presets';
 
@@ -82,6 +83,10 @@ console.log(`build ${buildMs.toFixed(0)} ms · run ${(runMs / 1000).toFixed(1)} 
 console.log(
   `end: day ${last.day} · population ${last.population.toLocaleString()} · ${last.buildings.toLocaleString()} buildings · ` +
     `happiness ${(last.happiness * 100).toFixed(0)}% · funds $${Math.round(last.funds).toLocaleString()}`,
+);
+console.log(
+  `evolution: ${STAGES[isStage(last.stage) ? last.stage : Stage.Hamlet].name} · comfortable ${last.comfortable.toLocaleString()} · ` +
+    `prosperous ${last.prosperous.toLocaleString()} residents · uncollected garbage ${last.garbage.toLocaleString()} t`,
 );
 if (args.out) console.log(`history: ${samples.length} monthly samples → ${args.out}`);
 

@@ -1,4 +1,5 @@
 import type { Simulation } from './core/Simulation';
+import { lifestyleReport } from './systems/lifestyle';
 import { cityStats } from './systems/population';
 
 /**
@@ -27,6 +28,12 @@ export interface CitySample {
   readonly demandI: number;
   readonly powerShort: number;
   readonly waterShort: number;
+  /** City stage (sim/stages.ts) and residents per lifestyle tier (docs/specs/evolution.md). */
+  readonly stage: number;
+  readonly comfortable: number;
+  readonly prosperous: number;
+  /** Tons of garbage lying uncollected. */
+  readonly garbage: number;
 }
 
 export function sampleCity(sim: Simulation): CitySample {
@@ -35,6 +42,7 @@ export function sampleCity(sim: Simulation): CitySample {
   const traffic = sim.commute.report;
   const needs = sim.needs.report;
   const utilities = sim.utilities.report;
+  const life = lifestyleReport(sim.city);
   return {
     day: sim.city.day,
     population: s.population,
@@ -55,6 +63,10 @@ export function sampleCity(sim: Simulation): CitySample {
     demandI: demand.i,
     powerShort: utilities.power.short,
     waterShort: utilities.water.short,
+    stage: sim.city.stage,
+    comfortable: life.residents[1],
+    prosperous: life.residents[2],
+    garbage: Math.round(sim.garbage.report.uncollected),
   };
 }
 
@@ -79,4 +91,8 @@ export const SAMPLE_COLUMNS: readonly (keyof CitySample)[] = [
   'demandI',
   'powerShort',
   'waterShort',
+  'stage',
+  'comfortable',
+  'prosperous',
+  'garbage',
 ];
