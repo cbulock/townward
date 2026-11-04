@@ -537,9 +537,14 @@ export class Game {
         this.notify(
           held.filling || held.lost > 0 ? 'error' : 'info',
           `${month}: upkeep $${r.expenses.toLocaleString()} paid. $${Math.round(held.waiting).toLocaleString()} in taxes waiting. ${where}.${lost}`,
+          'taxes',
         );
       } else {
-        this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
+        this.notify(
+          r.net >= 0 ? 'info' : 'error',
+          `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`,
+          'budget',
+        );
       }
       this.renderer.indicators.setTaxesWaiting(this.city.collectsTaxes && this.city.uncollected > 0, this.world);
     }
@@ -554,16 +559,16 @@ export class Game {
       const def = STAGES[out.stage];
       const unlocked = this.city.locked ? unlockedAt(out.stage).map((id) => buildingDef(id).name) : [];
       this.sound.play('build');
-      this.notify('milestone', `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim());
+      this.notify('milestone', `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim(), `stage-${out.stage}`);
     }
     if (out.research) {
       this.sound.play('coin');
-      this.notify('milestone', `Research finished: ${out.research.name}. ${out.research.effect}.`);
+      this.notify('milestone', `Research finished: ${out.research.name}. ${out.research.effect}.`, `research-${out.research.id}`);
     }
     if (out.lifestyle === Lifestyle.Comfortable) {
-      this.notify('milestone', 'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.');
+      this.notify('milestone', 'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.', 'lifestyle-1');
     } else if (out.lifestyle === Lifestyle.Prosperous) {
-      this.notify('milestone', 'The first homes are Prosperous! They pay the most tax, and they want a university.');
+      this.notify('milestone', 'The first homes are Prosperous! They pay the most tax, and they want a university.', 'lifestyle-2');
     }
   }
 
@@ -593,6 +598,7 @@ export class Game {
         out.abandoned.length === 1
           ? `A ${name} was abandoned: its people were unhappy. See "Citizens say".`
           : `${out.abandoned.length} buildings were abandoned. See "Citizens say".`,
+        'abandoned',
       );
     }
     if (out.burned.length > 0) {
@@ -605,6 +611,7 @@ export class Game {
       this.notify(
         'error',
         out.burned.length === 1 ? `A fire destroyed a ${name}. Build a Fire Station nearby.` : `${out.burned.length} buildings burned down. Build Fire Stations to cover the city.`,
+        'fire',
       );
     }
     this.afterSimChange();
@@ -760,13 +767,15 @@ export class Game {
   private hintUtilities() {
     const r = this.sim.utilities.report;
     for (const kind of ['power', 'water'] as const) {
+      if (r[kind].short === 0) this.resolve(`needs-${kind}`);
       if (this.hinted.has(kind) || r[kind].short === 0) continue;
       this.hinted.add(kind);
       this.notify(
         'info',
         kind === 'power'
           ? 'Buildings need power: build a power plant (Civic → Utilities) on the same roads. Coal and gas run day and night; wind and solar are clean but vary'
-          : 'Buildings need water: build a Water Tower (Civic → Utilities) on the same roads',
+          : 'Buildings need water: build a Water Tower (Civic → Utilities) within 14 tiles of them',
+        `needs-${kind}`,
       );
     }
   }
@@ -802,9 +811,10 @@ export class Game {
   /** Construction stalled for want of materials: say so, at most once a month (E6). */
   private explainMaterials() {
     const r = this.sim.materials.report;
+    if (r.waiting === 0 && this.city.needsMaterials) this.resolve('materials');
     if (r.waiting === 0 || this.city.day - this.materialsNoticeDay < BALANCE.daysPerMonth) return;
     this.materialsNoticeDay = this.city.day;
-    this.notify('error', 'Construction is waiting for materials: zone industry to make them (imports only cover a little each day)');
+    this.notify('error', 'Construction is waiting for materials: zone industry to make them (imports only cover a little each day)', 'materials');
   }
 
   /**
@@ -815,10 +825,11 @@ export class Game {
     const waiting = this.sim.growth.waiting;
     for (const k of ['r', 'c', 'o', 'i'] as const) {
       this.waitingDays[k] = waiting[k] > 0 ? this.waitingDays[k] + 1 : 0;
+      if (waiting[k] === 0) this.resolve(`zones-${k}`);
       if (this.waitingDays[k] < WAIT_NOTICE_DAYS || this.city.day - this.waitNoticeDay[k] < BALANCE.daysPerMonth) continue;
       this.waitNoticeDay[k] = this.city.day;
       const what = { r: 'home', c: 'shop', o: 'office', i: 'industry' }[k];
-      this.notify('info', `${waiting[k]} empty ${what} lots aren't growing: ${this.sim.growth.explain()[k]}`);
+      this.notify('info', `${waiting[k]} empty ${what} lots aren't growing: ${this.sim.growth.explain()[k]}`, `zones-${k}`);
     }
   }
 
@@ -830,6 +841,7 @@ export class Game {
     this.emitBudget();
     const p = this.sim.utilities.report.power;
     const clockDay = Math.floor(this.city.clock / BALANCE.secondsPerClockDay);
+    if (p.short === 0) this.resolve('brownout');
     if (p.short === 0 || this.brownoutDay === clockDay) return;
     this.brownoutDay = clockDay;
     const hour = String(Math.floor(this.city.hour)).padStart(2, '0');
@@ -837,6 +849,7 @@ export class Game {
     this.notify(
       'error',
       `Brownout at ${hour}:00: ${p.short} building${p.short === 1 ? '' : 's'} without power.${cause} add Battery Banks or a steady Coal or Gas plant.`,
+      'brownout',
     );
     this.emitCity();
   }
@@ -926,6 +939,7 @@ export class Game {
     }
     this.sound.play('coin');
     this.notify('info', `Collected $${r.amount.toLocaleString()} in taxes`);
+    this.resolve('taxes');
     this.events.emit('funds', this.city.funds);
     this.renderer.indicators.setTaxesWaiting(false, this.world);
     this.emitCity();
@@ -1132,8 +1146,16 @@ export class Game {
     return null;
   }
 
-  private notify(kind: Notice['kind'], message: string) {
-    this.events.emit('notice', { id: ++noticeSeq, kind, message });
+  /** A toast; with a `key` it is also kept in the alerts inbox until resolved or dismissed. */
+  private notify(kind: Notice['kind'], message: string, key?: string) {
+    const { year, month, dayOfMonth } = this.city.date;
+    const date = `${MONTH_NAMES[month]} ${dayOfMonth}, Y${year}`;
+    this.events.emit('notice', { id: ++noticeSeq, kind, message, ...(key && { key, date }) });
+  }
+
+  /** An ongoing problem is gone: clear its alert. */
+  private resolve(key: string) {
+    this.events.emit('resolve', key);
   }
 
   // ---------------------------------------------------------------- loop

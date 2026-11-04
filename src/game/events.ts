@@ -27,6 +27,8 @@ export interface GameEventMap {
   /** Live cost label for an in-progress drag; null when there's nothing to show. */
   toolPreview: ToolPreviewInfo | null;
   notice: Notice;
+  /** An ongoing problem was fixed: drop its alert (the Notice key) from the inbox. */
+  resolve: string;
   muted: boolean;
   /** View rotation in quarter turns (0–3). */
   rotation: number;
@@ -195,6 +197,14 @@ export interface Notice {
   /** Milestones (a new stage, residents moving up) stand out and stay longer. */
   kind: 'error' | 'info' | 'milestone';
   message: string;
+  /**
+   * Alerts worth keeping carry a key: they go to the alerts inbox, a newer one with the same key
+   * replaces the older, and the game resolves the key when the problem is gone. Without a key a
+   * notice is only a toast.
+   */
+  key?: string;
+  /** The game date it happened, for the inbox ("Jul 9, Y3"). */
+  date?: string;
 }
 
 export interface DebugStats {

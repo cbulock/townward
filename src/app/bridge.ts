@@ -13,6 +13,9 @@ import {
   inspectAtom,
   mutedAtom,
   noticesAtom,
+  inboxAtom,
+  INBOX_MAX,
+  type InboxAlert,
   rotationAtom,
   clockAtom,
   dayNightAtom,
@@ -33,6 +36,8 @@ const NOTICE_MS = 2600;
 export function connectGameToStore(game: Game, store: Store): () => void {
   // Seed atoms with current state; events only carry changes.
   store.set(gameAtom, game);
+  // A different city: its own alerts only.
+  store.set(inboxAtom, []);
   store.set(fundsAtom, game.city.funds);
   store.set(activeToolAtom, game.tool);
   store.set(mutedAtom, game.muted);
@@ -63,6 +68,12 @@ export function connectGameToStore(game: Game, store: Store): () => void {
     game.events.on('inspect', (i) => store.set(inspectAtom, i)),
     game.events.on('toolPreview', (p) => store.set(toolPreviewAtom, p)),
     game.events.on('notice', (n) => {
+      // Alerts with a key stay in the inbox: a newer one with the same key replaces the older.
+      const key = n.key;
+      if (key) {
+        const alert: InboxAlert = { key, kind: n.kind, message: n.message, date: n.date ?? '', id: n.id, read: false };
+        store.set(inboxAtom, (list) => [alert, ...list.filter((a) => a.key !== key)].slice(0, INBOX_MAX));
+      }
       store.set(noticesAtom, (list) => [...list.slice(-2), n]);
       const timer = setTimeout(() => {
         timers.delete(timer);
@@ -70,6 +81,8 @@ export function connectGameToStore(game: Game, store: Store): () => void {
       }, n.kind === 'milestone' ? NOTICE_MS * 2.5 : NOTICE_MS);
       timers.add(timer);
     }),
+    // An ongoing problem was fixed: its alert goes.
+    game.events.on('resolve', (key) => store.set(inboxAtom, (list) => (list.some((a) => a.key === key) ? list.filter((a) => a.key !== key) : list))),
   ];
   game.emitCity();
   game.emitBudget();

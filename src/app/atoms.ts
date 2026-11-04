@@ -18,6 +18,20 @@ export const fundsAtom = atom(0);
 export const activeToolAtom = atom<ToolId>('select');
 export const toolPreviewAtom = atom<ToolPreviewInfo | null>(null);
 export const noticesAtom = atom<readonly Notice[]>([]);
+
+/** An alert kept in the inbox until the game resolves it or the player dismisses it. */
+export interface InboxAlert {
+  key: string;
+  kind: Notice['kind'];
+  message: string;
+  date: string;
+  /** Notice id of the latest version (newest first). */
+  id: number;
+  read: boolean;
+}
+/** The alerts inbox (top bar bell), newest first; at most INBOX_MAX. */
+export const inboxAtom = atom<readonly InboxAlert[]>([]);
+export const INBOX_MAX = 40;
 export const mutedAtom = atom(false);
 export const buildingChoiceAtom = atom<BuildingId>('park');
 /** Footpath style picked in the road tool (0 = each road's default). */

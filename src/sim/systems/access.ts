@@ -1,3 +1,4 @@
+import { roadSpec } from '../roadTypes';
 import { BALANCE } from '../../shared/balance';
 import { BUILDINGS, type BuildingInstance } from '../buildings/catalog';
 import { BridgeAxis, RoadType } from '../roads';
@@ -22,6 +23,14 @@ function isLandRoad(world: World, i: number): boolean {
  * edge, then east, north and west.
  */
 export function findEntrance(world: World, x: number, y: number, w: number, h: number, range: number): number {
+  // Buildings front onto streets, avenues and boulevards (roads with a pavement); highways,
+  // expressways and ramps only when nothing else is in reach, so local trips stay off them
+  // (docs/specs/transport.md, "Frontage").
+  const street = nearestRoad(world, x, y, w, h, range, (i) => roadSpec(world.road[i])?.footpath != null);
+  return street !== -1 ? street : nearestRoad(world, x, y, w, h, range, () => true);
+}
+
+function nearestRoad(world: World, x: number, y: number, w: number, h: number, range: number, ok: (i: number) => boolean): number {
   for (let d = 1; d <= range; d++) {
     const x0 = x - d;
     const y0 = y - d;
@@ -30,7 +39,7 @@ export function findEntrance(world: World, x: number, y: number, w: number, h: n
     let best = -1;
     let bestSteps = Infinity;
     const check = (tx: number, ty: number) => {
-      if (!world.inBounds(tx, ty) || !isLandRoad(world, world.index(tx, ty))) return;
+      if (!world.inBounds(tx, ty) || !isLandRoad(world, world.index(tx, ty)) || !ok(world.index(tx, ty))) return;
       // Straight-line (Manhattan) steps from the footprint's edge.
       const steps = Math.max(0, x - tx, tx - (x + w - 1)) + Math.max(0, y - ty, ty - (y + h - 1));
       if (steps < bestSteps) {

@@ -30,6 +30,8 @@ const car = (path: Int32Array, t: number): Agent => ({
   wait: 0,
   dwell: 0,
   stopSeg: -1,
+  lane: 0,
+  prevLane: 0,
 });
 
 describe('rush hours', () => {
@@ -128,5 +130,43 @@ describe('bus stops', () => {
     for (let x = 2; x < 28; x += 2) applyPlace(city, planPlace(w, 'apartment_block', x, 3), 0);
     updateRoadAccess(w);
     expect(computeBusStops(w)).toHaveLength(0);
+  });
+});
+
+describe('multi-lane roads and frontage (transport overhaul, step 1)', () => {
+  it('a building between a highway and a street takes its access from the street', () => {
+    const w = new World(20, 20, 4);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 8 }, { x: 19, y: 8 }, true), RoadType.Highway), RoadType.Highway);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 11 }, { x: 19, y: 11 }, true), RoadType.Road), RoadType.Road);
+    applyPlace(city, planPlace(w, 'walkup', 6, 9), 0);
+    updateRoadAccess(w);
+    const home = [...w.buildings.values()][0];
+    expect(w.road[home.entrance]).toBe(RoadType.Road);
+  });
+
+  it('cars on a busy boulevard spread over its lanes', () => {
+    const w = new World(64, 16, 5);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 8 }, { x: 63, y: 8 }, true), RoadType.Boulevard), RoadType.Boulevard);
+    const place = (id: Parameters<typeof planPlace>[1], x: number, y: number) => applyPlace(city, planPlace(w, id, x, y), 0);
+    for (const x of [28, 30, 32, 34]) place('power_plant', x, 4);
+    for (const x of [6, 20, 44, 58]) {
+      place('water_tower', x, 5);
+      place('water_tower', x + 1, 5);
+    }
+    for (let x = 0; x < 16; x += 2) for (const y of [4, 11]) place('condo_tower', x, y);
+    for (let x = 48; x < 64; x += 2) for (const y of [4, 11]) place('office_tower', x, y);
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    sim.runDays(10);
+    const lanes = new Set<number>();
+    for (let f = 0; f < 3000; f++) {
+      sim.frame(1 / 15);
+      for (const a of sim.traffic.traffic.agents) if (a.kind !== 'person') lanes.add(a.lane);
+    }
+    expect(lanes.size).toBeGreaterThanOrEqual(2);
   });
 });

@@ -6,6 +6,7 @@ import { AccountButton } from '../account/AccountButton';
 import { tourStepAtom } from '../tour/tourState';
 import { SaveStatus } from './SaveStatus';
 import { StageChip } from './StageChip';
+import { AlertsButton } from './AlertsButton';
 import { aqiBand } from '../../sim/systems/air';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -400,6 +401,7 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
           </svg>
         </button>
       </Fold>
+      <AlertsButton />
       <button type="button" className="icon-button" title="Tour the basics" aria-label="Tour the basics" onClick={() => setTourStep(0)}>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <g {...icon}>

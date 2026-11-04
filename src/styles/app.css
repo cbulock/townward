@@ -4605,3 +4605,126 @@ summary {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Alerts inbox (top bar bell) ---------- */
+.alerts-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.alerts-button {
+  position: relative;
+}
+.alerts-button.is-open {
+  background: var(--bg-panel-hover);
+}
+.alerts-badge {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #2a0b0b;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.alerts-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -8px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
+  padding: 12px;
+  font-size: 12px;
+}
+.alerts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.alerts-clear {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.alerts-clear:hover {
+  color: var(--text);
+}
+.alerts-empty {
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.alert-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 8px 8px 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.alert-item i {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.alert-error i {
+  background: var(--danger);
+}
+.alert-milestone i {
+  background: var(--warn);
+}
+.alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.4;
+}
+.alert-date {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.alert-dismiss {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.alert-dismiss:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text);
+}
+@media (max-height: 520px) {
+  .alerts-menu {
+    position: fixed;
+    top: calc(48px + var(--safe-t));
+    right: calc(8px + var(--safe-r));
+    max-height: calc(100dvh - 60px - var(--safe-t) - var(--safe-b));
+  }
+}

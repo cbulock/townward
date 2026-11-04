@@ -25,6 +25,8 @@ const person = (path: Int32Array, seg: number, t: number): Agent => ({
   wait: 0,
   dwell: 0,
   stopSeg: -1,
+  lane: 0,
+  prevLane: 0,
 });
 
 describe('pedestrians on footpaths', () => {

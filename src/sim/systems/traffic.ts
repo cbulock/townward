@@ -7,6 +7,9 @@ import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
 import { roadSpec } from '../roadTypes';
 
+/** Most lanes a road has each way (expressway carriageways have 4); sizes the lane keys. */
+const MAX_LANES = 4;
+
 /** Cars may drive this road type (pedestrian streets: walkers only). */
 const carsMay = (t: number) => roadSpec(t)?.cars ?? false;
 
@@ -48,6 +51,9 @@ export interface Agent {
   /** Buses: seconds left at the current stop, and the path segment where they last stopped. */
   dwell: number;
   stopSeg: number;
+  /** Which lane it drives in on this segment (0 inner … lanes − 1 outer), and the one before, to ease across. */
+  lane: number;
+  prevLane: number;
 }
 
 /** A bus stop: a road tile and the pavement side its shelter stands on (0 −y, 1 +x, 2 +y, 3 −x). */
@@ -243,10 +249,16 @@ function rightOf(dir: number): [number, number] {
 }
 
 /** Lane offset of a vehicle on a tile: on multi-lane roads buses, trucks and some cars keep to the outer lane. */
-function laneOffset(world: World, a: Agent, tile: number): number {
+/** Lanes each way on a road tile (its road type's lane table). */
+function laneCount(world: World, tile: number): number {
+  return roadSpec(world.road[tile])?.lanes.length || 1;
+}
+
+/** The sideways offset of lane `lane` on a tile (clamped to the lanes the road has). */
+function laneOffset(world: World, tile: number, lane: number): number {
   const lanes = roadSpec(world.road[tile])?.lanes;
-  if (!lanes || lanes.length === 1) return lanes?.[0] ?? TRAFFIC.laneOffset;
-  return isLong(a) || a.variant % 3 === 0 ? lanes[lanes.length - 1] : lanes[0];
+  if (!lanes || lanes.length === 0) return TRAFFIC.laneOffset;
+  return lanes[Math.max(0, Math.min(lanes.length - 1, lane))];
 }
 
 /** Roads with footpaths both sides (pedestrians stroll there; never highways, bridges or one-way carriageways). */
@@ -302,14 +314,14 @@ export function agentPose(world: World, a: Agent): AgentPose {
   const y0 = Math.floor(i0 / w) + 0.5;
   const x1 = (i1 % w) + 0.5;
   const y1 = Math.floor(i1 / w) + 0.5;
-  const offset = laneOffset(world, a, i0);
+  const offset = laneOffset(world, i0, a.lane);
   const [rx, ry] = rightOf(dir);
   let ox = rx * offset;
   let oy = ry * offset;
   // Ease in from the previous segment's lane so turns and lane changes don't jump.
   if (a.seg > 0 && a.t < TRAFFIC.laneBlend) {
     const pd = stepDir(p[a.seg - 1], i0);
-    const prevOffset = laneOffset(world, a, p[a.seg - 1]);
+    const prevOffset = laneOffset(world, p[a.seg - 1], a.prevLane);
     if (pd !== dir || prevOffset !== offset) {
       const [px, py] = rightOf(pd);
       const k = a.t / TRAFFIC.laneBlend;
@@ -579,7 +591,8 @@ export class Traffic {
   }
 
   private addVehicle(kind: AgentKind, path: Int32Array, speed: number, dwell = 0) {
-    this.agents.push({ kind, path, seg: 0, t: 0, speed, variant: Math.floor(this.rng() * 6), age: 0, wait: 0, dwell, stopSeg: dwell > 0 ? 0 : -1 });
+    const lane = this.pickLane(path[0], path[1], kind === 'bus' || kind === 'truck');
+    this.agents.push({ kind, path, seg: 0, t: 0, speed, variant: Math.floor(this.rng() * 6), age: 0, wait: 0, dwell, stopSeg: dwell > 0 ? 0 : -1, lane, prevLane: lane });
   }
 
   /** Buses out from a station: those whose round trip starts and ends at its entrance. */
@@ -649,6 +662,8 @@ export class Traffic {
       wait: 0,
       dwell: 0,
       stopSeg: -1,
+      lane: 0,
+      prevLane: 0,
     });
   }
 
@@ -709,8 +724,39 @@ export class Traffic {
   }
 
   /** Lane key: one direction of one road segment. */
+  /** One lane of one direction of one road segment. */
   private laneKey(a: Agent, seg: number): number {
-    return a.path[seg] * this.junction.length + a.path[seg + 1];
+    return this.edgeLaneKey(a.path[seg], a.path[seg + 1], Math.min(a.lane, laneCount(this.world, a.path[seg]) - 1));
+  }
+
+  private edgeLaneKey(from: number, to: number, lane: number): number {
+    return (from * this.junction.length + to) * MAX_LANES + lane;
+  }
+
+  /**
+   * The lane to take onto the segment from → to: the one with the most room at its start (the
+   * last car in it furthest along), keeping right on ties; buses and trucks keep to the outer lane.
+   */
+  private pickLane(from: number, to: number, long: boolean): number {
+    const n = laneCount(this.world, from);
+    if (n === 1 || long) return n - 1;
+    let best = n - 1;
+    let bestRoom = -1;
+    for (let l = n - 1; l >= 0; l--) {
+      const queue = this.lanes.get(this.edgeLaneKey(from, to, l));
+      const room = queue && queue.length > 0 ? queue[queue.length - 1].t : 2;
+      if (room > bestRoom) {
+        best = l;
+        bestRoom = room;
+      }
+    }
+    return best;
+  }
+
+  /** The room at the start of a segment in the lane a car would take (the tail car, if any). */
+  private entryTail(from: number, to: number, long: boolean): Agent | undefined {
+    const queue = this.lanes.get(this.edgeLaneKey(from, to, this.pickLane(from, to, long)));
+    return queue?.[queue.length - 1];
   }
 
   /**
@@ -753,8 +799,8 @@ export class Traffic {
           const lead = this.laneKey(ahead, ahead.seg) === this.laneKey(a, a.seg) ? ahead.t : 1 + ahead.t;
           limit = lead - (isLong(ahead) ? TRAFFIC.longGap : TRAFFIC.gap);
         } else if (a.seg + 1 < last) {
-          const next = lanes.get(p[a.seg + 1] * this.junction.length + p[a.seg + 2]);
-          const tail = next?.[next.length - 1];
+          // Room in the lane it will take on the next segment.
+          const tail = this.entryTail(p[a.seg + 1], p[a.seg + 2], isLong(a));
           if (tail && tail !== a) limit = 1 + tail.t - (isLong(tail) ? TRAFFIC.longGap : TRAFFIC.gap);
         }
         // Junction ahead: stop at the line (halfway along the approach) on red, at a give-way
@@ -763,8 +809,9 @@ export class Traffic {
         const j = p[a.seg + 1];
         if (a.seg + 1 < last && this.junction[j] && a.t < 0.5) {
           const axis = stepDir(p[a.seg], j) % 2;
-          const exit = lanes.get(j * this.junction.length + p[a.seg + 2]);
-          const exitFull = !!exit && exit.some((b) => b !== a && b.t < TRAFFIC.gap + 0.25);
+          // The road beyond is full only when the lane it would take there is (every lane is, then).
+          const exitTail = this.entryTail(j, p[a.seg + 2], isLong(a));
+          const exitFull = !!exitTail && exitTail !== a && exitTail.t < TRAFFIC.gap + 0.25;
           const stop =
             this.control[j] === Control.Lights
               ? axis !== this.greenAxis(j)
@@ -785,6 +832,9 @@ export class Traffic {
         while (a.t >= 1 && a.seg < last) {
           a.t -= 1;
           a.seg++;
+          // Onto the next segment: take the lane with the most room there.
+          a.prevLane = a.lane;
+          if (a.seg < last) a.lane = this.pickLane(p[a.seg], p[a.seg + 1], isLong(a));
           // Buses pull in at every stop they pass (not the one they started from).
           if (a.kind === 'bus' && a.seg < last && a.stopSeg !== a.seg && this.stopTiles.has(p[a.seg])) {
             a.stopSeg = a.seg;

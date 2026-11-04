@@ -2,6 +2,9 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-05: Alerts inbox
+- Notices worth keeping carry a key and go to a top-bar alerts inbox (bell with an unread count): problems stay until the game resolves them (taxes collected, power back, materials arriving, water and power needs met, zones growing again) or the player dismisses them; a newer alert with the same key replaces the older; milestones, fires and abandonment stay until dismissed. Toasts are unchanged. Cleared per city.
+
 ## 2026-11-05: Water by reach; bus stops off highways; police, fire and clinic from the start (D-093)
 - `systems/utilities.ts`: water towers serve buildings within 14 tiles (nearest tower with water left), replacing road-island pooling; reach preview, card stat, info panel and the no-water alert updated. /demo: towers on a 12-tile grid plus every downtown block (37, no dry buildings). Test towns given towers within reach.
 - `systems/traffic.ts`: bus stops only on roads with a pavement; test that a highway gets none (fails on the old code).
