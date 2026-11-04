@@ -4399,3 +4399,41 @@ summary {
   font-size: 11px;
   font-weight: 600;
 }
+
+/* The map renderer couldn't start (no WebGL or WebGPU). */
+.render-failed {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 20;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px 22px;
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+.render-failed h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.render-failed p {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.render-failed .primary-button {
+  align-self: flex-start;
+  min-height: 34px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -1,7 +1,7 @@
 import { BUILDINGS, buildingDef, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
 import { roadMask, RoadType } from '../roads';
 import { World } from '../World';
-import { balancePower, buildingOutput, type GridHour, type PowerReport } from './energy';
+import { balancePower, plantOutput, type GridHour, type PowerReport } from './energy';
 import type { SimSystem } from '../core/System';
 
 /**
@@ -64,8 +64,19 @@ function powerNetwork(buildings: readonly BuildingInstance[], islands: Int32Arra
   };
 }
 
-/** Apply one day's maintenance wear and progress existing repairs. */
+/**
+ * Apply one day's maintenance wear and progress existing repairs. A plant wears when the grid
+ * as a whole runs above its safe share: demand against every working plant's *full* output
+ * (docs/specs/energy.md). Comparing against one plant's output, as before, wore every plant
+ * in a city with more than one, and derated output fed back into the load (a death spiral).
+ */
 function maintainPlants(world: World, report: UtilityReport) {
+  let capacity = 0;
+  for (const b of world.buildings.values()) {
+    const d = buildingDef(b.def);
+    if (d.energy && d.energy.source !== 'battery' && isWorking(b)) capacity += plantOutput(d, null);
+  }
+  const load = capacity === 0 ? 0 : report.power.demand / capacity;
   for (const b of world.buildings.values()) {
     const energy = buildingDef(b.def).energy;
     if (!energy || energy.source === 'battery' || b.construction > 0 || b.entrance === -1) continue;
@@ -74,9 +85,6 @@ function maintainPlants(world: World, report: UtilityReport) {
       if (b.repairDays === 0) b.condition = 1;
       continue;
     }
-    const output = buildingOutput(b, null);
-    const demand = report.power.demand;
-    const load = output === 0 ? 0 : demand / Math.max(1, output);
     if (load > (energy.overload ?? 0.9)) {
       b.condition = Math.max(0, b.condition - 0.04 * Math.min(2, load));
       if (b.condition <= 0) {

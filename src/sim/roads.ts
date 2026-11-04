@@ -83,7 +83,10 @@ function opensMedian(world: World, x: number, y: number): boolean {
     const ny = y + DIRS[side][1];
     if (!world.inBounds(nx, ny)) continue;
     const j = world.index(nx, ny);
-    if (world.road[j] === RoadType.None) continue;
+    // Only a road that joins this one and carries cars opens the median: a pedestrian street
+    // or a street beside an expressway runs alongside, it doesn't cross (user report: a
+    // pedestrian street next to an expressway put traffic lights on every tile).
+    if (world.road[j] === RoadType.None || world.road[j] === RoadType.Pedestrian || !accessOk(world.road[i], world.road[j])) continue;
     const dj = laneDir(world, j);
     if (dj < 0 || !sameAxis(dj, d)) return true;
   }

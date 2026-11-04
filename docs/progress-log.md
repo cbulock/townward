@@ -2,6 +2,15 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04 (later): Bug fixes: power wear, black map, lights on wide roads; demo substations (D-087)
+- Power: plant wear now uses grid load (demand ÷ all plants' full output). /demo after 90 days: 0 unpowered homes (was 819), commute times for 818/819 homes (was 0–190). Over 2 years /demo now ends at 88% happiness (was 62–69%) with 4,706 Comfortable and 18,962 Prosperous residents. The long-failing `transport.test.ts` corridor test was a real overload (one plant for ~7,000 demand); it now has three plants.
+- Renderer: `preference: ['webgl', 'webgpu']`; a "Your browser can't draw the city" card when neither exists. Checked in headless Chrome without GL (card) and with SwiftShader (map draws).
+- Roads: medians open only for side roads that join and carry cars; traffic lights only where 3+ car roads meet.
+- /demo: 24 substations on a 12-tile grid and power plants for the evening peak plus 40%.
+- Tests: plant wear (fails on the old rule), lights beside wide roads (fails on the old rule), moves during growth keep footprints consistent. 227 pass.
+- Not reproduced yet: "new buildings are built over a moved building" (asked the user for steps).
+- Cost note: with every home powered the commute model routes the whole city: `commute.day` ~64 ms on /demo (engine step 11.5 is the fix).
+
 ## 2026-11-04: City evolution: stages, lifestyle, hospital, university, garbage (D-085, D-086)
 - Spec [specs/evolution.md](specs/evolution.md). Decisions: the server will run each city (D-085, features first); stages lock buildings and garbage starts at Village (D-086).
 - Sim: `sim/stages.ts` (Hamlet → Village 500 → Town 2,500 → City 10,000 → Metropolis 30,000, unlock table), `sim/progression.ts` (stage gates: population plus the basics of the current stage), `systems/lifestyle.ts` (Basic → Comfortable → Prosperous; better-off homes expect a hospital, then a university, and pay 1.5× / 2.2× tax), `systems/garbage.ts` (daily garbage, collection by landfill / recycling centre / incinerator over road islands; landfills fill; recycling sells). Needs gained hospital, university and garbage, tier weights, and requests from content homes. University graduates add office demand. Hospitals count as clinics; level 3 still needs the four basic services.

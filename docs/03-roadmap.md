@@ -225,6 +225,8 @@ We focus on **one** terrain and make it look great before adding presets or menu
   - [x] T2 Boulevard (6 lanes) and Expressway (8 lanes) as 2-tile one-way carriageways (`World.lane`), ramps (expressways join only ramps and highways), pedestrian streets (walkers only), pavement styles (concrete, brick, granite setts, promenade; `World.pave`), turnarounds at wide-road ends, one-way routing for commutes and cars, Road picker UI; avenue trees redesigned after user feedback
   - [ ] **Next (user requests):** Move tool (pick up a building and place it elsewhere); camera: rotate by dragging (middle mouse / Alt) with an animated quarter turn
   - [ ] T3 Flyovers, interchange prefabs, truss / cable-stayed / suspension bridges, tunnels
+  - [ ] **Curved roads** (user request, 2026-11-04): smooth bends and diagonal roads instead of right-angle grids; needs a spec (curves over the tile grid, how lots front them, how cars follow them)
+  - [ ] Smarter junction control (user report, 2026-11-04: too many lights): lights only where traffic needs them, stop signs and roundabouts otherwise (T4)
   - [ ] T4 Road segment graph + Dijkstra (fixes the 92 ms day), junction control, adaptive lights, isochrones
   - [ ] T5 Buses: stops, line tool, depots, line panel, mode choice, transit view
   - [ ] T6 Trams, metro, rail, ferries, transfers

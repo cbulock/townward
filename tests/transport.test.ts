@@ -15,8 +15,11 @@ function corridor(type: BuildableRoad) {
   w.terrain.fill(Terrain.Grass);
   const city = new City(w, 1e9);
   applyRoad(city, planRoad(w, roadPath({ x: 0, y: 5 }, { x: 63, y: 5 }, true), type), type);
-  // Utilities right by the road (within the 3-tile access range).
+  // Utilities right by the road (within the 3-tile access range). Three plants keep the grid
+  // under its wear threshold (docs/specs/energy.md), so the corridor never loses power mid-test.
   applyPlace(city, planPlace(w, 'power_plant', 30, 3), 0);
+  applyPlace(city, planPlace(w, 'power_plant', 34, 3), 0);
+  applyPlace(city, planPlace(w, 'power_plant', 30, 6), 0);
   applyPlace(city, planPlace(w, 'water_tower', 32, 4), 0);
   applyPlace(city, planPlace(w, 'water_tower', 33, 4), 0);
   for (let x = 0; x < 14; x++) for (const y of [3, 4, 6, 7]) applyPlace(city, planPlace(w, 'walkup', x, y), 0);
@@ -59,6 +62,23 @@ describe('wide roads, ramps and pedestrian streets (T2)', () => {
   }
   const build = (city: City, type: BuildableRoad, a: { x: number; y: number }, b: { x: number; y: number }) =>
     applyRoad(city, planRoad(city.world, roadPath(a, b, true), type), type);
+
+  it('pedestrian streets alongside an expressway or boulevard open no median and put up no lights', () => {
+    // User report: a pedestrian street next to an expressway had traffic lights on every tile.
+    for (const type of [RoadType.Expressway, RoadType.Boulevard] as const) {
+      const { w, city } = flat(24);
+      build(city, type, { x: 2, y: 10 }, { x: 20, y: 10 }); // rows 9 and 10
+      build(city, RoadType.Pedestrian, { x: 2, y: 8 }, { x: 20, y: 8 });
+      build(city, RoadType.Pedestrian, { x: 2, y: 11 }, { x: 20, y: 11 });
+      for (let x = 4; x <= 18; x++) {
+        // No link across the median mid-span (row 9 → SW, row 10 → NE).
+        expect(roadMask(w, x, 9) & 0b0100).toBe(0);
+        expect(roadMask(w, x, 10) & 0b0001).toBe(0);
+      }
+      const sim = new Simulation(city);
+      expect(sim.traffic.traffic.lights()).toHaveLength(0);
+    }
+  });
 
   it('one drag lays a boulevard as two opposite one-way carriageways that join only at crossings and ends', () => {
     const { w, city } = flat();

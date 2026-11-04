@@ -2,10 +2,13 @@ import { mulberry32 } from '../../shared/rng';
 import { BUILDINGS } from '../buildings/catalog';
 import { isActive } from './access';
 import { speedFactor, type CommuteTrip } from './commute';
-import { roadMask, RoadType, stepAllowed } from '../roads';
+import { DIRS as DIR_STEP, roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
 import type { SimSystem, WorldChange } from '../core/System';
 import { roadSpec } from '../roadTypes';
+
+/** Cars may drive this road type (pedestrian streets: walkers only). */
+const carsMay = (t: number) => roadSpec(t)?.cars ?? false;
 
 /**
  * Cars and pedestrians moving over the road network. Pure data and logic;
@@ -359,8 +362,11 @@ export class Traffic {
       for (let x = 0; x < w.width; x++) {
         const i = w.index(x, y);
         if (w.road[i] !== RoadType.None) this.roadTiles++;
-        const m = roadMask(w, x, y);
-        const links = (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
+        // A junction is where three or more car roads meet; a pedestrian street joining one
+        // gets a zebra crossing, not lights.
+        const m = carsMay(w.road[i]) ? roadMask(w, x, y) : 0;
+        let links = 0;
+        for (let d = 0; d < 4; d++) if (m & (1 << d) && carsMay(w.road[w.index(x + DIR_STEP[d][0], y + DIR_STEP[d][1])])) links++;
         this.junction[i] = links >= 3 ? 1 : 0;
         if (links >= 3) this.junctions.push(i);
       }

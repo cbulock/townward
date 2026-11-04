@@ -3,6 +3,7 @@ import { ART_VARIANTS, BUILDINGS, startLevel, zonedBuildings, type BuildingDef, 
 import { BALANCE } from '../shared/balance';
 import { Decor } from './terrain/types';
 import type { City } from './City';
+import type { World } from './World';
 import { applyPlace, applyRoad, applyZone, planPlace, planRoad, planZone, type Plan } from './commands';
 import { growDay } from './systems/growth';
 import { refreshCity } from './core/Simulation';
@@ -29,6 +30,8 @@ const DAYS = 640;
 const GROWTH_STEPS = 3;
 /** Days simulated after the empty lots are built out. */
 const SETTLE_DAYS = 40;
+/** Power plants for this much more than the evening peak (the city keeps growing). */
+const POWER_HEADROOM = 1.4;
 
 type BlockUse =
   | { kind: 'zone'; zone: ZonedType }
@@ -83,6 +86,9 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
       const iy = y0 + by * PITCH + 1;
       const zone = (x: number, y: number, x1: number, y1: number, z: ZonedType) =>
         applyZone(city, planZone(w, rectTiles({ x, y }, { x: x1, y: y1 }), z), z);
+      // Power substations on a 12-tile grid (every other block's south corner, by the street):
+      // every building is within a substation's 12-tile reach (docs/specs/energy.md).
+      if (bx % 2 === 0 && by % 2 === 0) place('substation', ix + 4, iy + 4);
       if (use.kind === 'zone') zone(ix, iy, ix + 4, iy + 4, use.zone);
       else if (use.kind === 'park') for (let y = iy; y < iy + 5; y++) for (let x = ix; x < ix + 5; x++) place('park', x, y);
       else if (use.kind === 'hall') {
@@ -146,6 +152,7 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
     simulateDay(w);
   }
   for (let k = 0; k < 60 && serveIslands(city, utilitySlots, rng); k++);
+  powerHeadroom(city, utilitySlots, rng);
   refreshCity(w);
   city.day = DAYS + SETTLE_DAYS;
   return { centre: { x: x0 + span / 2, y: y0 + span / 2 } };
@@ -248,6 +255,43 @@ function serveIslands(city: City, slots: UtilitySlot[], rng: () => number): bool
   }
   refreshCity(w);
   return true;
+}
+
+/**
+ * Plants for the evening peak plus room for the city to keep growing, so a visitor's demo
+ * doesn't brown out or wear its plants down (docs/specs/energy.md). Substations pool every
+ * plant into one grid, so any free spot by a road will do.
+ */
+function powerHeadroom(city: City, slots: UtilitySlot[], rng: () => number) {
+  const w = city.world;
+  let peak = 0;
+  let capacity = 0;
+  for (const b of w.buildings.values()) {
+    const d: BuildingDef = BUILDINGS[b.def];
+    if (needsUtilities(d)) peak += d.capacity;
+    if (d.energy && d.energy.source !== 'battery') capacity += d.supplies?.power ?? 0;
+  }
+  const want = peak * POWER_HEADROOM;
+  const plant = BUILDINGS.power_plant.supplies.power;
+  const islands = roadIslands(w);
+  for (let guard = 0; capacity < want && guard < 40; guard++) {
+    const k = slots.findIndex((s) => s.id === 'power_plant' && applyPlace(city, planPlace(w, s.id, s.x, s.y), Math.floor(rng() * ART_VARIANTS)).ok);
+    if (k !== -1) slots.splice(k, 1);
+    else placeOnIsland(city, 'power_plant', islands[findCentreRoad(w)], islands, rng);
+    capacity += plant;
+  }
+}
+
+/** A road tile at (or nearest) the map centre. */
+function findCentreRoad(w: World): number {
+  const cx = Math.floor(w.width / 2);
+  const cy = Math.floor(w.height / 2);
+  for (let r = 0; r < w.width; r++) {
+    for (let y = cy - r; y <= cy + r; y++) {
+      for (let x = cx - r; x <= cx + r; x++) if (w.inBounds(x, y) && w.road[w.index(x, y)] !== RoadType.None) return w.index(x, y);
+    }
+  }
+  return 0;
 }
 
 /** Place `id` on the first free spot whose entrance road is on `island`. */

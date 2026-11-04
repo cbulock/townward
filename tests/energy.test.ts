@@ -73,4 +73,29 @@ describe('energy (docs/specs/energy.md)', () => {
       expect(sim.utilities.report.power.sources.gas).toBe(5000);
     }
   });
+
+  it('plants with headroom never wear, however many there are; an overloaded grid does', () => {
+    // Regression: wear compared the whole city's demand with ONE plant's output, so every
+    // plant in a multi-plant city wore out and the city browned out for good.
+    // Five turbines (2,000 together) under a row of apartments: more than one turbine's safe
+    // share, well under the grid's.
+    const turbines = ['wind_turbine', 'wind_turbine', 'wind_turbine', 'wind_turbine', 'wind_turbine'] as const;
+    const healthy = grid(turbines, 0);
+    for (let x = 0; x < 47; x++) applyPlace(healthy.city, planPlace(healthy.world, 'walkup', x, 2), 0);
+    healthy.worldChanged({ roads: false });
+    healthy.runDays(40);
+    const demand = healthy.utilities.report.power.demand;
+    expect(demand).toBeGreaterThan(400 * 0.8);
+    expect(demand).toBeLessThan(2000 * 0.8);
+    for (const b of healthy.world.buildings.values()) if (b.def === 'wind_turbine') expect(b.condition).toBe(1);
+
+    // One wind turbine under two rows of apartments: the grid runs far above its safe share.
+    const overloaded = grid(['wind_turbine'], 0);
+    for (let x = 0; x < 47; x++) for (const y of [1, 2]) applyPlace(overloaded.city, planPlace(overloaded.world, 'walkup', x, y), 0);
+    overloaded.worldChanged({ roads: false });
+    overloaded.runDays(10);
+    const plant = [...overloaded.world.buildings.values()].find((b) => b.def === 'wind_turbine');
+    expect(overloaded.utilities.report.power.demand).toBeGreaterThan(400);
+    expect(plant && (plant.condition < 1 || plant.repairDays > 0)).toBe(true);
+  });
 });

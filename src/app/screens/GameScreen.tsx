@@ -39,6 +39,8 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
   const hostRef = useRef<HTMLDivElement>(null);
   const store = useStore();
   const [ready, setReady] = useState(false);
+  /** The map couldn't start (no WebGL or WebGPU in this browser). */
+  const [failed, setFailed] = useState(false);
   const saverRef = useRef<CitySaver | null>(null);
   // Read through refs so the game isn't recreated when these change.
   const initialRef = useRef(cityRef);
@@ -110,6 +112,10 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
         });
       }
       setReady(true);
+    }).catch((err: unknown) => {
+      if (cancelled) return;
+      console.error('Could not start the map renderer', err);
+      setFailed(true);
     });
 
     return () => {
@@ -147,6 +153,18 @@ export function GameScreen({ options, cityRef, onSaved, onReroll, onNewCity }: G
       <Tour autoStart={options.demo ? 'never' : options.save ? 'resume' : 'start'} />
       <GuestLimit cityName={options.name} />
       <RotatePrompt />
+      {failed && (
+        <div className="render-failed" role="alert">
+          <h2>Your browser can't draw the city</h2>
+          <p>
+            Openpolis needs WebGL. Turn on hardware acceleration in your browser settings (Chrome: Settings → System → Use graphics acceleration), then
+            reload. If it's already on, try an up-to-date Chrome, Edge, Firefox or Safari.
+          </p>
+          <button type="button" className="primary-button" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      )}
     </div>
   );
 }

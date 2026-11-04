@@ -3,7 +3,7 @@ import { BALANCE } from '../src/shared/balance';
 import { mulberry32 } from '../src/shared/rng';
 import { BUILDINGS, chooseBuilding, type BuildingDef } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
-import { applyClear, applyPlace, applyRoad, applyZone, planClear, planPlace, planRoad, planZone } from '../src/sim/commands';
+import { applyClear, applyMove, applyPlace, applyRoad, applyZone, planClear, planMove, planPlace, planRoad, planZone } from '../src/sim/commands';
 import { explainDemand, growDay, zoneDemand } from '../src/sim/systems/growth';
 import { findEntrance } from '../src/sim/systems/access';
 import { cityStats, simulateDay } from '../src/sim/systems/population';
@@ -225,5 +225,48 @@ describe('demand explanations (master plan §6.4)', () => {
     const g = growDay(w, mulberry32(1));
     expect(g.waiting.o).toBe(4); // the four office lots wait, and growth says so
     expect(g.started).toHaveLength(0);
+  });
+});
+
+describe('moving buildings in a growing town', () => {
+  /** Every footprint tile belongs to its building, and every owned tile to a live building. */
+  function footprintsConsistent(w: World): string | null {
+    const owned = new Map<number, number>();
+    for (const b of w.buildings.values()) {
+      const { w: bw, h: bh } = BUILDINGS[b.def].size;
+      for (let y = b.y; y < b.y + bh; y++) {
+        for (let x = b.x; x < b.x + bw; x++) {
+          const at = w.building[w.index(x, y)];
+          if (at !== b.id) return `${b.def}#${b.id} at ${x},${y} but tile says ${at}`;
+          owned.set(w.index(x, y), b.id);
+        }
+      }
+    }
+    for (let i = 0; i < w.building.length; i++) if (w.building[i] !== -1 && owned.get(i) !== w.building[i]) return `stray tile ${i} → ${w.building[i]}`;
+    return null;
+  }
+
+  it('nothing grows over a moved building, wherever it goes', () => {
+    const { w, city } = town(32);
+    serve(city);
+    zone(city, 0, 9, 31, 11, ZoneType.Residential);
+    zone(city, 0, 5, 13, 7, ZoneType.Commercial);
+    runDays(w, 40);
+    const rng = mulberry32(7);
+    for (let round = 0; round < 30; round++) {
+      // Move a random finished building to a random spot it can go (often a zoned lot).
+      const done = [...w.buildings.values()].filter((b) => b.construction === 0);
+      const b = done[Math.floor(rng() * done.length)];
+      for (let k = 0; k < 40; k++) {
+        const plan = planMove(w, b.id, Math.floor(rng() * 32), 5 + Math.floor(rng() * 7));
+        if (plan?.ok) {
+          applyMove(city, plan);
+          break;
+        }
+      }
+      refreshCity(w);
+      runDays(w, 3, round);
+      expect(footprintsConsistent(w)).toBeNull();
+    }
   });
 });

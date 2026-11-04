@@ -136,7 +136,10 @@ export class Renderer {
     const app = new Application();
     await app.init({
       resizeTo: host,
-      preference: 'webgl',
+      // WebGL, else WebGPU, never Pixi's Canvas fallback: it can't draw the ground meshes, so a
+      // browser without WebGL got a silent black map. Without either, Game.create fails and the
+      // game screen says how to fix it.
+      preference: ['webgl', 'webgpu'],
       background: '#0d1117',
       antialias: false,
       autoDensity: true,
