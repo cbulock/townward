@@ -125,6 +125,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'done',
     modal: true,
     title: "You're the planner now",
-    body: same('Add shops and industry for jobs and parks to keep people happy. As the city grows it unlocks police, schools, clinics and more: click the stage badge next to the population to see what comes next. Your city saves itself as you go.'),
+    body: same('Add shops and industry for jobs and parks to keep people happy. As the city grows it unlocks schools, hospitals, universities and more: click the stage badge next to the population to see what comes next. Your city saves itself as you go.'),
   },
 ];

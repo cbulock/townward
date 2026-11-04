@@ -21,8 +21,8 @@ unlocks buildings and brings a new problem (D-086).
 
 | Stage | Population | Unlocks | New problem |
 |---|---|---|---|
-| **Hamlet** | 0 | roads, zones, coal plant, wind turbine, water tower, substation, park, town hall | power, water, first jobs |
-| **Village** | 500 | police, fire, clinic, school, **landfill**, riverside market, central park | **garbage** starts piling up |
+| **Hamlet** | 0 | roads, zones, coal plant, wind turbine, water tower, substation, park, town hall, police, fire, clinic | power, water, first jobs |
+| **Village** | 500 | school, **landfill**, riverside market, central park | **garbage** starts piling up |
 | **Town** | 2,500 | **hospital**, **recycling centre**, gas plant, solar farm, battery bank, botanical garden, shopping complex | homes become *Comfortable* and want a hospital |
 | **City** | 10,000 | **university**, **incinerator** (later: trauma centre, trains) | homes become *Prosperous* and want a university |
 | **Metropolis** | 30,000 | research centre (automatic research, E7) | — |

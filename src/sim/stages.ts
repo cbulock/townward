@@ -30,9 +30,6 @@ export const STAGE_ORDER: readonly Stage[] = [Stage.Hamlet, Stage.Village, Stage
 
 /** The stage each building unlocks at; anything not listed is available from the start. */
 const UNLOCKS: Readonly<Partial<Record<BuildingId, Stage>>> = {
-  police_station: Stage.Village,
-  fire_station: Stage.Village,
-  clinic: Stage.Village,
   school: Stage.Village,
   landfill: Stage.Village,
   riverside_market: Stage.Village,
