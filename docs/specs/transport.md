@@ -23,6 +23,17 @@ this spec supersedes them where they differ (D-069).
 6. **Deterministic and fast.** Everything runs on the tick clock (D-068) and the road segment
    graph; visible vehicles stay a sample (D-059).
 
+## Transport overhaul (user direction 2026-11-05: "only focus on transportation mechanics")
+
+Goal: traffic that flows, grade-separated crossings, and a metro that takes people out of cars.
+
+| Step | Content | Status |
+|---|---|---|
+| **TX1** | Multi-lane traffic: each car has a lane and queues only behind its lane; it takes the lane with the most room on each segment (buses and trucks keep right); a junction only holds a car back when the lane it would take beyond is full. Frontage: buildings take access from roads with a pavement, falling back to a highway or expressway only when nothing else is in reach. Bus stops never on highways. | **done** |
+| **TX2** | Flyovers: a road carried over another road (or track) with no junction, ramps up and down; wide roads on bridges; the commute model and cars treat the two levels as separate. | next |
+| **TX3** | Metro: underground lines (tunnels with surface station entrances) and elevated lines (a viaduct on pillars over streets), metro stations with a wider walk-in reach than train stations, mode choice like trains, visible metro trains on the viaduct. | planned |
+| TX4 | Adaptive lights and roundabouts; transit share rising with congestion. | planned |
+
 ## The road hierarchy
 
 | Type | Width | Lanes | Capacity / day | Speed | Frontage | Cost / tile | Notes |

@@ -2,6 +2,11 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-05: Transport overhaul TX1: multi-lane traffic and street frontage
+- `systems/traffic.ts`: cars carry a lane; lane queues keyed per lane; lane choice by room on every segment (buses and trucks outer); junction exits judged by the lane the car would take; lane changes eased. Test: a busy boulevard uses 2+ lanes (it used one queue per direction before).
+- `systems/access.ts`: entrances prefer roads with a pavement; highways and expressways only as a fallback. Test: a home between a highway and a street uses the street.
+- /demo one year: 44 ms/day (commute 30 ms, up from 15: more distinct street entrances); 260 tests pass.
+
 ## 2026-11-05: Alerts inbox
 - Notices worth keeping carry a key and go to a top-bar alerts inbox (bell with an unread count): problems stay until the game resolves them (taxes collected, power back, materials arriving, water and power needs met, zones growing again) or the player dismisses them; a newer alert with the same key replaces the older; milestones, fires and abandonment stay until dismissed. Toasts are unchanged. Cleared per city.
 
