@@ -2,6 +2,20 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-05: Art Track: modern architecture and landmarks (D-096)
+- Recipes split one file per building (`buildings/recipes/<category>/<id>.ts`).
+- Modern kit `atlas/modern/`: `facets.ts` (facets lit by their normals, depth-sorted), `plans.ts` (superellipse, chamfered, trefoil, sail, rotate), `loft.ts` (lofts, prisms, sweeps, plan shadows), `skins.ts` (curtain glass with floor lines, mullions and night-light marks; bands; fabric), `parts.ts` (spires, slabs, light rings, halos), `vault.ts`, `wheel.ts`, `coaster.ts`.
+- New landmarks in Parks & Places (`atlas/landmarks/`, one module each): Sky Tower (3×3, Metropolis), Sail Hotel (3×3, City), Observation Wheel (3×3, City), Theme Park (4×4, City; castle, rides). /demo places one of each round downtown (test added).
+- Modern zoned towers (`atlas/towers/`): office tower (twist, obelisk, bullet, twin slabs, stepped, slant), condo tower (wave balconies, twisting stack, twin sky-pool towers), hotel (crescent, blade, cantilevered stack). Shopping complex and train station restyled (glass vaults, LED name bands, wave roofs).
+- Checked in the art gallery (all rotations) and on /demo. Atlas 380 → 540 ms, 6 → 7 pages; 60 FPS idle and panning. 266 tests pass; typecheck and lint clean.
+- **Next (Art Track):** modern restyle of homes, shops, small offices, apartments, services, utilities and energy; then roads.
+
+## 2026-11-05: Art Track: cleaner ground tiles (D-095)
+- Ground art moved from `atlas/groundArt.ts` to `atlas/nature/ground/` (`marks.ts` shared soft marks, `land.ts` grass/dry grass/sand/dirt/rock, `water.ts` deep/shallow, `index.ts` paintGround). Colours are `THEME.ground` tokens; `GROUND_BASE` (underlay, minimap) derives from them; the unused `INK` set is gone.
+- Restyle: no more 1px speckle noise or dark grass outlines; softer modern bases; anti-aliased tufts, grains, ripples, pebbles and cracks at low contrast; water glints shimmer smoothly; surf band fades out from the shore.
+- Checked in headless Chrome on a fresh coastal map (near, far, grid on) and /demo. 265 tests pass; typecheck and lint clean.
+- **Next (Art Track):** roads restyle; theme picker.
+
 ## 2026-11-05: Transport overhaul TX2: flyovers (D-094)
 - Map layers `over`/`overAxis` (saved); route-graph helpers in `sim/roads.ts` (deck nodes n + tile, straight-through only); commute Dijkstra and the cars' BFS on the two-level graph; deck traffic counted apart; no junctions on flyovers; road links use the deck's type along the deck.
 - Road tool: At crossings → Junction / Flyover in the road picker; planner turns right-angle crossings into decks (+$400); clearing removes decks; deck ghost in the preview.

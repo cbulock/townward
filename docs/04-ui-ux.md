@@ -3,7 +3,7 @@
 ## Look & Feel
 
 - **Style:** modern "glass" HUD floating over the world. Panels are translucent dark with backdrop blur, soft shadows and rounded corners (12px). The world stays the hero, and the UI never covers it with big opaque bars.
-- **World art:** clean, bright, slightly stylised isometric pixel-art look, generated in code. Saturated greens and blues, with crisp tile edges at zoom 1.
+- **World art:** clean, bright, slightly stylised isometric look, generated in code: lit 3D objects (D-072) on calm, soft ground (D-095). Ground is flat colour with a few low-contrast marks, so the city on top stays the focus.
 - **Motion:** every interaction gives feedback within 1 frame. Panels animate in over 150–200 ms (ease-out). Placed objects "pop" (scale 0.85 → 1.05 → 1 with a dust puff).
 - **Typography:** Inter (UI) plus a tabular-number font feature for money and population.
 

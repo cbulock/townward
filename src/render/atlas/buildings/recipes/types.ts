@@ -1,4 +1,6 @@
 import type { EnergyArtId } from '../../energy';
+import type { LandmarkArtId } from '../../landmarks';
+import type { TowerArtId } from '../../towers';
 import type { BuildingId } from '../../../../sim/buildings/catalog';
 import type { Box } from '../../core';
 
@@ -118,5 +120,7 @@ export type CustomArtId =
   | 'landfill'
   | 'train_station'
   | 'bus_station'
-  | EnergyArtId;
+  | EnergyArtId
+  | LandmarkArtId
+  | TowerArtId;
 export type RecipeId = Exclude<BuildingId, CustomArtId>;

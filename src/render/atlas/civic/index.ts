@@ -1,5 +1,7 @@
 import type { CustomArtId } from '../buildings/recipes';
 import { ENERGY_ART } from '../energy';
+import { LANDMARK_ART } from '../landmarks';
+import { TOWER_ART } from '../towers';
 import { paintRiversideMarket } from './commerce/riversideMarket';
 import { paintShoppingComplex } from './commerce/shoppingComplex';
 import type { CivicArt } from './lot';
@@ -33,4 +35,6 @@ export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   // Variant = the side its street runs along, so the driveway turns off it.
   bus_station: { variants: 4, headroom: () => 46, paint: paintBusStation },
   ...ENERGY_ART,
+  ...LANDMARK_ART,
+  ...TOWER_ART,
 };

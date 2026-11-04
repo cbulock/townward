@@ -242,7 +242,13 @@ We focus on **one** terrain and make it look great before adding presets or menu
 
 - [x] Split tile and building art into small single-purpose modules (ground, water edges, road pieces, bridge parts, furniture, building massing, roofs, facades, rooftop details), refactor first with no visual change
 - [x] A theme system: palette and lighting as tokens (`theme/tokens.ts`, one `ArtTheme`); a theme picker is still to do
-- [x] Modern 3D look for buildings, parks, trees and decor (D-072); roads and ground still to restyle
+- [x] Modern 3D look for buildings, parks, trees and decor (D-072)
+- [x] Clean, calm ground tiles: soft surfaces, no pixel speckle or outlines, ground colours as tokens (D-095)
+- [x] Modern architecture kit (`atlas/modern/`: lofts, facet lighting, glass and fabric skins, vaults, wheels, coaster track) and one file per building (D-096)
+- [x] Landmarks: Sky Tower, Sail Hotel, Observation Wheel, Theme Park (D-096)
+- [x] Modern office tower, condo tower, hotel, shopping complex and train station (D-096)
+- [ ] Modern restyle of the remaining buildings: homes, shops, offices, apartments, services, utilities and energy
+- [ ] Restyle roads to match
 - [x] Ambient life: swaying trees, night window lights, beacons, fountains, birds, cloud shadows (D-072)
 
 ## Later Phases

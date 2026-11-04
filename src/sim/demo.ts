@@ -32,6 +32,13 @@ const GROWTH_STEPS = 3;
 const SETTLE_DAYS = 40;
 /** The block that holds the bus station (south-west of downtown). */
 const BUS_BLOCK = { bx: 3, by: 6 } as const;
+/** The showpiece landmarks and the blocks they stand in. */
+const LANDMARKS: readonly { bx: number; by: number; id: BuildingId }[] = [
+  { bx: 3, by: 3, id: 'sky_tower' },
+  { bx: 6, by: 3, id: 'sail_hotel' },
+  { bx: 6, by: 6, id: 'theme_park' },
+  { bx: 3, by: 5, id: 'observation_wheel' },
+];
 /** The row of blocks the rail line runs through (north of the town hall). */
 const RAIL_ROW = 2;
 /** Power plants for this much more than the evening peak (the city keeps growing). */
@@ -40,6 +47,7 @@ const POWER_HEADROOM = 1.4;
 type BlockUse =
   | { kind: 'zone'; zone: ZonedType }
   | { kind: 'park' }
+  | { kind: 'landmark'; id: BuildingId }
   | { kind: 'services' }
   | { kind: 'utilities' }
   | { kind: 'hall' }
@@ -117,6 +125,12 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
       if (bx === BUS_BLOCK.bx && by === BUS_BLOCK.by && use.kind === 'zone') place('bus_station', ix + 1, iy + 1);
       if (use.kind === 'zone') zone(ix, iy, ix + 4, iy + 4, use.zone);
       else if (use.kind === 'park') for (let y = iy; y < iy + 5; y++) for (let x = ix; x < ix + 5; x++) place('park', x, y);
+      else if (use.kind === 'landmark') {
+        // A showpiece on the street corner, the rest of the block a park round it.
+        const half = Math.floor((BUILDINGS[use.id].size.w - 1) / 2);
+        place(use.id, ix + half, iy + half);
+        for (let y = iy; y < iy + 5; y++) for (let x = ix; x < ix + 5; x++) place('park', x, y);
+      }
       else if (use.kind === 'hall') {
         place('town_hall', ix + 1, iy + 1);
         for (const [x, y] of ringOf(ix, iy)) place('park', x, y);
@@ -360,6 +374,9 @@ function blockUse(bx: number, by: number, rng: () => number): BlockUse {
   const ring = Math.max(Math.abs(bx - c), Math.abs(by - c)) - 0.5;
   if (ring === 0 && bx === BLOCKS - 1 && by === BLOCKS - 1) return { kind: 'hall' };
   if (ring === 0 && bx === BLOCKS && by === BLOCKS) return { kind: 'campus' };
+  // Landmarks on the ring round downtown (D-096).
+  const landmark = LANDMARKS.find((l) => l.bx === bx && l.by === by);
+  if (landmark) return { kind: 'landmark', id: landmark.id };
   // A service block every three blocks keeps everything covered, the industrial corner included.
   if (bx % 3 === 1 && by % 3 === 1) return { kind: 'services' };
   // Industry and utilities in the far corner.

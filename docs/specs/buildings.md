@@ -66,6 +66,17 @@ All art is original and generated in code (`src/render/atlas/buildings/`), with 
 
 More civic buildings (police, fire, school, hospital, power, water) come with services in Phases 7–8.
 
+### Landmarks (D-096)
+
+Placeable showpieces in **Parks & Places**. They count as parks for happiness, employ people, and the luxury ones lift investor confidence.
+
+| Id | Name | Size | Unlocks | Look |
+|---|---|---|---|---|
+| `observation_wheel` | Observation Wheel | 3×3 | City | giant wheel of glass pods, A-frame legs, LED rim, glass boarding hall |
+| `theme_park` | Theme Park | 4×4 | City | fairy-tale castle, looping coaster, carousel, drop tower, small wheel, lagoon, entrance arch |
+| `sail_hotel` | Sail Hotel | 3×3 | City | sail-shaped tower on a lagoon island, V exoskeleton and mast, helipad |
+| `sky_tower` | Sky Tower | 3×3 | Metropolis | supertall on a three-winged plan, setbacks spiralling up to a needle spire |
+
 ## Placement Rules (`planPlace` / `applyPlace` in `sim/commands.ts`)
 
 - The footprint must be fully on the map and on land (no water or rock), with no road and no other building.
@@ -83,7 +94,8 @@ More civic buildings (police, fire, school, hospital, power, water) come with se
 
 - A building is **one sprite**, in a frame tall enough for its floors and roof.
 - It's drawn in the chunk that owns its **front tile** `(x + w − 1, y + h − 1)` and sorted with trees by that tile's diagonal, so buildings and trees overlap correctly.
-- Painter (`buildings/index.ts`) reads recipes from `buildings/recipes/`. Each building is a stack of lit iso boxes (warm SW face, cool shaded SE face; D-072). Parks, the town hall and utilities have their own painters (`civic/`).
+- Painter (`buildings/index.ts`) reads recipes from `buildings/recipes/<category>/<id>.ts`, one file per building. Each recipe building is a stack of lit iso boxes (warm SW face, cool shaded SE face; D-072). Parks, the town hall and utilities have their own painters (`civic/`).
+- Modern forms (D-096) use the modern kit in `atlas/modern/`: lofted solids from plan shapes (`loft.ts`, `plans.ts`) that taper, twist, curve and lean, lit facet by facet (`facets.ts`); skins for curtain glass, bands and fabric (`skins.ts`); spires, slabs and light rings (`parts.ts`); glass vaults, observation wheels and coaster track. Landmarks live in `atlas/landmarks/` and the modern zoned towers (office tower, condo tower, hotel) in `atlas/towers/`, one module each.
 - Each zoned building has 6 variants that change form, not only colour. See [city-art.md](city-art.md) for massing, facades, roofs, rooftop and lot details.
 
 ## Zoning (Phase 4b)

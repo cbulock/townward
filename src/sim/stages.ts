@@ -44,6 +44,10 @@ const UNLOCKS: Readonly<Partial<Record<BuildingId, Stage>>> = {
   university: Stage.City,
   incinerator: Stage.City,
   research_centre: Stage.Metropolis,
+  observation_wheel: Stage.City,
+  theme_park: Stage.City,
+  sail_hotel: Stage.City,
+  sky_tower: Stage.Metropolis,
   bus_station: Stage.Town,
 };
 
