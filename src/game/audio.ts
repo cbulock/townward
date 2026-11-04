@@ -2,7 +2,7 @@
  * Procedural sound effects (Web Audio): no audio files, like the art.
  * The AudioContext is created on the first user gesture (browsers block audio before that).
  */
-export type SoundId = 'build' | 'bridge' | 'clear' | 'error' | 'tool' | 'tick';
+export type SoundId = 'build' | 'bridge' | 'clear' | 'error' | 'tool' | 'tick' | 'coin';
 
 const MUTE_KEY = 'citybuilder.muted';
 const MASTER_VOLUME = 0.6;
@@ -93,6 +93,11 @@ export class SoundBoard {
         break;
       case 'tool':
         this.tone('sine', 880, 990, t, 0.035, 0.05);
+        break;
+      case 'coin':
+        // Two bright notes, a fifth apart: money in the bank.
+        this.tone('triangle', 1320, 1320, t, 0.07, 0.07);
+        this.tone('triangle', 1980, 1980, t + 0.07, 0.16, 0.07);
         break;
       case 'build':
         this.tone('sine', 150 * pitch, 55 * pitch, t, 0.16, 0.32);

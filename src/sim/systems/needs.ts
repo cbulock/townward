@@ -1,5 +1,5 @@
 import { BALANCE } from '../../shared/balance';
-import { BUILDINGS, Lifestyle, type BuildingDef, type BuildingId, type BuildingInstance } from '../buildings/catalog';
+import { BUILDINGS, Lifestyle, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
 import type { DayOutcome, SimSystem } from '../core/System';
 import type { World } from '../World';
 import { isActive } from './access';
@@ -9,6 +9,7 @@ import { cityStats } from './population';
 import { roadSpec } from '../roadTypes';
 import { Stage } from '../stages';
 import { garbageScore } from './garbage';
+import { airScore, aqiBand, type AirSystem } from './air';
 
 /**
  * Needs system (docs/specs/needs.md): every finished, connected zoned building scores its
@@ -107,18 +108,7 @@ const REQUESTS: Readonly<Record<Lifestyle, readonly NeedKind[]>> = {
   [Lifestyle.Prosperous]: ['hospital', 'university'],
 };
 
-const RADIUS = { shopping: 12, pollution: 6, parks: 6, highway: 2 } as const;
-/** Pollution weight per source at distance 0 (it falls off linearly to the radius). */
-/** Clean-air weight of each polluting building (gas burns cleaner than coal; wind, solar and batteries don't pollute). */
-const POLLUTERS: Readonly<Partial<Record<BuildingId, number>>> = {
-  workshop: 0.25,
-  warehouse: 0.35,
-  factory: 0.7,
-  power_plant: 0.8,
-  gas_plant: 0.4,
-  landfill: 0.5,
-  incinerator: 0.8,
-};
+const RADIUS = { shopping: 12, parks: 6, highway: 2 } as const;
 
 /** One building's needs (only the ones it has) and the result. */
 export interface BuildingNeeds {
@@ -170,11 +160,14 @@ export class NeedsSystem implements SimSystem {
   private readonly commute: CommuteSystem | null;
   /** The city's stage: garbage counts from the Village on. */
   private readonly stage: () => Stage;
+  /** The air quality field (clean air reads its AQI); without it the air is clean. */
+  private readonly air: AirSystem | null;
 
-  constructor(world: World, commute: CommuteSystem | null = null, stage: () => Stage = () => Stage.Hamlet) {
+  constructor(world: World, commute: CommuteSystem | null = null, stage: () => Stage = () => Stage.Hamlet, air: AirSystem | null = null) {
     this.world = world;
     this.commute = commute;
     this.stage = stage;
+    this.air = air;
   }
 
   /** Re-score after edits (so placing a clinic shows up straight away). */
@@ -231,13 +224,10 @@ export class NeedsSystem implements SimSystem {
     // Places that matter to neighbours, with their centres.
     const shops: { x: number; y: number; jobs: number }[] = [];
     const homes: { x: number; y: number; people: number }[] = [];
-    const polluters: { x: number; y: number; weight: number }[] = [];
     const parks: { x: number; y: number }[] = [];
     for (const b of all) {
       const d: BuildingDef = BUILDINGS[b.def];
       const c = centre(b);
-      const weight = POLLUTERS[b.def];
-      if (weight !== undefined && b.construction === 0) polluters.push({ ...c, weight });
       if (!isActive(b) || b.abandoned) continue;
       if (d.category === 'commercial') shops.push({ ...c, jobs: d.capacity });
       if (d.category === 'residential') homes.push({ ...c, people: b.occupants });
@@ -266,14 +256,8 @@ export class NeedsSystem implements SimSystem {
           residents: () => (b.entrance === -1 ? 0 : homes.reduce((n, h) => n + h.people, 0)),
           traffic,
           parks: () => parks.filter((p) => near(c, p, RADIUS.parks)).length,
-          pollution: () => {
-            let p = 0;
-            for (const s of polluters) {
-              const dist = Math.hypot(s.x - c.x, s.y - c.y);
-              if (dist < RADIUS.pollution) p += s.weight * (1 - dist / RADIUS.pollution);
-            }
-            return p + this.highwayNoise(b);
-          },
+          // Clean air from the AQI where it stands (docs/specs/evolution.md, E4), less highway noise.
+          air: () => Math.max(0, (this.air ? airScore(this.air.aqiOf(b)) : 1) - this.highwayNoise(b)),
         });
       }
       let happiness = 0;
@@ -316,7 +300,7 @@ export class NeedsSystem implements SimSystem {
       shops: () => number;
       residents: () => number;
       parks: () => number;
-      pollution: () => number;
+      air: () => number;
     },
   ): number {
     switch (kind) {
@@ -345,7 +329,7 @@ export class NeedsSystem implements SimSystem {
         return Math.max(0, Math.min(1, 1 - (m - 15) / 45));
       }
       case 'air':
-        return Math.max(0, 1 - ctx.pollution());
+        return ctx.air();
       case 'parks':
         return Math.min(1, ctx.parks() / 2);
       case 'workers':
@@ -397,7 +381,7 @@ export class NeedsSystem implements SimSystem {
       const c = centre(g.worst);
       complaints.push({
         kind,
-        text: COMPLAINT_TEXT[kind],
+        text: kind === 'air' && this.air && this.air.aqiOf(g.worst) > 150 ? 'The air is making us sick' : COMPLAINT_TEXT[kind],
         count: g.count,
         building: g.worst.id,
         x: c.x,
@@ -425,6 +409,10 @@ export class NeedsSystem implements SimSystem {
     if (kind === 'traffic') {
       const minutes = this.commute?.report.avgMinutes ?? 0;
       return [{ label: 'Average travel time', value: `${Math.round(minutes)} minutes` }];
+    }
+    if (kind === 'air' && this.air) {
+      const aqi = Math.round(this.air.aqiOf(b));
+      return [{ label: 'Air quality', value: `AQI ${aqi} (${aqiBand(aqi).label})` }];
     }
     if (kind === 'garbage') {
       return [{ label: 'Uncollected garbage', value: `${Math.round(b.garbage)} t` }];

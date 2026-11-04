@@ -74,6 +74,23 @@ export function BudgetPanel() {
         </button>
       </header>
 
+      {info.taxes && (
+        <div className="tax-chest">
+          <span className="budget-line">
+            <span>Taxes waiting at the Town Hall</span>
+            <strong>{money(info.taxes.waiting)}</strong>
+          </span>
+          {info.taxes.hasTownHall ? (
+            <button type="button" className="primary-button" disabled={info.taxes.waiting <= 0} onClick={() => game?.collectTaxes()}>
+              Collect taxes
+            </button>
+          ) : (
+            <span className="tax-hint">Build a Town Hall (Civic → Parks & Places) to collect them.</span>
+          )}
+          <span className="tax-hint">Taxes arrive at the end of each month. The chest holds six months; collect before it overflows.</span>
+        </div>
+      )}
+
       <label className="tax">
         <span className="budget-line">
           <span>Tax rate</span>

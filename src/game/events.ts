@@ -9,6 +9,7 @@ import type { NeedKind, NeedsReport } from '../sim/systems/needs';
 import type { ServiceKind } from '../sim/buildings/catalog';
 import type { StageRequirement } from '../sim/progression';
 import type { Stage } from '../sim/stages';
+import type { AirReport } from '../sim/systems/air';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -33,6 +34,8 @@ export interface GameEventMap {
   dayNight: DayNightMode;
   trafficView: boolean;
   happinessView: boolean;
+  /** The air quality (AQI) view is on. */
+  airView: boolean;
   /** Version counter, bumped when tiles or buildings change (minimap repaint). */
   worldChanged: number;
   budget: BudgetInfo;
@@ -66,6 +69,8 @@ export interface CityInfo {
   needs: NeedsReport;
   /** Stage, what the next one needs, and residents by lifestyle (docs/specs/evolution.md). */
   progress: ProgressInfo;
+  /** Residents' average AQI and the worst area's (docs/specs/evolution.md, E4). */
+  air: AirReport;
 }
 
 export interface ProgressInfo {
@@ -90,6 +95,8 @@ export interface BudgetInfo {
   water: UtilityTotals;
   /** Clock hour the grid was balanced for. */
   hour: number;
+  /** Cities that collect taxes by hand: what's waiting at the Town Hall (docs/specs/evolution.md, E5). */
+  taxes: { waiting: number; hasTownHall: boolean } | null;
 }
 
 /** What a civic building provides (shown in the info panel). */
@@ -139,6 +146,10 @@ export interface InspectInfo {
   garbage: number | null;
   /** Garbage facilities: today's collection and, for landfills, how full they are. */
   facility: { collectedToday: number; trucks: number; filled: number | null; holds: number | null } | null;
+  /** Air quality where it stands (0–500). */
+  aqi: number;
+  /** The Town Hall in a city that collects by hand: taxes waiting there. */
+  taxesWaiting: number | null;
 }
 
 export interface ToolPreviewInfo {

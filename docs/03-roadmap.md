@@ -200,7 +200,7 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [ ] 11.2 City history ring buffer (saved) + Graphs panel
 - [ ] 11.3 Cadence tiers + time-slicing: no sim frame over 16 ms on /demo
 - [ ] 11.4 Fields engine (coarse grids, diffuse, decay, wind)
-- [ ] 11.5 Road segment graph + Dijkstra + isochrones: `commute.day` under 25 ms on /demo
+- [ ] 11.5 Road segment graph + Dijkstra + isochrones: `commute.day` under 25 ms on /demo (**met: 15.3 ms** with a daily flat graph, identical results; isochrones still to do)
 - [ ] 11.6 Simulation in a Web Worker: main-thread sim cost under 1 ms per frame
 
 ## Feature Track (user order, D-067)
@@ -214,7 +214,7 @@ We focus on **one** terrain and make it look great before adding presets or menu
   - [x] E2 Garbage: landfill, recycling centre, incinerator; garbage need from the Village
   - [x] Info panel redesign, Move from the selected building, sticky "Citizens say"
   - [ ] E3 Incidents that work together: fires, theft and illness dispatched to fire, police and hospital, with burning buildings and theft markers on the map; trauma centre
-  - [ ] E4 Air quality index (AQI) per area and for the city, from industry, power, traffic and incinerators
+  - [x] E4 Air quality index (AQI) per area and for the city, from industry, power, traffic and incinerators; AQI view (`O`), top-bar AQI, clean-air need reads it
   - [ ] E5 Taxes collected by hand at the Town Hall
   - [ ] E6 Industry makes construction materials that new buildings and upgrades consume
   - [ ] E7 Research centre and research tree; trains (rail, stations, mode choice)
@@ -225,8 +225,9 @@ We focus on **one** terrain and make it look great before adding presets or menu
   - [x] T2 Boulevard (6 lanes) and Expressway (8 lanes) as 2-tile one-way carriageways (`World.lane`), ramps (expressways join only ramps and highways), pedestrian streets (walkers only), pavement styles (concrete, brick, granite setts, promenade; `World.pave`), turnarounds at wide-road ends, one-way routing for commutes and cars, Road picker UI; avenue trees redesigned after user feedback
   - [ ] **Next (user requests):** Move tool (pick up a building and place it elsewhere); camera: rotate by dragging (middle mouse / Alt) with an animated quarter turn
   - [ ] T3 Flyovers, interchange prefabs, truss / cable-stayed / suspension bridges, tunnels
-  - [ ] **Curved roads** (user request, 2026-11-04): smooth bends and diagonal roads instead of right-angle grids; needs a spec (curves over the tile grid, how lots front them, how cars follow them)
-  - [ ] Smarter junction control (user report, 2026-11-04: too many lights): lights only where traffic needs them, stop signs and roundabouts otherwise (T4)
+  - [ ] **Curved roads** (D-089, spec: transport.md "Curved roads"): C1 45° diagonal strips with smoothed vehicle paths → C2 rounded corners → C3 Curve drag mode and arcs for wide roads
+  - [x] Smarter junction control, first part (D-088): give-way by default, lights only where the load needs them
+  - [ ] Junction control, rest (T4): stop-sign art, adaptive lights, roundabouts, click to override
   - [ ] T4 Road segment graph + Dijkstra (fixes the 92 ms day), junction control, adaptive lights, isochrones
   - [ ] T5 Buses: stops, line tool, depots, line panel, mode choice, transit view
   - [ ] T6 Trams, metro, rail, ferries, transfers

@@ -59,6 +59,9 @@ export interface SavedCity {
   /** Highest stage reached and whether stages lock buildings (D-086); absent in older saves. */
   readonly stage?: number;
   readonly locked?: boolean;
+  /** Taxes collected by hand at the Town Hall, and what's waiting there (docs/specs/evolution.md, E5). */
+  readonly collectsTaxes?: boolean;
+  readonly uncollected?: number;
 }
 
 /** Run-length encoded, base64 typed-array layers (one byte per tile). */
@@ -172,7 +175,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
     gen: GENERATOR_VERSION,
     name,
     terrain: { ...terrain },
-    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate, stage: city.stage, locked: city.locked },
+    city: { funds: city.funds, day: city.day, clock: city.clock, taxRate: city.taxRate, stage: city.stage, locked: city.locked, collectsTaxes: city.collectsTaxes, uncollected: city.uncollected },
     layers: {
       road: encodeLayer(w.road),
       bridge: encodeLayer(w.bridge),
@@ -252,6 +255,8 @@ export function deserialize(data: SaveData): City {
   city.taxRate = data.city.taxRate;
   // Cities saved before stages existed keep everything they could build (user call, D-086).
   city.locked = data.city.locked ?? false;
+  city.collectsTaxes = data.city.collectsTaxes ?? false;
+  city.uncollected = Math.max(0, data.city.uncollected ?? 0);
   city.stage = data.city.stage !== undefined && isStage(data.city.stage) ? data.city.stage : Stage.Hamlet;
   return city;
 }
@@ -460,6 +465,8 @@ export function parseSave(json: unknown): SaveData {
       taxRate: num(c, 'taxRate', 0, 100),
       ...(isFiniteNumber(c.stage) && isStage(c.stage) && { stage: c.stage }),
       ...(typeof c.locked === 'boolean' && { locked: c.locked }),
+      ...(typeof c.collectsTaxes === 'boolean' && { collectsTaxes: c.collectsTaxes }),
+      ...(isFiniteNumber(c.uncollected) && { uncollected: c.uncollected }),
     },
     layers: {
       road: str(l, 'road'),

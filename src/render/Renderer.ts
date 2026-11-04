@@ -218,7 +218,7 @@ export class Renderer {
     this.rotors = new Rotors(this.viewRef);
     this.ambient = new Ambient(tex.ambient, this.viewRef);
     this.agents = new AgentRenderer(tex, this.viewRef);
-    this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater }, this.viewRef);
+    this.indicators = new Indicators({ road: tex.warnRoad, power: tex.warnPower, water: tex.warnWater, coin: tex.taxCoin }, this.viewRef);
     this.hover = new HoverHighlight(tex.hover, this.viewRef);
     t0 = performance.now();
     this.ext = generateBorderlands(this.world, this.ring);

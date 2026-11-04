@@ -134,6 +134,9 @@ export const BALANCE = {
   garbageDays: 6,
   /** A pile stops growing at this many days of output (it is already as bad as it gets). */
   garbageMaxDays: 30,
+  /** The Town Hall's chest holds this many months of taxes; the toast warns from chestWarnMonths. */
+  chestMonths: 6,
+  chestWarnMonths: 3,
   /** Income per ton a recycling centre sells. */
   recyclePrice: 0.5,
 } as const;

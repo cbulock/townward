@@ -166,6 +166,70 @@ under 0.5 ms a day on /demo.
 - Budget: recycling income appears under income.
 - Later: visible garbage bags at high zoom, garbage trucks sampled from collection, sickness.
 
+## E4: Air quality (`sim/systems/air.ts`)
+
+The air is a coarse field: one cell per 4×4 tiles (32×32 on a 128 map), recomputed every day
+and after edits from today's sources, with no memory, so saves need nothing new.
+
+**Sources** (emission per day, on each footprint tile):
+
+| Source | Emission |
+|---|---|
+| Workshop / warehouse / factory | 0.25 / 0.35 / 0.7, × (0.4 + 0.6 × how full it is) |
+| Coal plant / gas plant / incinerator | 2.4 / 1.2 / 2.0 |
+| Landfill | 0.5 (dust and smell) |
+| Road traffic | 0.05 per 1,000 commuters a day on the tile |
+
+Wind, solar, batteries, homes, shops, offices and parks emit nothing.
+
+**Spread:** emissions are summed per cell, then blurred twice with a 3×3 box (smoke drifts
+about 2 cells, 8 tiles, so a source's own block stays dirtiest), on top of a clean background.
+
+Calibrated on test layouts and /demo: a full block of six factories reads 103; a coal plant's
+own block 84, the next 61, two away 38; /demo's residents average 63 (Moderate), its
+16-plant coal district 457 (Hazardous).
+
+**AQI** (the familiar 0–500 scale): `AQI = 15 + 260 × concentration`, capped at 500.
+
+| AQI | Label | Colour |
+|---|---|---|
+| 0–50 | Good | green |
+| 51–100 | Moderate | yellow |
+| 101–150 | Unhealthy for some | orange |
+| 151–200 | Unhealthy | red |
+| 201–300 | Very unhealthy | purple |
+| 301+ | Hazardous | maroon |
+
+**Effects:** the clean-air need now reads the AQI where the building stands: 1 up to AQI 50,
+falling to 0 at AQI 200, minus highway noise as before. It replaces the old 6-tile radius
+check. (Later: illness from bad air, E3.)
+
+**Showing it:**
+- **Top bar:** the city AQI (residents' average) with its label and colour; click it, or press
+  `O`, for the AQI view.
+- **AQI view:** every land tile tinted by its cell's AQI; buildings fade as in the other views.
+- **Info panel:** each building's AQI.
+- Complaint text for the air need: "The air is making us sick" when AQI is over 150,
+  otherwise "Too much smoke and noise".
+
+**Cost:** a few hundred sources and two blur passes over 1,024 cells: about 0.07 ms a day.
+
+## E5: Taxes at the Town Hall
+
+In new player cities (`City.collectsTaxes`, set with `locked`; saved cities and /demo keep
+automatic taxes, so nobody is disturbed), taxes no longer land in the funds by themselves:
+
+- **At month end** upkeep is paid from the funds as before, but the month's taxes (and
+  recycling sales) go into the **Town Hall's chest** (`City.uncollected`).
+- **Collect** with the button on the Town Hall's info panel or in the budget panel. The funds
+  jump, with a coin sound.
+- **No Town Hall, no collecting:** the money waits, and the budget panel says to build one
+  (it's unlocked from the start).
+- **The chest holds 6 months of taxes.** Above that the extra is lost, and the month-end toast
+  warns from 3 months on ("Your Town Hall is filling up: collect $X").
+- A gold coin badge bobs over the Town Hall while there is money to collect.
+- Saved as `city.uncollected` and `city.collectsTaxes` (absent: 0 and automatic).
+
 ## Planned steps (user requests, 2026-11-04)
 
 Each gets its spec section before code.
@@ -176,11 +240,8 @@ Each gets its spec section before code.
   load (a fire with no ambulance nearby hurts people). On the map: burning buildings with
   flames and smoke, a theft marker over robbed shops and homes, and an ambulance or patrol car
   heading there. The trauma centre (City) joins here.
-- **E4 Air quality index (AQI):** a coarse pollution field from industry, power plants,
-  incinerators, landfills and traffic, shown as a 0–500 AQI per area and for the city, with a
-  map view. Replaces the one-off clean-air radius check.
-- **E5 Taxes collected at the Town Hall:** taxes build up in the Town Hall each month, and the
-  player collects them by hand (a button on the Town Hall and in the budget panel).
+- **E4 Air quality index (AQI):** built, see "E4: Air quality" below.
+- **E5 Taxes collected at the Town Hall:** built, see "E5: Taxes at the Town Hall" below.
 - **E6 Industry makes construction materials:** industry produces materials; new buildings
   and upgrades consume them, so a city without industry (or imports) builds slowly.
 - **Shops and industry ahead of workers:** to decide: whether zones may grow beyond demand,

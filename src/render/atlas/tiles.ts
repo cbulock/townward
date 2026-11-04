@@ -105,6 +105,8 @@ export interface TerrainTextures {
   /** Warning badges: no road access, no power, no water. */
   warnRoad: Texture;
   warnPower: Texture;
+  /** Taxes waiting at the Town Hall: a gold coin. */
+  taxCoin: Texture;
   warnWater: Texture;
   /** Traffic-light pole (lamp tinted red/green). */
   lamp: Texture;
@@ -262,6 +264,20 @@ function paintWarnPower(ctx: CanvasRenderingContext2D) {
   ctx.fill();
 }
 
+/** "Taxes waiting": a gold coin with a dollar sign. */
+function paintTaxCoin(ctx: CanvasRenderingContext2D) {
+  paintPin(ctx, '#6b4a06', '#f5c518');
+  ctx.fillStyle = '#fde68a';
+  ctx.beginPath();
+  ctx.arc(9, 8, 4.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#8a5a00';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('$', 9, 8.4);
+}
+
 /** "No water": a drop. */
 function paintWarnWater(ctx: CanvasRenderingContext2D) {
   paintPin(ctx, '#123a5a', '#3a9bf0');
@@ -390,6 +406,7 @@ export function buildTerrainTextures(): TerrainTextures {
   b.add('warn_road', 18, 20, paintWarnRoad);
   b.add('warn_power', 18, 20, paintWarnPower);
   b.add('warn_water', 18, 20, paintWarnWater);
+  b.add('tax_coin', 18, 20, paintTaxCoin);
   b.add('lamp', 7, 16, paintLamp);
   for (const k of BUBBLE_KINDS) b.add(`bubble_${k}`, BUBBLE_W, BUBBLE_H, (ctx) => paintBubble(ctx, k));
   b.add('fx_puff', PUFF_SIZE, PUFF_SIZE, paintPuff);
@@ -463,6 +480,7 @@ export function buildTerrainTextures(): TerrainTextures {
     busStops: range(4, (side) => get(`stop_${side}`)),
     warnRoad: get('warn_road'),
     warnPower: get('warn_power'),
+    taxCoin: get('tax_coin'),
     warnWater: get('warn_water'),
     lamp: get('lamp'),
     bubbles: Object.fromEntries(BUBBLE_KINDS.map((k) => [k, get(`bubble_${k}`)])) as Record<ComplaintKind, Texture>,

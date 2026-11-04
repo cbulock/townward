@@ -1,5 +1,6 @@
 import { BALANCE } from '../../shared/balance';
-import { BUILDINGS, upkeepOf, type BuildingDef } from '../buildings/catalog';
+import { BUILDINGS, upkeepOf, type BuildingDef, type BuildingInstance } from '../buildings/catalog';
+import { isWorking } from './utilities';
 import type { City } from '../City';
 import { BridgeAxis, RoadType } from '../roads';
 import { roadSpec } from '../roadTypes';
@@ -64,24 +65,64 @@ export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRat
   };
 }
 
-/** Apply a month's budget to the city. */
-export function collectBudget(city: City): BudgetReport {
+/** What happened to this month's taxes when they wait at the Town Hall (docs/specs/evolution.md, E5). */
+export interface HeldTaxes {
+  /** Waiting in the chest now. */
+  waiting: number;
+  /** Lost because the chest was full. */
+  lost: number;
+  /** The chest is past the warning line. */
+  filling: boolean;
+}
+
+/** Apply a month's budget to the city: upkeep from the funds, taxes to the funds or the Town Hall's chest. */
+export function collectBudget(city: City): BudgetReport & { held: HeldTaxes | null } {
   const r = monthlyBudget(city.world, city.taxRate);
-  city.funds += r.net;
-  return r;
+  if (!city.collectsTaxes) {
+    city.funds += r.net;
+    return { ...r, held: null };
+  }
+  city.funds -= r.expenses;
+  const cap = Math.max(0, r.income) * BALANCE.chestMonths;
+  const total = city.uncollected + r.income;
+  city.uncollected = Math.min(total, Math.max(cap, city.uncollected));
+  return {
+    ...r,
+    held: { waiting: city.uncollected, lost: total - city.uncollected, filling: city.uncollected >= r.income * BALANCE.chestWarnMonths },
+  };
+}
+
+/** The working Town Hall that taxes are collected at, if the city has one. */
+export function townHall(world: World): BuildingInstance | null {
+  for (const b of world.buildings.values()) if (b.def === 'town_hall' && isWorking(b)) return b;
+  return null;
+}
+
+/** Collect the taxes waiting at the Town Hall. Returns the amount, or why it couldn't. */
+export function collectTaxes(city: City): { ok: true; amount: number } | { ok: false; reason: 'nothing-waiting' | 'no-town-hall' } {
+  if (city.uncollected <= 0) return { ok: false, reason: 'nothing-waiting' };
+  if (!townHall(city.world)) return { ok: false, reason: 'no-town-hall' };
+  const amount = Math.round(city.uncollected);
+  city.funds += amount;
+  city.uncollected = 0;
+  return { ok: true, amount };
 }
 
 /** Collects the monthly budget and keeps the last report. */
 export class BudgetSystem implements SimSystem {
   readonly name = 'budget';
   last: BudgetReport | null = null;
+  /** This month's taxes held at the Town Hall (cities that collect by hand). */
+  held: HeldTaxes | null = null;
   private readonly city: City;
   constructor(city: City) {
     this.city = city;
   }
   onMonth(out: DayOutcome) {
-    this.last = collectBudget(this.city);
-    out.budget = this.last;
+    const r = collectBudget(this.city);
+    this.held = r.held;
+    this.last = r;
+    out.budget = r;
   }
   /** Next month at today's numbers. */
   forecast(): BudgetReport {

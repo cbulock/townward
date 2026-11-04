@@ -11,6 +11,18 @@ import { roadSpec } from '../roadTypes';
 const carsMay = (t: number) => roadSpec(t)?.cars ?? false;
 
 /**
+ * How a junction is run (docs/specs/transport.md, "Junctions"; D-088). Busy junctions get
+ * traffic lights; quiet ones are give-way junctions where the smaller road waits while the
+ * junction is in use (equal roads: everyone gives way).
+ */
+const Control = { GiveWay: 1, Lights: 2 } as const;
+/** Junction congestion (volume ÷ capacity) that puts lights up, and below which they come down. */
+const LIGHTS_ON = 0.35;
+const LIGHTS_OFF = 0.25;
+/** `major` value when the roads meeting are the same size. */
+const NO_MAJOR = 2;
+
+/**
  * Cars and pedestrians moving over the road network. Pure data and logic;
  * render/AgentRenderer.ts draws them. See docs/specs/simulation.md.
  */
@@ -331,9 +343,16 @@ export class Traffic {
   /** Bus stops, recomputed with demand. */
   stops: readonly BusStop[] = [];
   private stopTiles = new Set<number>();
-  /** Road tiles with 3–4 connections (traffic lights); rebuilt when roads change. */
+  /** Road tiles where 3–4 car roads meet; rebuilt when roads change. */
   private junction: Uint8Array;
   private junctions: number[] = [];
+  /** Per junction: give way or lights (Control), chosen daily by load. */
+  private control: Uint8Array;
+  /** Per junction: the axis (0 or 1) of the bigger road, or NO_MAJOR when they're equal. */
+  private major: Uint8Array;
+  /** Junction tiles a car is crossing this frame (equal to frameStamp). */
+  private occupied: Int32Array;
+  private frameStamp = 0;
   private roadTiles = 0;
   private readonly lanes = new Map<number, Agent[]>();
   /** Sim seconds elapsed (drives the traffic lights). */
@@ -351,6 +370,9 @@ export class Traffic {
     this.rng = mulberry32(seed);
     this.scratch = new Int32Array(world.width * world.height);
     this.junction = new Uint8Array(world.width * world.height);
+    this.control = new Uint8Array(world.width * world.height);
+    this.major = new Uint8Array(world.width * world.height);
+    this.occupied = new Int32Array(world.width * world.height);
     this.findJunctions();
   }
 
@@ -368,9 +390,39 @@ export class Traffic {
         let links = 0;
         for (let d = 0; d < 4; d++) if (m & (1 << d) && carsMay(w.road[w.index(x + DIR_STEP[d][0], y + DIR_STEP[d][1])])) links++;
         this.junction[i] = links >= 3 ? 1 : 0;
-        if (links >= 3) this.junctions.push(i);
+        if (links >= 3) {
+          this.junctions.push(i);
+          this.major[i] = this.majorAxis(x, y);
+          // New junctions start from today's load; without a commute model they all get lights.
+          this.control[i] = this.wantsLights(i, false) ? Control.Lights : Control.GiveWay;
+        }
       }
     }
+  }
+
+  /** The axis (0: NE–SW, 1: NW–SE) whose roads rank higher at a junction, or NO_MAJOR. */
+  private majorAxis(x: number, y: number): number {
+    const w = this.world;
+    const rank = [0, 0];
+    for (let d = 0; d < 4; d++) {
+      const nx = x + DIR_STEP[d][0];
+      const ny = y + DIR_STEP[d][1];
+      if (!w.inBounds(nx, ny)) continue;
+      rank[d % 2] = Math.max(rank[d % 2], roadSpec(w.road[w.index(nx, ny)])?.rank ?? 0);
+    }
+    return rank[0] === rank[1] ? NO_MAJOR : rank[0] > rank[1] ? 0 : 1;
+  }
+
+  /** Lights where the junction is busy, with a band so they don't flicker on and off. */
+  private wantsLights(tile: number, lit: boolean): boolean {
+    if (!this.commute) return true;
+    const c = this.commute.congestion[tile];
+    return lit ? c >= LIGHTS_OFF : c >= LIGHTS_ON;
+  }
+
+  /** Daily: put lights up at junctions that got busy, and take them down where it's quiet. */
+  updateControls() {
+    for (const j of this.junctions) this.control[j] = this.wantsLights(j, this.control[j] === Control.Lights) ? Control.Lights : Control.GiveWay;
   }
 
   /** Which axis has green at a junction now. Junctions are offset so they don't all switch together. */
@@ -381,7 +433,7 @@ export class Traffic {
 
   /** Every junction's light right now (for drawing). */
   lights(): TrafficLight[] {
-    return this.junctions.map((tile) => ({ tile, greenAxis: this.greenAxis(tile) }));
+    return this.junctions.filter((tile) => this.control[tile] === Control.Lights).map((tile) => ({ tile, greenAxis: this.greenAxis(tile) }));
   }
 
   /** At most this many cars on screen: a share of the road network, so roads never overfill. */
@@ -625,6 +677,15 @@ export class Traffic {
       else lanes.set(key, [a]);
     }
     for (const lane of lanes.values()) lane.sort((p, q) => q.t - p.t);
+    // Junctions a car is crossing right now: past the stop line on the way in, or not yet clear on the way out.
+    const stamp = ++this.frameStamp;
+    for (const a of this.agents) {
+      if (a.kind === 'person' || a.seg >= a.path.length - 1) continue;
+      const into = a.path[a.seg + 1];
+      if (a.t >= 0.5 && this.junction[into]) this.occupied[into] = stamp;
+      const from = a.path[a.seg];
+      if (a.t < 0.5 && this.junction[from]) this.occupied[from] = stamp;
+    }
 
     for (const lane of lanes.values()) {
       for (let k = 0; k < lane.length; k++) {
@@ -643,14 +704,19 @@ export class Traffic {
           const tail = next?.[next.length - 1];
           if (tail && tail !== a) limit = 1 + tail.t - (isLong(tail) ? TRAFFIC.longGap : TRAFFIC.gap);
         }
-        // Junction ahead: stop at the line (halfway along the approach) on red, or when the
-        // road beyond is full, so nobody blocks the junction. Cars already past the line go on.
+        // Junction ahead: stop at the line (halfway along the approach) on red, at a give-way
+        // when the junction is in use and this is the smaller road, or when the road beyond is
+        // full, so nobody blocks the junction. Cars already past the line go on.
         const j = p[a.seg + 1];
         if (a.seg + 1 < last && this.junction[j] && a.t < 0.5) {
           const axis = stepDir(p[a.seg], j) % 2;
           const exit = lanes.get(j * this.junction.length + p[a.seg + 2]);
           const exitFull = !!exit && exit.some((b) => b !== a && b.t < TRAFFIC.gap + 0.25);
-          if (axis !== this.greenAxis(j) || exitFull) limit = Math.min(limit, 0.46);
+          const stop =
+            this.control[j] === Control.Lights
+              ? axis !== this.greenAxis(j)
+              : this.major[j] !== axis && this.occupied[j] === stamp;
+          if (stop || exitFull) limit = Math.min(limit, 0.46);
         }
         if (a.dwell > 0) {
           a.dwell -= dt;
@@ -695,6 +761,7 @@ export class TrafficSystem implements SimSystem {
   }
   onDay() {
     this.traffic.refreshDemand();
+    this.traffic.updateControls();
   }
   onFrame(dt: number, hour: number) {
     this.traffic.update(dt, hour);

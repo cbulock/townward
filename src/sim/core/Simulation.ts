@@ -7,6 +7,7 @@ import { BudgetSystem } from '../systems/budget';
 import { CommuteSystem } from '../systems/commute';
 import { NeedsSystem } from '../systems/needs';
 import { CoverageSystem, updateCoverage } from '../systems/coverage';
+import { AirSystem } from '../systems/air';
 import { FireSystem } from '../systems/fire';
 import { GarbageSystem } from '../systems/garbage';
 import { LifestyleSystem } from '../systems/lifestyle';
@@ -28,8 +29,8 @@ const SALT = { growth: 0x6077, fire: 0xf12e } as const;
 
 /**
  * The simulation core (D-058): owns the systems and runs them in a fixed order.
- *   - after an edit:  access → utilities → coverage → commute (if roads changed) → needs → traffic
- *   - each day:       stage → growth → fire → (the edit refresh) → garbage → commute → needs → lifestyle → population → traffic,
+ *   - after an edit:  access → utilities → coverage → commute (if roads changed) → air → needs → traffic
+ *   - each day:       stage → growth → fire → (the edit refresh) → garbage → commute → air → needs → lifestyle → population → traffic,
  *                     plus budget (then the garbage month reset) at month end
  *   - each frame:     the clock and traffic
  * The game layer only calls these entry points and shows the outcome.
@@ -46,6 +47,7 @@ export class Simulation {
   readonly needs: NeedsSystem;
   readonly traffic: TrafficSystem;
   readonly garbage: GarbageSystem;
+  readonly air: AirSystem;
   readonly lifestyle: LifestyleSystem;
   /** Run after any change to roads or buildings. */
   private readonly onChange: readonly SimSystem[];
@@ -69,13 +71,14 @@ export class Simulation {
     this.population = new PopulationSystem(world);
     this.budget = new BudgetSystem(city);
     this.commute = new CommuteSystem(world);
-    this.needs = new NeedsSystem(world, this.commute, () => city.stage);
+    this.air = new AirSystem(world, this.commute);
+    this.needs = new NeedsSystem(world, this.commute, () => city.stage, this.air);
     this.traffic = new TrafficSystem(world, this.commute);
     this.garbage = new GarbageSystem(city);
     this.lifestyle = new LifestyleSystem(city);
     // An unlocked city opens at its stage straight away (the /demo city, old saves), with no toast.
     if (!city.locked) this.followPopulation();
-    this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.needs, this.traffic];
+    this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.air, this.needs, this.traffic];
   }
 
   get world(): World {
@@ -99,6 +102,7 @@ export class Simulation {
     this.worldChanged({ roads: false });
     t.run('garbage.day', () => this.garbage.onDay());
     t.run('commute.day', () => this.commute.onDay());
+    t.run('air.day', () => this.air.onDay());
     t.run('needs.day', () => this.needs.onDay(out));
     t.run('lifestyle.day', () => this.lifestyle.onDay(out));
     t.run('population.day', () => this.population.onDay());

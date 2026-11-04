@@ -14,6 +14,7 @@ const HINTS: [string, string][] = [
   ['L', 'Day/night'],
   ['T', 'Traffic'],
   ['Y', 'Happiness'],
+  ['O', 'Air quality'],
   ['N', 'New map'],
   ['F3', 'Debug'],
 ];

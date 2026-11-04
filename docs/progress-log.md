@@ -2,6 +2,19 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04 (later): E4 Air quality (AQI)
+- `systems/air.ts`: a 4×4-tile field rebuilt daily and after edits from industry (by how busy), coal and gas plants, incinerators, landfills and road traffic; two 3×3 blur passes; AQI = 15 + 260 × concentration (0–500) with the six usual bands. No memory, so nothing new to save.
+- The clean-air need reads the AQI where a building stands (1 up to 50, 0 at 200) less highway noise, replacing the 6-tile radius check; "The air is making us sick" above AQI 150, with the AQI in the complaint.
+- HUD: top-bar AQI (residents' average) toggles the AQI view (`O`); info panel shows each building's AQI.
+- Calibration: six-factory block 103, coal plant's block 84; /demo residents 63 (Moderate), coal district 457. 0.07 ms a day. Tests: bands and score, a factory district dirty nearby and clean far away. 230 pass.
+
+## 2026-11-04 (later): Lights only where traffic needs them (D-088)
+- `systems/traffic.ts`: per-junction control, give way or lights, re-chosen daily from the commute load (on at 35% of capacity, off below 25%); the bigger road has priority at give-way junctions, equal roads all give way; a per-frame "junction in use" mark. Test: a quiet crossroads has no lights, gets them when busy, keeps them through small dips. /demo: 69 of 101 junctions lit. 228 tests pass.
+
+## 2026-11-04 (later): Commute model 4× faster (engine 11.5, first part)
+- `systems/commute.ts`: the road graph is built once per day (CSR adjacency with one-way and median rules, entry minutes at today's congestion); Dijkstra on typed arrays with a reused heap and stamp arrays; jobs as flat arrays; visible-car trips pick the top 4 instead of sorting every reached job.
+- /demo, one year: `commute.day` 64.8 → 15.3 ms (max 21), a sim day 81.8 → 32.1 ms. The monthly history CSV is byte-identical before and after. 227 tests pass.
+
 ## 2026-11-04 (later): Bug fixes: power wear, black map, lights on wide roads; demo substations (D-087)
 - Power: plant wear now uses grid load (demand ÷ all plants' full output). /demo after 90 days: 0 unpowered homes (was 819), commute times for 818/819 homes (was 0–190). Over 2 years /demo now ends at 88% happiness (was 62–69%) with 4,706 Comfortable and 18,962 Prosperous residents. The long-failing `transport.test.ts` corridor test was a real overload (one plant for ~7,000 demand); it now has three plants.
 - Renderer: `preference: ['webgl', 'webgpu']`; a "Your browser can't draw the city" card when neither exists. Checked in headless Chrome without GL (card) and with SwiftShader (map draws).

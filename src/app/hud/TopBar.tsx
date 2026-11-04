@@ -1,11 +1,12 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
-import { budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import { airViewAtom, budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
 import { AccountButton } from '../account/AccountButton';
 import { tourStepAtom } from '../tour/tourState';
 import { SaveStatus } from './SaveStatus';
 import { StageChip } from './StageChip';
+import { aqiBand } from '../../sim/systems/air';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -226,6 +227,9 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
   const setTourStep = useSetAtom(tourStepAtom);
   const trafficView = useAtomValue(trafficViewAtom);
   const happinessView = useAtomValue(happinessViewAtom);
+  const airView = useAtomValue(airViewAtom);
+  const aqi = Math.round(city?.air.cityAqi ?? 0);
+  const band = aqiBand(aqi);
   const happy = city?.needs.happiness ?? 1;
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
@@ -289,6 +293,17 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
           </g>
         </svg>
         <span className="stat-value">{Math.round(happy * 100)}%</span>
+      </button>
+      <button
+        type="button"
+        className={`happy-stat air-stat ${airView ? 'is-on' : ''}`}
+        title={`Air quality where people live: AQI ${aqi} (${band.label}) · click for the air view (O)`}
+        aria-pressed={airView}
+        onClick={() => game?.setAirView(!airView)}
+      >
+        <span className="air-dot" style={{ background: `#${band.color.toString(16).padStart(6, '0')}` }} aria-hidden="true" />
+        <span className="stat-dim">AQI</span>
+        <span className="stat-value">{aqi}</span>
       </button>
       <DemandMeter demand={city?.demand} why={city?.demandWhy} />
       <button

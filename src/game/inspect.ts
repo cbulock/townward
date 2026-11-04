@@ -62,6 +62,8 @@ export function inspectInfo(sim: Simulation, b: BuildingInstance): InspectInfo {
           holds: d.garbage.holds ?? null,
         }
       : null,
+    aqi: Math.round(sim.air.aqiOf(b)),
+    taxesWaiting: b.def === 'town_hall' && sim.city.collectsTaxes ? Math.round(sim.city.uncollected) : null,
   };
 }
 

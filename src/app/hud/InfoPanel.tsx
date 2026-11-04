@@ -4,6 +4,7 @@ import { SERVICE_KINDS as ALL_SERVICES, type ServiceKind } from '../../sim/build
 import type { NeedKind } from '../../sim/systems/needs';
 import type { InspectInfo } from '../../game/events';
 import { gameAtom, inspectAtom } from '../atoms';
+import { aqiBand } from '../../sim/systems/air';
 
 const NEED_LABEL: Readonly<Record<NeedKind, string>> = {
   jobs: 'Jobs',
@@ -137,6 +138,17 @@ export function InfoPanel() {
           </svg>
           Move
         </button>
+        {info.taxesWaiting !== null && (
+          <button
+            type="button"
+            className="secondary-button collect-button"
+            onClick={() => game?.collectTaxes()}
+            disabled={info.taxesWaiting <= 0}
+            title="Taxes arrive at the end of each month"
+          >
+            Collect ${info.taxesWaiting.toLocaleString()}
+          </button>
+        )}
         {canRepair && (
           <button type="button" className="secondary-button" onClick={() => game?.repairBuilding(info.id)} disabled={info.repairCost <= 0}>
             Repair · ${info.repairCost.toLocaleString()}
@@ -176,6 +188,7 @@ export function InfoPanel() {
         {info.lifestyle && <Stat label="Lifestyle" value={info.lifestyle.tier} />}
         {info.commuteMinutes !== null && <Stat label="Commute" value={`${Math.round(info.commuteMinutes)} min`} />}
         {info.garbage !== null && <Stat label="Garbage waiting" value={`${info.garbage.toFixed(1)} t`} />}
+        <Stat label="Air quality" value={`AQI ${info.aqi} · ${aqiBand(info.aqi).label}`} />
       </div>
       {info.lifestyle && <p className="info-note">{info.lifestyle.note}</p>}
 

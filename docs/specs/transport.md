@@ -56,10 +56,57 @@ this spec supersedes them where they differ (D-069).
 Height is drawn by the renderer (maps stay flat, D-051). A `level` layer (0 ground, 1 flyover)
 lets two roads share a tile without connecting.
 
+## Curved roads (user request 2026-11-04, D-089)
+
+Roads stay on the tile grid underneath (zoning, lots, access, routing, utilities and saves are
+unchanged); what changes is how they are **laid** and **drawn**, so a city no longer looks like
+graph paper.
+
+**Laying them (road tool):**
+- **Straight** (today): an L or, with Shift, one axis.
+- **Diagonal**: dragging at about 45° lays a staircase of tiles (one step across for each step
+  along). Any angle between snaps to the nearest of straight or 45°.
+- **Curve**: a third drag mode (toggle in the road picker, or hold `C`): drag start → bend point
+  → end, and the tool lays a staircase along a smooth arc (radius 2–6 tiles) between them. The
+  ghost preview shows the smooth shape, not the staircase.
+- Wide roads (boulevard, expressway) curve too: both carriageways follow the same arc.
+
+**Drawing them (renderer):**
+- Runs of staircase tiles are recognised as one **diagonal strip** and drawn as a straight road
+  at 45°: one textured quad along the run, with the footpaths, lane markings and kerbs of the
+  road type. The staircase tiles under it show grass in the triangles the strip doesn't cover.
+- Right-angle bends between two straight runs are drawn as a **rounded corner** whose radius
+  depends on the road type (street 0.6 tile, avenue 1, boulevard 1.5). Arcs laid with the Curve
+  mode are drawn as one smooth band through the tile centres.
+- Junctions, bridges and ramps stay as today.
+
+**Driving them:** cars, buses and pedestrians follow a smoothed centreline (a Catmull-Rom
+spline through the tile centres of their path, sampled once per route) instead of turning at
+each tile corner, at the same lane offsets.
+
+**Lots:** buildings and zones stay square on the grid. Along a diagonal the triangles between
+the strip and the lots are grass with a street tree now and then.
+
+**Cost:** recognising strips is done per chunk when roads change (no per-frame work), and each
+strip is one quad, so a diagonal draws fewer sprites than a staircase.
+
+**Steps:** C1 diagonal strips (recognise and draw staircases as 45° roads; cars follow the
+smoothed path) → C2 rounded corners → C3 the Curve drag mode and arcs for wide roads.
+
 ## Junctions
 
 Chosen automatically by load and overridable by clicking: none, stop signs, traffic lights
 (current, D-059), adaptive lights (green time follows queues), roundabout (3×3).
+
+**Built (2026-11-04, D-088):**
+- A junction is where three or more *car* roads meet. Pedestrian streets never count, and a road
+  running alongside a wide road doesn't open its median unless it joins it and carries cars.
+- **Give way** (the default): the smaller road's cars wait at the line while a car is crossing
+  the junction; the bigger road goes on. Where equal roads meet, everyone gives way.
+- **Traffic lights** go up when the junction's daily load reaches 35% of its biggest road's
+  capacity, and come down below 25% (the band stops them flickering). Re-chosen daily.
+- Still to do: stop-sign and lights art for give-way junctions, adaptive lights, roundabouts,
+  and clicking a junction to override.
 
 ## Public transport
 

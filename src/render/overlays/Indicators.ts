@@ -10,14 +10,17 @@ export interface BadgeTextures {
   road: Texture;
   power: Texture;
   water: Texture;
+  /** Taxes waiting at the Town Hall (docs/specs/evolution.md, E5). */
+  coin: Texture;
 }
 
-/** Floating badges above buildings that need attention: no road access, then no power, then no water. */
+/** Floating badges above buildings that need attention: no road access, taxes to collect, no power, no water. */
 export class Indicators {
   readonly container = new Container();
   private readonly pool: Sprite[] = [];
   private t = 0;
   private bases: number[] = [];
+  private taxesWaiting = false;
 
   constructor(
     private readonly badges: BadgeTextures,
@@ -27,10 +30,18 @@ export class Indicators {
   /** Which badge a building needs, if any (one at a time, most basic problem first). */
   private badgeFor(b: BuildingInstance): Texture | null {
     if (b.entrance === -1) return this.badges.road;
+    if (this.taxesWaiting && b.def === 'town_hall' && b.construction === 0) return this.badges.coin;
     if (b.construction > 0 || !needsUtilities(BUILDINGS[b.def])) return null;
     if (!b.powered) return this.badges.power;
     if (!b.watered) return this.badges.water;
     return null;
+  }
+
+  /** Show or hide the coin over the Town Hall; redraws only when it changes. */
+  setTaxesWaiting(on: boolean, world: World) {
+    if (on === this.taxesWaiting) return;
+    this.taxesWaiting = on;
+    this.sync(world);
   }
 
   /** Rebuild badges from the world; call after road access or utilities change. */

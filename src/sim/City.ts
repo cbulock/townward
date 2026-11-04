@@ -19,6 +19,13 @@ export class City {
   stage: Stage = Stage.Hamlet;
   /** Stages lock buildings (D-086): on for player cities, off for /demo, tests and the harness. */
   locked = false;
+  /**
+   * Taxes wait in the Town Hall until the player collects them (docs/specs/evolution.md, E5).
+   * On for new player cities, with `locked`; saved cities and /demo collect automatically.
+   */
+  collectsTaxes = false;
+  /** Taxes waiting in the Town Hall's chest. */
+  uncollected = 0;
 
   readonly world: World;
 

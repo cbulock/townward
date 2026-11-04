@@ -19,7 +19,10 @@ import { findEntrance } from '../sim/systems/access';
 import { nextStage, STAGES, unlockedAt, unlockStage } from '../sim/stages';
 import { stageRequirements } from '../sim/progression';
 import { lifestyleReport } from '../sim/systems/lifestyle';
+import { collectTaxes, townHall } from '../sim/systems/budget';
 import { inspectInfo } from './inspect';
+import { aqiBand } from '../sim/systems/air';
+import { isWaterTerrain } from '../render/transitions';
 import { windFactor } from '../sim/systems/energy';
 import { demandFor } from '../sim/systems/growth';
 import { PAVEMENTS, ROAD_SPECS } from '../sim/roadTypes';
@@ -123,7 +126,7 @@ export class Game {
   private lastPointer: ScreenPoint | null = null;
   private dayNightMode = readDayNight();
   /** The data view shown over the city, if any (roads by congestion, buildings by happiness). */
-  private dataView: 'traffic' | 'happiness' | null = null;
+  private dataView: DataView | null = null;
   /** Bumped whenever tiles or buildings change, so the minimap knows to repaint. */
   private worldVersion = 0;
   /** Utility hints already shown this game. */
@@ -183,6 +186,8 @@ export class Game {
       const city = new City(generateTerrain(opts.terrain), opts.funds);
       // Player cities unlock buildings stage by stage (D-086); the /demo showcase has everything.
       city.locked = !opts.demo;
+      // ... and collect their taxes by hand at the Town Hall (docs/specs/evolution.md, E5).
+      city.collectsTaxes = !opts.demo;
       demo = opts.demo ? buildDemoCity(city, opts.terrain.seed) : null;
       sim = new Simulation(city);
       if (demo) sim.worldChanged({ roads: true });
@@ -459,6 +464,7 @@ export class Game {
   private afterSimChange() {
     this.bumpWorld();
     this.refreshDataView();
+    this.renderer.indicators.setTaxesWaiting(this.city.collectsTaxes && this.city.uncollected > 0, this.world);
     this.renderer.indicators.sync(this.world);
     this.hintUtilities();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
@@ -502,7 +508,19 @@ export class Game {
       this.events.emit('funds', this.city.funds);
       const month = MONTH_NAMES[(this.city.date.month + 11) % 12];
       const sign = r.net >= 0 ? '+' : '−';
-      this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
+      const held = this.sim.budget.held;
+      if (held) {
+        // Taxes wait at the Town Hall (docs/specs/evolution.md, E5).
+        const where = townHall(this.world) ? 'Collect them at the Town Hall' : 'Build a Town Hall to collect them';
+        const lost = held.lost > 0 ? ` The chest is full: $${Math.round(held.lost).toLocaleString()} was lost.` : '';
+        this.notify(
+          held.filling || held.lost > 0 ? 'error' : 'info',
+          `${month}: upkeep $${r.expenses.toLocaleString()} paid. $${Math.round(held.waiting).toLocaleString()} in taxes waiting. ${where}.${lost}`,
+        );
+      } else {
+        this.notify(r.net >= 0 ? 'info' : 'error', `${month} budget: ${sign}$${Math.abs(r.net).toLocaleString()} (taxes $${r.income.toLocaleString()}, upkeep $${r.expenses.toLocaleString()})`);
+      }
+      this.renderer.indicators.setTaxesWaiting(this.city.collectsTaxes && this.city.uncollected > 0, this.world);
     }
     this.emitCity();
     this.emitBudget();
@@ -625,19 +643,44 @@ export class Game {
     this.showDataView(on ? 'happiness' : null);
   }
 
-  private showDataView(view: 'traffic' | 'happiness' | null) {
+  get airView(): boolean {
+    return this.dataView === 'air';
+  }
+
+  /** Show or hide the air quality view (land tinted by AQI). */
+  setAirView(on: boolean) {
+    this.showDataView(on ? 'air' : null);
+  }
+
+  private showDataView(view: DataView | null) {
     this.dataView = view;
     this.refreshDataView();
     this.sound.play('tool');
     this.events.emit('trafficView', view === 'traffic');
     this.events.emit('happinessView', view === 'happiness');
+    this.events.emit('airView', view === 'air');
   }
 
   /** Redraw the active data view from today's numbers. */
   private refreshDataView() {
     if (this.dataView === 'traffic') this.renderer.setTrafficOverlay(this.sim.commute.congestion);
     else if (this.dataView === 'happiness') this.renderer.setDataOverlay(this.happinessTiles());
+    else if (this.dataView === 'air') this.renderer.setDataOverlay(this.airTiles());
     else this.renderer.setDataOverlay(null);
+  }
+
+  /** Every land tile, coloured by the AQI of its air cell. */
+  private airTiles(): OverlayTile[] {
+    const w = this.world;
+    const tiles: OverlayTile[] = [];
+    for (let y = 0; y < w.height; y++) {
+      for (let x = 0; x < w.width; x++) {
+        const i = w.index(x, y);
+        if (isWaterTerrain(w.terrain[i])) continue;
+        tiles.push({ tile: i, color: aqiBand(this.sim.air.aqiAt(x, y)).color });
+      }
+    }
+    return tiles;
   }
 
   /** Every zoned building's footprint, coloured by its happiness. */
@@ -726,6 +769,7 @@ export class Game {
       power: u.power,
       water: u.water,
       hour: Math.floor(this.city.hour),
+      taxes: this.city.collectsTaxes ? { waiting: Math.round(this.city.uncollected), hasTownHall: townHall(this.world) !== null } : null,
     });
   }
 
@@ -781,6 +825,7 @@ export class Game {
       cars,
       people: this.traffic.agents.length - cars,
       progress: this.progressInfo(),
+      air: this.sim.air.report,
     });
   }
 
@@ -816,6 +861,23 @@ export class Game {
   private emitInspect() {
     const b = this.inspected === null ? undefined : this.world.buildings.get(this.inspected);
     this.events.emit('inspect', b ? inspectInfo(this.sim, b) : null);
+  }
+
+  /** Collect the taxes waiting at the Town Hall (info panel and budget panel buttons). */
+  collectTaxes() {
+    const r = collectTaxes(this.city);
+    if (!r.ok) {
+      this.sound.play('error');
+      this.notify('error', r.reason === 'no-town-hall' ? 'Build a Town Hall to collect taxes' : 'No taxes waiting yet: they arrive at the end of each month');
+      return;
+    }
+    this.sound.play('coin');
+    this.notify('info', `Collected $${r.amount.toLocaleString()} in taxes`);
+    this.events.emit('funds', this.city.funds);
+    this.renderer.indicators.setTaxesWaiting(false, this.world);
+    this.emitCity();
+    this.emitBudget();
+    this.emitInspect();
   }
 
   /** Bulldoze a whole building (from the info panel). */
@@ -1107,6 +1169,7 @@ export class Game {
     else if (code === 'KeyM') this.setMuted(!this.sound.muted);
     else if (code === 'KeyT') this.setTrafficView(this.dataView !== 'traffic');
     else if (code === 'KeyY') this.setHappinessView(this.dataView !== 'happiness');
+    else if (code === 'KeyO') this.setAirView(this.dataView !== 'air');
     else if (code === 'KeyL') this.setDayNight(DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length]);
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);
@@ -1139,6 +1202,9 @@ export class Game {
     this.renderer.destroy();
   }
 }
+
+/** The map's data views (one at a time). */
+type DataView = 'traffic' | 'happiness' | 'air';
 
 /** The centre of what the player built (roads and buildings), or of the map if nothing yet. */
 function builtCentre(world: World): TilePos {

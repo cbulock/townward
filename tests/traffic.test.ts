@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { City } from '../src/sim/City';
+import { Simulation } from '../src/sim/core/Simulation';
 import { applyPlace, applyRoad, planPlace, planRoad } from '../src/sim/commands';
 import { updateRoadAccess } from '../src/sim/systems/access';
 import { roadPath, RoadType } from '../src/sim/roads';
@@ -90,5 +91,30 @@ describe('bus stops', () => {
     expect(stops.length).toBe(2);
     const office = stops.find((s) => s.tile === w.index(17, 10));
     expect(office?.side).toBe(2);
+  });
+});
+
+describe('junction control (docs/specs/transport.md, "Junctions")', () => {
+  it('a quiet crossroads gives way; lights go up only when it gets busy, and stay up through small dips', () => {
+    const w = new World(20, 20, 1);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 2, y: 10 }, { x: 18, y: 10 }, true), RoadType.Road), RoadType.Road);
+    applyRoad(city, planRoad(w, roadPath({ x: 10, y: 2 }, { x: 10, y: 18 }, true), RoadType.Road), RoadType.Road);
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    sim.runDays(1);
+    const lights = () => sim.traffic.traffic.lights().length;
+    expect(lights()).toBe(0);
+    const junction = w.index(10, 10);
+    sim.commute.congestion[junction] = 0.5;
+    sim.traffic.traffic.updateControls();
+    expect(lights()).toBe(1);
+    sim.commute.congestion[junction] = 0.3; // inside the band: lights stay
+    sim.traffic.traffic.updateControls();
+    expect(lights()).toBe(1);
+    sim.commute.congestion[junction] = 0.1;
+    sim.traffic.traffic.updateControls();
+    expect(lights()).toBe(0);
   });
 });

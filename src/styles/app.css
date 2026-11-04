@@ -4437,3 +4437,40 @@ summary {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ---------- Top bar: air quality (docs/specs/evolution.md, E4) ---------- */
+.air-stat {
+  gap: 5px;
+}
+.air-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Taxes at the Town Hall (docs/specs/evolution.md, E5) ---------- */
+.tax-chest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 197, 24, 0.35);
+  border-radius: 10px;
+  background: rgba(245, 197, 24, 0.07);
+}
+.tax-chest .primary-button {
+  min-height: 32px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tax-chest .primary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.collect-button {
+  color: #fde68a;
+  border-color: rgba(245, 197, 24, 0.45);
+}

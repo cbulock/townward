@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/shared/balance';
-import { Lifestyle } from '../src/sim/buildings/catalog';
+import { BUILDINGS, Lifestyle } from '../src/sim/buildings/catalog';
 import { City } from '../src/sim/City';
 import { applyPlace, applyRoad, planPlace, planRoad } from '../src/sim/commands';
 import { refreshCity, Simulation } from '../src/sim/core/Simulation';
@@ -9,7 +9,8 @@ import { roadPath, RoadType } from '../src/sim/roads';
 import { deserialize, parseSave, serialize } from '../src/sim/save';
 import { stageRequirements } from '../src/sim/progression';
 import { Stage, stageFor } from '../src/sim/stages';
-import { monthlyBudget } from '../src/sim/systems/budget';
+import { collectBudget, collectTaxes, monthlyBudget } from '../src/sim/systems/budget';
+import { airScore, aqiBand } from '../src/sim/systems/air';
 import { garbageDay, garbageScore } from '../src/sim/systems/garbage';
 import { lifestyleDay } from '../src/sim/systems/lifestyle';
 import { Terrain } from '../src/sim/terrain/types';
@@ -199,5 +200,95 @@ describe('saving evolution state', () => {
     expect(h.lifeDays).toBe(-4);
     expect(h.garbage).toBeCloseTo(1.3);
     expect(only(loaded.world, 'landfill').filled).toBe(420);
+  });
+});
+
+describe('air quality (E4)', () => {
+  it('bands and the clean-air score follow the AQI scale', () => {
+    expect(aqiBand(30).label).toBe('Good');
+    expect(aqiBand(120).label).toBe('Unhealthy for some');
+    expect(aqiBand(420).label).toBe('Hazardous');
+    expect(airScore(40)).toBe(1);
+    expect(airScore(125)).toBeCloseTo(0.5);
+    expect(airScore(260)).toBe(0);
+  });
+
+  it('a busy factory district dirties the air around it, not across the map', () => {
+    const w = new World(64, 64, 3);
+    w.terrain.fill(Terrain.Grass);
+    const city = new City(w, 1e9);
+    applyRoad(city, planRoad(w, roadPath({ x: 0, y: 20 }, { x: 63, y: 20 }, true), RoadType.Road), RoadType.Road);
+    for (let x = 2; x < 14; x += 2) applyPlace(city, planPlace(w, 'factory', x, 18), 0);
+    applyPlace(city, planPlace(w, 'walkup', 15, 19), 0);
+    applyPlace(city, planPlace(w, 'walkup', 60, 19), 0);
+    refreshCity(w);
+    for (const b of w.buildings.values()) if (b.def === 'factory') b.occupants = BUILDINGS.factory.capacity;
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    const near = sim.air.aqiAt(8, 18);
+    const far = sim.air.aqiAt(60, 19);
+    expect(near).toBeGreaterThan(100);
+    expect(far).toBeLessThan(25);
+    const homes = [...w.buildings.values()].filter((b) => b.def === 'walkup');
+    const score = (b: (typeof homes)[number]) => sim.needs.byBuilding.get(b.id)?.scores.air ?? 1;
+    expect(score(homes[0])).toBeLessThan(score(homes[1]));
+  });
+});
+
+describe('taxes at the Town Hall (E5)', () => {
+  function taxedTown() {
+    const { w, city, place } = town();
+    city.collectsTaxes = true;
+    place('walkup', 4, 19);
+    refreshCity(w);
+    only(w, 'walkup').occupants = 24;
+    return { w, city, place };
+  }
+
+  it('month-end taxes wait in the chest while upkeep is paid; a Town Hall collects them', () => {
+    const { w, city, place } = taxedTown();
+    const funds = city.funds;
+    const r = collectBudget(city);
+    expect(r.income).toBeGreaterThan(0);
+    expect(city.funds).toBe(funds - r.expenses);
+    expect(city.uncollected).toBe(r.income);
+    expect(collectTaxes(city)).toEqual({ ok: false, reason: 'no-town-hall' });
+    place('town_hall', 12, 22);
+    refreshCity(w);
+    const before = city.funds;
+    expect(collectTaxes(city)).toEqual({ ok: true, amount: r.income });
+    expect(city.funds).toBe(before + r.income);
+    expect(city.uncollected).toBe(0);
+  });
+
+  it('the chest holds six months; the rest is lost', () => {
+    const { city } = taxedTown();
+    let income = 0;
+    let lost = 0;
+    for (let m = 0; m < 9; m++) {
+      const r = collectBudget(city);
+      income = r.income;
+      lost += r.held?.lost ?? 0;
+    }
+    expect(city.uncollected).toBe(income * BALANCE.chestMonths);
+    expect(lost).toBe(income * 3);
+  });
+
+  it('cities that collect automatically are unchanged, and the chest survives a save', () => {
+    const { w, city, place } = town();
+    place('walkup', 4, 19);
+    refreshCity(w);
+    only(w, 'walkup').occupants = 24;
+    const funds = city.funds;
+    const r = collectBudget(city);
+    expect(city.funds).toBe(funds + r.net);
+    expect(r.held).toBeNull();
+
+    city.collectsTaxes = true;
+    city.uncollected = 1234;
+    const terrain = { preset: 'plains', seed: 3, size: 40, water: 0, trees: 0, rivers: 0, coastSides: 0 } as const;
+    const loaded = deserialize(parseSave(JSON.parse(JSON.stringify(serialize(city, terrain, 'Chest')))));
+    expect(loaded.collectsTaxes).toBe(true);
+    expect(loaded.uncollected).toBe(1234);
   });
 });
