@@ -1,31 +1,20 @@
 import { Terrain, type TerrainId } from '../../../sim/terrain/types';
 import { ZoneType, type ZonedType } from '../../../sim/zones';
+import { GROUND } from './tokens';
 
 /**
- * Bright, saturated pixel-art palette (see docs/04-ui-ux.md, "World art").
- * Base colours are also used for the map underlay, so any seam blends into the right colour.
+ * Flat ground colours by terrain (theme tokens, see docs/04-ui-ux.md "World art").
+ * Also used for the map underlay and minimap, so any seam blends into the right colour.
  */
 export const GROUND_BASE: Readonly<Record<TerrainId, string>> = {
-  [Terrain.DeepWater]: '#2b66c4',
-  [Terrain.ShallowWater]: '#3a8ee0',
-  [Terrain.Sand]: '#ebc77f',
-  [Terrain.Grass]: '#62bf3c',
-  [Terrain.DryGrass]: '#a9b552',
-  [Terrain.Dirt]: '#a67c4e',
-  [Terrain.Rock]: '#9298a0',
+  [Terrain.DeepWater]: GROUND.deep.base,
+  [Terrain.ShallowWater]: GROUND.shallow.base,
+  [Terrain.Sand]: GROUND.sand.base,
+  [Terrain.Grass]: GROUND.grass.base,
+  [Terrain.DryGrass]: GROUND.dryGrass.base,
+  [Terrain.Dirt]: GROUND.dirt.base,
+  [Terrain.Rock]: GROUND.rock.base,
 };
-
-export const INK = {
-  /** Dark outline used on trees and rocks. */
-  outline: '#173d1f',
-  grassDark: '#4aa22d',
-  grassLight: '#86d65a',
-  grassRim: 'rgba(44, 122, 36, 0.9)',
-  sandDark: '#cfa35c',
-  sandLight: '#f6dca0',
-  foam: 'rgb(196, 238, 255)',
-  sparkle: 'rgb(200, 236, 255)',
-} as const;
 
 /** Zone tints (match --zone-r/c/i in styles/tokens.css). */
 export const ZONE_TINT: Readonly<Record<ZonedType, number>> = {

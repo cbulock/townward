@@ -21,7 +21,7 @@ import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
 import { OVERPASS_LIFT } from './atlas/rail';
 import { DECK_LIFT } from './atlas/roadArt';
 import { FURNITURE_HEADROOM } from './atlas/streetArt';
-import { WATER_PHASES } from './atlas/groundArt';
+import { WATER_PHASES } from './atlas/nature/ground';
 import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/theme/palette';
 import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from './atlas/tiles';
 import { roadVariant } from './atlas/roads';

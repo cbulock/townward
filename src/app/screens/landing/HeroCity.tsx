@@ -5,7 +5,7 @@ import { RoadType } from '../../../sim/roads';
 import { Terrain } from '../../../sim/terrain/types';
 import { buildingHeadroom, paintBuilding } from '../../../render/atlas/buildings';
 import { GROUND_PAD, TREE_HEADROOM } from '../../../render/atlas/geometry';
-import { paintGround } from '../../../render/atlas/groundArt';
+import { paintGround } from '../../../render/atlas/nature/ground';
 import { paintTreeCluster } from '../../../render/atlas/nature/trees';
 import { paintRoad } from '../../../render/atlas/roadArt';
 

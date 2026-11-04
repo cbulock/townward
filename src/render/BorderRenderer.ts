@@ -4,7 +4,7 @@ import { cornerHeight } from '../sim/terrain/elevation';
 import { Terrain, type TerrainId } from '../sim/terrain/types';
 import type { World } from '../sim/World';
 import { GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
-import { WATER_PHASES } from './atlas/groundArt';
+import { WATER_PHASES } from './atlas/nature/ground';
 import type { TerrainTextures } from './atlas/tiles';
 import { WOBBLE_VARIANTS } from './atlas/transitionArt';
 import { TREE_VARIANTS } from './atlas/nature/trees';

@@ -5,7 +5,7 @@ import { OVERLAY_TERRAINS } from '../transitions';
 import { AtlasBuilder, type FramePainter } from './AtlasBuilder';
 import { DECOR_VARIANTS, paintDecor } from './nature/decor';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
-import { paintGround, WATER_PHASES } from './groundArt';
+import { paintGround, WATER_PHASES } from './nature/ground';
 import { DECK_LIFT, paintBridge, paintDeck, paintRoad } from './roadArt';
 import { OVERPASS_LIFT, paintOverpass, paintTrack, paintTrackCurve, RAIL_CURVES, RAIL_LOOKS, type RailCurve, type RailLook } from './rail';
 

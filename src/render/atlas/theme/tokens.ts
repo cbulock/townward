@@ -70,6 +70,30 @@ export interface NatureTokens {
   readonly rock: Foliage;
 }
 
+/** One ground surface: its flat base and the soft darker and lighter tones of the marks on it. */
+export interface GroundTone {
+  readonly base: string;
+  readonly dark: string;
+  readonly light: string;
+}
+
+/** Open ground (render/atlas/nature/ground): calm, even surfaces so the city on top reads clearly. */
+export interface GroundTokens {
+  readonly grass: GroundTone;
+  readonly dryGrass: GroundTone;
+  readonly sand: GroundTone;
+  readonly dirt: GroundTone;
+  readonly rock: GroundTone;
+  readonly shallow: GroundTone;
+  readonly deep: GroundTone;
+  /** Soft lip just inside a grass edge. */
+  readonly grassEdge: string;
+  /** Surf along the shore. */
+  readonly foam: string;
+  /** Sun glints on water. */
+  readonly glint: string;
+}
+
 export interface MaterialTokens {
   readonly paving: string;
   readonly pavingLight: string;
@@ -93,6 +117,7 @@ export interface ArtTheme {
   readonly light: LightTokens;
   readonly glass: GlassTokens;
   readonly nature: NatureTokens;
+  readonly ground: GroundTokens;
   readonly material: MaterialTokens;
 }
 
@@ -157,6 +182,18 @@ export const SUNNY_AFTERNOON: ArtTheme = {
     waterLight: '#8fd0f5',
     rock: { dark: '#68717c', mid: '#9aa3ad', light: '#d6dce2' },
   },
+  ground: {
+    grass: { base: '#6cbc4c', dark: '#57a53e', light: '#88cf66' },
+    dryGrass: { base: '#b3bb66', dark: '#99a253', light: '#ccd384' },
+    sand: { base: '#eed49c', dark: '#d9bb7f', light: '#f8e7bf' },
+    dirt: { base: '#b08a62', dark: '#93714f', light: '#c9a67f' },
+    rock: { base: '#a0a7b0', dark: '#858d97', light: '#c3c9d0' },
+    shallow: { base: '#49a9e4', dark: '#3a95d3', light: '#a9dcf7' },
+    deep: { base: '#2f78cc', dark: '#2867b6', light: '#8cc5f0' },
+    grassEdge: '#4f9a3a',
+    foam: '#e6f6ff',
+    glint: '#f2fbff',
+  },
   material: {
     paving: '#d9d4c8',
     pavingLight: '#e9e4d8',
@@ -181,4 +218,5 @@ export const THEME: ArtTheme = SUNNY_AFTERNOON;
 export const LIGHT = THEME.light;
 export const GLASS = THEME.glass;
 export const NATURE = THEME.nature;
+export const GROUND = THEME.ground;
 export const MATERIAL = THEME.material;

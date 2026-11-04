@@ -1,6 +1,8 @@
 import { smoothstep } from '../../shared/noise';
 import { mulberry32 } from '../../shared/rng';
+import { parseColor } from './core/color';
 import { frameToTileUV } from './geometry';
+import { GROUND } from './theme/tokens';
 
 /**
  * Pixel masks for dual-grid terrain transitions (see render/transitions.ts).
@@ -22,10 +24,10 @@ export interface MaskShape {
   rim?: { rgb: readonly [number, number, number]; width: number; strength: number };
 }
 
-/** Land over anything: crisp. Foam uses the same wobble, so it hugs the shoreline. */
-export const LAND_SHAPE: MaskShape = { amp: 0.12, soft: 0.018 };
-/** Grass edges get a darker green rim, like a pixel-art outline. */
-export const GRASS_SHAPE: MaskShape = { ...LAND_SHAPE, rim: { rgb: [52, 140, 38], width: 0.07, strength: 0.85 } };
+/** Land over anything: a clean, slightly softened edge. Foam uses the same wobble, so it hugs the shoreline. */
+export const LAND_SHAPE: MaskShape = { amp: 0.12, soft: 0.026 };
+/** Grass edges get a faint darker lip, so a lawn reads as a slightly raised turf rather than an outline. */
+export const GRASS_SHAPE: MaskShape = { ...LAND_SHAPE, rim: { rgb: parseColor(GROUND.grassEdge), width: 0.06, strength: 0.4 } };
 /** Shallow water fading over deep: wide and soft. */
 export const SHALLOW_SHAPE: MaskShape = { amp: 0.15, soft: 0.2 };
 
@@ -109,7 +111,9 @@ export function maskedOverlay(src: ImageData, resolution: number, mask: number, 
   return out;
 }
 
-/** Solid light-cyan surf band just outside the land contour, on the water side. */
+/** Surf just outside the land contour, on the water side: brightest at the shore, fading out to sea. */
+const FOAM = parseColor(GROUND.foam);
+
 export function foamOverlay(width: number, height: number, resolution: number, mask: number, w: number): ImageData {
   const out = new ImageData(width, height);
   const d = out.data;
@@ -118,13 +122,13 @@ export function foamOverlay(width: number, height: number, resolution: number, m
       const c = cellCoords(px, py, resolution);
       if (!c) continue;
       const f = field(c.s, c.t, mask, w, LAND_SHAPE.amp);
-      const ring = smoothstep(-0.15, -0.13, f) * (1 - smoothstep(-0.02, 0, f));
+      const ring = smoothstep(-0.16, -0.03, f) * (1 - smoothstep(-0.025, 0, f));
       if (ring <= 0.01) continue;
       const o = (py * width + px) * 4;
-      d[o] = 196;
-      d[o + 1] = 238;
-      d[o + 2] = 255;
-      d[o + 3] = Math.round(ring * 235);
+      d[o] = FOAM[0];
+      d[o + 1] = FOAM[1];
+      d[o + 2] = FOAM[2];
+      d[o + 3] = Math.round(ring * 215);
     }
   }
   return out;
