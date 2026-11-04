@@ -208,6 +208,18 @@ We focus on **one** terrain and make it look great before adding presets or menu
 - [x] **A. Energy v2** → [specs/energy.md](specs/energy.md): coal, gas, wind (daily wind), solar (sun curve) and battery banks; demand follows the clock with an evening peak; hourly per-island balance; brownout notice; Energy Mix in the budget panel; deterministic tick clock (D-068); 4 energy tests
 - [ ] **B. Water, sewage and drainage**: shore water pumps, treatment, sewage outlets and plants, river flow carries pollution downstream, storm drains and street flooding (master plan §12.2, §12.2b)
 - [ ] **C. Health and education**: hospital (beds, ambulances), clinic, elementary and high school, university, library, research centre
+- [ ] **G. City evolution** → [specs/evolution.md](specs/evolution.md) (D-085, D-086), user order:
+  - [x] E0 Stages that lock buildings, with gates (population + working basics); old saves unlocked
+  - [x] E1 Lifestyle tiers (Basic → Comfortable → Prosperous), hospital and university expectations, lifestyle tax, graduates → office demand
+  - [x] E2 Garbage: landfill, recycling centre, incinerator; garbage need from the Village
+  - [x] Info panel redesign, Move from the selected building, sticky "Citizens say"
+  - [ ] E3 Incidents that work together: fires, theft and illness dispatched to fire, police and hospital, with burning buildings and theft markers on the map; trauma centre
+  - [ ] E4 Air quality index (AQI) per area and for the city, from industry, power, traffic and incinerators
+  - [ ] E5 Taxes collected by hand at the Town Hall
+  - [ ] E6 Industry makes construction materials that new buildings and upgrades consume
+  - [ ] E7 Research centre and research tree; trains (rail, stations, mode choice)
+  - [ ] Power made understandable (a "how power works" explainer, power view on the map)
+  - [ ] Server-run cities (D-085): the server ticks each open city, the browser sends commands
 - [ ] **D + E. Transport** → [specs/transport.md](specs/transport.md) (D-069), steps T1–T7:
   - [x] T1 Road-type table (`sim/roadTypes.ts`) with every system reading it; **Avenue** (4 lanes, planted median, brick footpaths, median trees and lamps); upgrade in place paying the difference; road art split into `render/atlas/roads/` (one file per type)
   - [x] T2 Boulevard (6 lanes) and Expressway (8 lanes) as 2-tile one-way carriageways (`World.lane`), ramps (expressways join only ramps and highways), pedestrian streets (walkers only), pavement styles (concrete, brick, granite setts, promenade; `World.pave`), turnarounds at wide-road ends, one-way routing for commutes and cars, Road picker UI; avenue trees redesigned after user feedback

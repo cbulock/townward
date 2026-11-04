@@ -166,16 +166,32 @@ under 0.5 ms a day on /demo.
 - Budget: recycling income appears under income.
 - Later: visible garbage bags at high zoom, garbage trucks sampled from collection, sickness.
 
-## Planned steps
+## Planned steps (user requests, 2026-11-04)
 
-- **E3 Trauma centre:** health ladder clinic → hospital → trauma centre (City); emergencies
-  (accidents, fires) create patients, and only a trauma centre in reach keeps deaths down.
-- **E4 Research centre** (Metropolis, needs a university in reach): research points, a small tree.
-- **E5 Trains** (below).
+Each gets its spec section before code.
+
+- **E3 Incidents that work together:** fires, theft and illness arise from hazard (density,
+  condition, unemployment, missing coverage). Fire stations, police and hospitals answer them
+  over the roads, so traffic and reach matter, and one service's gap shows up as another's
+  load (a fire with no ambulance nearby hurts people). On the map: burning buildings with
+  flames and smoke, a theft marker over robbed shops and homes, and an ambulance or patrol car
+  heading there. The trauma centre (City) joins here.
+- **E4 Air quality index (AQI):** a coarse pollution field from industry, power plants,
+  incinerators, landfills and traffic, shown as a 0–500 AQI per area and for the city, with a
+  map view. Replaces the one-off clean-air radius check.
+- **E5 Taxes collected at the Town Hall:** taxes build up in the Town Hall each month, and the
+  player collects them by hand (a button on the Town Hall and in the budget panel).
+- **E6 Industry makes construction materials:** industry produces materials; new buildings
+  and upgrades consume them, so a city without industry (or imports) builds slowly.
+- **Shops and industry ahead of workers:** to decide: whether zones may grow beyond demand,
+  with businesses that can't find workers complaining and, in time, abandoning.
+- **E7 Research centre** (Metropolis, needs a university in reach) and the research tree;
+  **trains** (below).
+- **Power made understandable:** a short "how power works" explainer and a power view on the map.
 - **Server-run cities (D-085):** the server ticks each open city with `src/sim`; the browser
   sends commands and renders state. Its own spec and phase.
 
-## E5: Trains (planned, its own step)
+## Trains (planned, its own step)
 
 Rail is the first mode that ignores road traffic. It needs a rail tile layer, a rail tool,
 stations and visible trains, so it gets its own spec section and session:

@@ -7,9 +7,9 @@ work session, read **Current Status** below, then the relevant spec.
 
 | | |
 |---|---|
-| **Current phase** | Transport (specs/transport.md): T1 ✅ avenue, **T2 ✅** boulevard, expressway, ramps, pedestrian streets, paving |
-| **Next phase** | User requests: Move tool and drag-to-rotate camera; then T3 (flyovers, interchanges, big bridges, tunnels) |
-| **Last updated** | 2026-11-03 |
+| **Current phase** | City evolution (specs/evolution.md): E0 stages ✅, E1 lifestyle ✅, E2 garbage ✅ |
+| **Next phase** | E3 incidents (fire, theft, illness working together), then AQI, Town Hall tax collection, industry materials; server-run cities after (D-085) |
+| **Last updated** | 2026-11-04 |
 
 ## Run It
 
@@ -49,6 +49,7 @@ bun run typecheck && bun run lint
 | [specs/engine.md](specs/engine.md) | Phase 11: harness, timings, determinism, time-slicing, fields, road graph, Worker |
 | [specs/energy.md](specs/energy.md) | Power plants, day/night demand, batteries, the tick clock |
 | [specs/transport.md](specs/transport.md) | Road hierarchy, wide roads, flyovers, bridges, public transport, parks |
+| [specs/evolution.md](specs/evolution.md) | City stages and unlocks, lifestyle tiers, hospital, university, garbage |
 | [deploy.md](deploy.md) | Docker image, environment settings, production checklist |
 | [decisions.md](decisions.md) | Decision log (why we chose X over Y) |
 | [progress-log.md](progress-log.md) | Dated log of what got done each session |

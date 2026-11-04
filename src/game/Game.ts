@@ -12,19 +12,19 @@ import type { BurstKind } from '../render/fx/Effects';
 import { applyClear, applyMove, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
-import { buildingDef, isPlaceable, SERVICE_KINDS, type BuildingDef, type BuildingInstance } from '../sim/buildings/catalog';
+import { buildingDef, isPlaceable, Lifestyle, type BuildingInstance } from '../sim/buildings/catalog';
 import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
-import { serviceBit } from '../sim/systems/coverage';
-import { STAGES, unlockStage } from '../sim/stages';
+import { nextStage, STAGES, unlockedAt, unlockStage } from '../sim/stages';
+import { stageRequirements } from '../sim/progression';
+import { lifestyleReport } from '../sim/systems/lifestyle';
+import { inspectInfo } from './inspect';
 import { windFactor } from '../sim/systems/energy';
 import { demandFor } from '../sim/systems/growth';
 import { PAVEMENTS, ROAD_SPECS } from '../sim/roadTypes';
 import { cityStats } from '../sim/systems/population';
 import type { Traffic } from '../sim/systems/traffic';
-import { isWorking, needsUtilities } from '../sim/systems/utilities';
-import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
 import { happinessColor, type OverlayTile } from '../render/Renderer';
 import { rectTiles, RoadType, roadMask, type BuildableRoad, type TilePos } from '../sim/roads';
 import { Decor } from '../sim/terrain/types';
@@ -35,7 +35,7 @@ import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
 import { daylightTint, nightness } from '../render/daylight';
 import type { Point, ViewTransform } from '../render/view/ViewTransform';
-import { EventBus, type DayNightMode, type GameEventMap, type InspectInfo } from './events';
+import { EventBus, type DayNightMode, type GameEventMap, type Notice, type ProgressInfo } from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
 import { coveragePreviewTiles, isRoadTool, isZoneTool, planTool, type RoadToolId, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
@@ -285,9 +285,14 @@ export class Game {
     const p = this.plan(null, t);
     if (!p || p.kind !== 'move') return;
     const funds = this.city.funds;
+    const moved = this.carrying;
     this.execute(p);
-    // Moved (money spent): ready to pick up the next one.
-    if (this.city.funds < funds) this.carrying = null;
+    // Moved (money spent): back to Select with the building still selected at its new place.
+    if (this.city.funds < funds) {
+      this.setTool('select');
+      this.inspect(moved);
+      return;
+    }
     this.updatePreview();
   }
 
@@ -488,6 +493,7 @@ export class Game {
 
   private newDay(out: DayOutcome) {
     this.showDay(out);
+    this.showMilestones(out);
     this.explainWaitingZones();
     // Congestion changes every day, even when no buildings did.
     if (out.changed.length === 0) this.refreshDataView();
@@ -501,6 +507,21 @@ export class Game {
     this.emitCity();
     this.emitBudget();
     this.emitInspect();
+  }
+
+  /** A new stage (with what it unlocks) or the first homes reaching a better lifestyle. */
+  private showMilestones(out: DayOutcome) {
+    if (out.stage !== null) {
+      const def = STAGES[out.stage];
+      const unlocked = this.city.locked ? unlockedAt(out.stage).map((id) => buildingDef(id).name) : [];
+      this.sound.play('build');
+      this.notify('milestone', `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim());
+    }
+    if (out.lifestyle === Lifestyle.Comfortable) {
+      this.notify('milestone', 'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.');
+    } else if (out.lifestyle === Lifestyle.Prosperous) {
+      this.notify('milestone', 'The first homes are Prosperous! They pay the most tax, and they want a university.');
+    }
   }
 
   /**
@@ -634,19 +655,6 @@ export class Game {
   }
 
   /** A building's happiness and need scores for the info panel (null for civic buildings). */
-  private needsInfo(id: number): InspectInfo['needs'] {
-    const n = this.sim.needs.byBuilding.get(id);
-    if (!n) return null;
-    return {
-      happiness: n.happiness,
-      scores: NEED_KINDS.flatMap((kind) => {
-        const score = n.scores[kind];
-        return score === undefined ? [] : [{ kind, score }];
-      }),
-      complaint: n.complaint ? COMPLAINT_TEXT[n.complaint] : null,
-    };
-  }
-
   /** Glide the camera to a world tile (the Citizens panel's "Show me"). */
   focusTile(x: number, y: number) {
     this.lookAt(this.renderer.view.pointToView(x, y));
@@ -772,7 +780,20 @@ export class Game {
       speed: this.speedIndex,
       cars,
       people: this.traffic.agents.length - cars,
+      progress: this.progressInfo(),
     });
+  }
+
+  private progressInfo(): ProgressInfo {
+    const stage = this.city.stage;
+    const next = nextStage(stage);
+    return {
+      stage,
+      stageName: STAGES[stage].name,
+      locked: this.city.locked,
+      next: next === null ? null : { name: STAGES[next].name, requirements: stageRequirements(this.world, next) },
+      residents: lifestyleReport(this.city).residents,
+    };
   }
 
   // ---------------------------------------------------------------- inspect
@@ -794,81 +815,7 @@ export class Game {
 
   private emitInspect() {
     const b = this.inspected === null ? undefined : this.world.buildings.get(this.inspected);
-    if (!b) {
-      this.events.emit('inspect', null);
-      return;
-    }
-    const d: BuildingDef = BUILDINGS[b.def];
-    const info: InspectInfo = {
-      id: b.id,
-      name: d.name,
-      category: d.category,
-      level: d.level,
-      wealth: d.wealth ?? 'everyday',
-      investorValue: d.investorValue ?? 0,
-      description: d.description,
-      occupants: b.occupants,
-      capacity: d.capacity,
-      occupantLabel: d.category === 'residential' ? 'Residents' : 'Workers',
-      hasRoad: b.entrance !== -1,
-      size: d.size,
-      grown: b.grown,
-      constructionDays: b.construction,
-      needsUtilities: needsUtilities(d),
-      powered: b.powered,
-      watered: b.watered,
-      services: d.category === 'civic' ? [] : SERVICE_KINDS.filter((k) => b.services & serviceBit(k)),
-      provides: d.service
-        ? { kind: 'service', service: d.service, radius: d.radius ?? 0 }
-        : d.supplies || d.energy || d.substation
-          ? {
-              kind: 'utility',
-              ...d.supplies,
-              coverage: d.energy?.coverage ?? d.substation?.radius,
-              condition: d.energy && d.energy.source !== 'battery' ? b.condition : undefined,
-              repairCost: d.energy?.repairCost,
-            }
-          : null,
-      powerIssue: this.powerIssue(b),
-      condition: d.energy && d.energy.source !== 'battery' ? b.condition : null,
-      repairDays: b.repairDays,
-      repairCost: d.energy?.repairCost ?? 0,
-      upkeep: d.upkeep ?? 0,
-      commuteMinutes: d.category === 'residential' ? (this.sim.commute.commuteMinutes.get(b.id) ?? null) : null,
-      needs: this.needsInfo(b.id),
-      abandoned: b.abandoned,
-    };
-    this.events.emit('inspect', info);
-  }
-
-  private powerIssue(b: BuildingInstance): InspectInfo['powerIssue'] {
-    const d: BuildingDef = buildingDef(b.def);
-    if (d.category === 'civic' || b.powered) return null;
-    if (b.entrance === -1) return { reason: 'No road access', stats: [{ label: 'Required', value: 'A connected road within 3 tiles' }] };
-    const report = this.sim.utilities.report.power;
-    const substations = [...this.world.buildings.values()].filter((s) => buildingDef(s.def).substation && isWorking(s));
-    if (substations.length > 0) {
-      const connected = substations.some((s) => {
-        const sd = buildingDef(s.def).substation;
-        const cx = b.x + d.size.w / 2;
-        const cy = b.y + d.size.h / 2;
-        return sd !== undefined && Math.hypot(s.x + 0.5 - cx, s.y + 0.5 - cy) <= sd.radius;
-      });
-      if (!connected) {
-        return {
-          reason: 'Outside substation coverage',
-          stats: [{ label: 'Coverage', value: 'Move closer to a connected GRID substation' }],
-        };
-      }
-    }
-    return {
-      reason: report.supply < report.demand ? 'Insufficient generation' : 'Power already allocated to earlier buildings',
-      stats: [
-        { label: 'Demand', value: report.demand.toLocaleString() },
-        { label: 'Available', value: report.supply.toLocaleString() },
-        { label: 'Short', value: report.short.toLocaleString() },
-      ],
-    };
+    this.events.emit('inspect', b ? inspectInfo(this.sim, b) : null);
   }
 
   /** Bulldoze a whole building (from the info panel). */
@@ -1070,7 +1017,7 @@ export class Game {
     return null;
   }
 
-  private notify(kind: 'error' | 'info', message: string) {
+  private notify(kind: Notice['kind'], message: string) {
     this.events.emit('notice', { id: ++noticeSeq, kind, message });
   }
 
@@ -1166,7 +1113,10 @@ export class Game {
     else if (code === 'Space') this.togglePause();
     else if (code === 'BracketLeft') this.setSpeed(Math.max(1, this.speedIndex - 1));
     else if (code === 'BracketRight') this.setSpeed(this.speedIndex + 1);
-    else if (code === 'Escape') {
+    // P moves the selected building (the info panel's Move button).
+    else if (code === TOOL_KEYS.move) {
+      if (this.inspected !== null) this.startMove(this.inspected);
+    } else if (code === 'Escape') {
       if (this.inspected !== null && !this.drag) this.inspect(null);
       else this.cancel();
     }

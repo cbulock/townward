@@ -73,6 +73,8 @@ export class Simulation {
     this.traffic = new TrafficSystem(world, this.commute);
     this.garbage = new GarbageSystem(city);
     this.lifestyle = new LifestyleSystem(city);
+    // An unlocked city opens at its stage straight away (the /demo city, old saves), with no toast.
+    if (!city.locked) this.followPopulation();
     this.onChange = [this.access, this.utilities, this.coverage, this.commute, this.needs, this.traffic];
   }
 
@@ -109,19 +111,27 @@ export class Simulation {
   }
 
   /**
-   * The city moves up one stage when it meets every requirement of the next (its population
-   * and the basics of the current stage); stages never go back down (D-086). Unlocked cities
-   * (/demo, old saves) just follow their population.
+   * A locked city moves up one stage when it meets every requirement of the next (its
+   * population and the basics of the current stage); stages never go back down (D-086).
+   * Unlocked cities (/demo, old saves) simply follow their population.
    */
   private climbStage(out: DayOutcome) {
+    if (!this.city.locked) {
+      const before = this.city.stage;
+      this.followPopulation();
+      if (this.city.stage !== before) out.stage = this.city.stage;
+      return;
+    }
     const next = nextStage(this.city.stage);
-    if (next === null) return;
-    const ready = this.city.locked
-      ? stageRequirements(this.world, next).every((r) => r.met)
-      : stageFor(cityStats(this.world).population) >= next;
-    if (!ready) return;
+    if (next === null || !stageRequirements(this.world, next).every((r) => r.met)) return;
     this.city.stage = next;
     out.stage = next;
+  }
+
+  /** Unlocked cities: the stage their population reaches (never lower than before). */
+  private followPopulation() {
+    const reached = stageFor(cityStats(this.world).population);
+    if (reached > this.city.stage) this.city.stage = reached;
   }
 
   /**

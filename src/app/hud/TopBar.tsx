@@ -5,6 +5,7 @@ import { budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom
 import { AccountButton } from '../account/AccountButton';
 import { tourStepAtom } from '../tour/tourState';
 import { SaveStatus } from './SaveStatus';
+import { StageChip } from './StageChip';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -260,6 +261,7 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
       >
         <span className="stat-value">{(city?.population ?? 0).toLocaleString()}</span>
       </Stat>
+      <StageChip />
       {/* Jobs folds with the date: one toggle, shown in the date's place. */}
       <Fold id="city" open={fold}>
         <Stat

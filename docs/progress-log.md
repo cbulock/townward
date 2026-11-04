@@ -2,6 +2,17 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04: City evolution: stages, lifestyle, hospital, university, garbage (D-085, D-086)
+- Spec [specs/evolution.md](specs/evolution.md). Decisions: the server will run each city (D-085, features first); stages lock buildings and garbage starts at Village (D-086).
+- Sim: `sim/stages.ts` (Hamlet → Village 500 → Town 2,500 → City 10,000 → Metropolis 30,000, unlock table), `sim/progression.ts` (stage gates: population plus the basics of the current stage), `systems/lifestyle.ts` (Basic → Comfortable → Prosperous; better-off homes expect a hospital, then a university, and pay 1.5× / 2.2× tax), `systems/garbage.ts` (daily garbage, collection by landfill / recycling centre / incinerator over road islands; landfills fill; recycling sells). Needs gained hospital, university and garbage, tier weights, and requests from content homes. University graduates add office demand. Hospitals count as clinics; level 3 still needs the four basic services.
+- New buildings: Hospital (3×2), University (3×3), Landfill (3×3, own painter), Recycling Centre and Incinerator (2×2). `/demo` gained a downtown campus and a recycling centre per services block, and opens at its real stage.
+- Saving: `city.stage` and `city.locked`; buildings carry lifestyle, streak, garbage and landfill fill (optional tail, save v1). Cities saved before stages load unlocked (user call: current players aren't disturbed).
+- HUD: stage chip with the next-stage checklist and lifestyle mix; locked cards in the Civic picker; milestone toasts; info panel redesigned (actions at the top, one alert with the fix, stats grid, needs worst first with hints, what a facility provides, details folded; scrolls on desktop, where it used to run off screen); Move lives in the info panel and on `P` (the toolbar Move tool is gone) and returns to Select with the building still selected; "Citizens say" is a sticky toggle with a count badge that remembers open/closed.
+- Refactor: the info-panel data moved out of `Game.ts` into `game/inspect.ts` (1,236 → ~1,150 lines).
+- Harness: history samples gained stage, comfortable, prosperous and uncollected garbage; `sim:run` prints them. New systems cost ~0.1 ms a day on /demo.
+- Tests: `tests/evolution.test.ts` (10). 223 pass; pre-existing failure untouched: `transport.test.ts` avenue corridor.
+- Found, not fixed: only ~190 of 822 /demo homes get a commute time, so 487 score 0 on jobs (likely the same root cause as the transport test); Pixi `validateRenderable` crash in headless Chrome on `main` too (black map).
+
 ## 2026-11-03: Email codes for sign-up, password reset, and anti-bombing limits (D-084)
 - Server: `server/modules/email/mailer.ts` (Brevo, console for development), `auth/emailCodes.ts` (hashed codes, migration 6 `email_codes`), `auth/humanCheck.ts` (Turnstile), new routes `signup/verify`, `password/forgot`, `password/reset`, `code/resend`; send limits per inbox, per address and per day in `auth.limits.ts`. Config `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME`, `MAIL_DAILY_LIMIT`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` (docker-compose, `.env.example`, deploy.md "Email codes").
 - Client: the auth dialog continues to a code step after sign-up, offers "Forgot password?" on log in, with resend countdowns; honeypot and Turnstile on forms that send email.

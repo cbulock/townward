@@ -7,6 +7,8 @@ import type { UtilityTotals } from '../sim/systems/utilities';
 import type { CommuteReport } from '../sim/systems/commute';
 import type { NeedKind, NeedsReport } from '../sim/systems/needs';
 import type { ServiceKind } from '../sim/buildings/catalog';
+import type { StageRequirement } from '../sim/progression';
+import type { Stage } from '../sim/stages';
 import type { ToolId } from './tools';
 
 /** Typed event bus: the game emits, the UI bridge / renderer listen. Nothing polls. */
@@ -62,6 +64,18 @@ export interface CityInfo {
   traffic: CommuteReport;
   /** City happiness, abandoned buildings and the top complaints (docs/specs/needs.md). */
   needs: NeedsReport;
+  /** Stage, what the next one needs, and residents by lifestyle (docs/specs/evolution.md). */
+  progress: ProgressInfo;
+}
+
+export interface ProgressInfo {
+  stage: Stage;
+  stageName: string;
+  /** Stages lock buildings in this city (D-086). */
+  locked: boolean;
+  next: { name: string; requirements: readonly StageRequirement[] } | null;
+  /** Residents per lifestyle tier: Basic, Comfortable, Prosperous. */
+  residents: readonly [number, number, number];
 }
 
 export interface BudgetInfo {
@@ -119,6 +133,12 @@ export interface InspectInfo {
   /** Zoned buildings: happiness, each need's score and the current complaint. */
   needs: { happiness: number; scores: readonly { kind: NeedKind; score: number }[]; complaint: string | null } | null;
   abandoned: boolean;
+  /** Homes: lifestyle tier and what moves it (docs/specs/evolution.md). */
+  lifestyle: { tier: string; note: string } | null;
+  /** Zoned buildings from the Village stage: tons of garbage waiting for collection. */
+  garbage: number | null;
+  /** Garbage facilities: today's collection and, for landfills, how full they are. */
+  facility: { collectedToday: number; trucks: number; filled: number | null; holds: number | null } | null;
 }
 
 export interface ToolPreviewInfo {
@@ -141,7 +161,8 @@ export interface ToolPreviewInfo {
 
 export interface Notice {
   id: number;
-  kind: 'error' | 'info';
+  /** Milestones (a new stage, residents moving up) stand out and stay longer. */
+  kind: 'error' | 'info' | 'milestone';
   message: string;
 }
 

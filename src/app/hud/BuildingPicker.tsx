@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildings';
 import { BUILDINGS, PLACEABLE_IDS, type BuildingDef, type BuildingId, type CivicGroup } from '../../sim/buildings/catalog';
 import type { ZoneToolId } from '../../game/tools';
-import { activeToolAtom, buildingChoiceAtom, fundsAtom, gameAtom } from '../atoms';
+import { STAGES, unlockStage } from '../../sim/stages';
+import { activeToolAtom, buildingChoiceAtom, cityAtom, fundsAtom, gameAtom } from '../atoms';
 
 const THUMB = 64;
 
@@ -28,7 +29,7 @@ function BuildingThumb({ id }: { id: BuildingId }) {
 
 const GROUPS: readonly { id: CivicGroup; label: string; hint: string }[] = [
   { id: 'services', label: 'Services', hint: 'Cover the area around them. Covered buildings fill up, and all four let towers grow.' },
-  { id: 'utilities', label: 'Utilities', hint: 'Power and water every building on the same roads, up to their capacity.' },
+  { id: 'utilities', label: 'Utilities', hint: 'Power, water and garbage trucks reach every building on the same connected roads, up to their capacity.' },
   { id: 'parks', label: 'Parks & Places', hint: 'Beautiful parks, markets, shopping and the town hall.' },
 ];
 
@@ -56,13 +57,16 @@ export function BuildingPicker() {
   const tool = useAtomValue(activeToolAtom);
   const choice = useAtomValue(buildingChoiceAtom);
   const funds = useAtomValue(fundsAtom);
+  const progress = useAtomValue(cityAtom)?.progress;
   const [tab, setTab] = useState<CivicGroup>('services');
 
   if (tool !== 'build') return null;
+  // Locked buildings (D-086) come last, greyed, with the stage that unlocks them.
+  const isLocked = (id: BuildingId) => progress !== undefined && progress.locked && unlockStage(id) > progress.stage;
   const ids = PLACEABLE_IDS.filter((id) => {
     const d: BuildingDef = BUILDINGS[id];
     return d.group === tab;
-  });
+  }).sort((a, b) => Number(isLocked(a)) - Number(isLocked(b)) || unlockStage(a) - unlockStage(b));
 
   return (
     <div className="panel building-picker" role="dialog" aria-label="Choose a civic building">
@@ -86,19 +90,28 @@ export function BuildingPicker() {
         {ids.map((id) => {
           const d: BuildingDef = BUILDINGS[id];
           const affordable = d.cost <= funds;
+          const locked = isLocked(id);
+          const stage = STAGES[unlockStage(id)];
           return (
             <button
               key={id}
               type="button"
-              className={`building-card ${id === choice ? 'is-active' : ''} ${affordable ? '' : 'is-unaffordable'}`}
-              title={d.description}
-              onClick={() => game?.setBuilding(id)}
+              className={`building-card ${id === choice ? 'is-active' : ''} ${affordable ? '' : 'is-unaffordable'} ${locked ? 'is-locked' : ''}`}
+              title={locked ? `Unlocks when the city becomes a ${stage.name} (${stage.population.toLocaleString()} people and its basics)` : d.description}
+              aria-disabled={locked}
+              onClick={() => (locked ? undefined : game?.setBuilding(id))}
             >
               <BuildingThumb id={id} />
               <span className="card-name">{d.name}</span>
               <span className="card-meta">
-                <span className="card-cost">${d.cost.toLocaleString()}</span>
-                <span className="card-size">{cardStat(d)}</span>
+                {locked ? (
+                  <span className="card-lock">🔒 {stage.name}</span>
+                ) : (
+                  <>
+                    <span className="card-cost">${d.cost.toLocaleString()}</span>
+                    <span className="card-size">{cardStat(d)}</span>
+                  </>
+                )}
               </span>
             </button>
           );

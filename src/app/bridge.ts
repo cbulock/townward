@@ -65,7 +65,7 @@ export function connectGameToStore(game: Game, store: Store): () => void {
       const timer = setTimeout(() => {
         timers.delete(timer);
         store.set(noticesAtom, (list) => list.filter((x) => x.id !== n.id));
-      }, NOTICE_MS);
+      }, n.kind === 'milestone' ? NOTICE_MS * 2.5 : NOTICE_MS);
       timers.add(timer);
     }),
   ];

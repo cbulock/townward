@@ -23,40 +23,79 @@ const TONE: Readonly<Record<ComplaintKind, string>> = {
   abandoned: '#6f665c',
 };
 
-/** "Citizens say…": the city's top complaints, each with a button that shows where. */
+const OPEN_KEY = 'openpolis.citizensOpen';
+
+/** Open or closed, remembered per device; folded by default on short (landscape phone) screens. */
+function initialOpen(): boolean {
+  try {
+    const saved = localStorage.getItem(OPEN_KEY);
+    if (saved !== null) return saved === '1';
+  } catch {
+    // Storage blocked (private mode): fall back to the screen-size default.
+  }
+  return !window.matchMedia(COMPACT).matches;
+}
+
+/**
+ * "Citizens say…": the city's top complaints and requests, each with a button that shows where.
+ * Always on screen as a sticky toggle (user request: it used to vanish whenever the list was
+ * momentarily empty), with the complaint count and city happiness in its header.
+ */
 export function CitizensPanel() {
   const city = useAtomValue(cityAtom);
   const game = useAtomValue(gameAtom);
-  // Folded on short (landscape phone) screens, where it would cover the city.
-  const [open, setOpen] = useState(() => !window.matchMedia(COMPACT).matches);
-  const complaints = city?.needs.complaints ?? [];
-  if (complaints.length === 0) return null;
+  const [open, setOpen] = useState(initialOpen);
+  if (!city) return null;
+  const complaints = city.needs.complaints;
+  const total = complaints.reduce((n, c) => n + c.count, 0);
+  const toggle = () =>
+    setOpen((o) => {
+      try {
+        localStorage.setItem(OPEN_KEY, o ? '0' : '1');
+      } catch {
+        // Not remembered this time; the panel still toggles.
+      }
+      return !o;
+    });
   return (
-    <aside className="panel citizens" aria-label="Citizens say">
-      <button type="button" className="citizens-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span>Citizens say…</span>
+    <aside className={`panel citizens ${open ? 'is-open' : ''}`} aria-label="Citizens say">
+      <button type="button" className="citizens-header" aria-expanded={open} onClick={toggle}>
+        <span className="citizens-title">Citizens say</span>
+        {total > 0 && (
+          <span className="citizens-badge" aria-label={`${total} buildings complaining`}>
+            {total > 999 ? '999+' : total}
+          </span>
+        )}
+        <span className="citizens-mood">{Math.round(city.needs.happiness * 100)}% happy</span>
         <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" style={{ transform: open ? 'none' : 'rotate(-90deg)' }}>
           <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
       </button>
-      {open && (
-        <ul className="citizens-list">
-          {complaints.map((c) => (
-            <li key={c.kind} className="citizens-item">
-              <i style={{ background: TONE[c.kind] }} />
-              <span className="citizens-text">
-                “{c.text}”<span className="citizens-count">{c.count}</span>
-                <span className="citizens-stats">
-                  {c.stats.map((stat) => <span key={stat.label}>{stat.label}: {stat.value}</span>)}
+      {open &&
+        (complaints.length === 0 ? (
+          <p className="citizens-empty">Nobody is complaining right now.</p>
+        ) : (
+          <ul className="citizens-list">
+            {complaints.map((c) => (
+              <li key={c.kind} className="citizens-item">
+                <i style={{ background: TONE[c.kind] }} />
+                <span className="citizens-text">
+                  “{c.text}”<span className="citizens-count">{c.count}</span>
+                  <span className="citizens-stats">
+                    {c.stats.map((stat) => (
+                      <span key={stat.label}>
+                        {stat.label}: {stat.value}
+                      </span>
+                    ))}
+                  </span>
                 </span>
-              </span>
-              <button type="button" className="citizens-show" onClick={() => game?.focusBuilding(c.building)}>
-                Show me
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <button type="button" className="citizens-show" onClick={() => game?.focusBuilding(c.building)}>
+                  Show me
+                </button>
+              </li>
+            ))}
+          </ul>
+        ))}
     </aside>
   );
 }
