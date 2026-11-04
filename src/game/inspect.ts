@@ -6,7 +6,7 @@ import { serviceBit } from '../sim/systems/coverage';
 import { riseBlocker } from '../sim/systems/lifestyle';
 import { COMPLAINT_TEXT, NEED_KINDS } from '../sim/systems/needs';
 import { isWorking, needsUtilities } from '../sim/systems/utilities';
-import { platformOf } from '../sim/rail';
+import { platformOf, stationName } from '../sim/rail';
 import type { InspectInfo } from './events';
 
 /**
@@ -65,7 +65,17 @@ export function inspectInfo(sim: Simulation, b: BuildingInstance): InspectInfo {
       : null,
     aqi: Math.round(sim.air.aqiOf(b)),
     taxesWaiting: b.def === 'town_hall' && sim.city.collectsTaxes ? Math.round(sim.city.uncollected) : null,
-    station: d.railStation ? { riders: Math.round(sim.commute.stationRiders.get(b.id) ?? 0), onTrack: platformOf(sim.world, b) !== -1 } : null,
+    station: d.railStation
+      ? {
+          name: `${stationName(b.id)} Station`,
+          riders: Math.round(sim.commute.stationRiders.get(b.id) ?? 0),
+          onTrack: platformOf(sim.world, b) !== -1,
+          lines: sim.trains.linesAt(b.id).map((l) => ({
+            trains: l.trains,
+            stops: l.stops.map((id) => ({ name: stationName(id), riders: Math.round(sim.commute.stationRiders.get(id) ?? 0), here: id === b.id })),
+          })),
+        }
+      : null,
   };
 }
 

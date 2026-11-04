@@ -243,6 +243,7 @@ export class Renderer {
       this.agents.container,
       this.daylight,
       this.objects,
+      this.agents.raised,
       this.ambient.lower,
       this.rotors.container,
       this.smoke.container,

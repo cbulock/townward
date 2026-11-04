@@ -6,7 +6,8 @@ import { roadVariant } from '../render/atlas/roads';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
 import { planClear, planMove, planPlace, planRail, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
-import { isRail, Rail } from '../sim/rail';
+import { isCornerMask, isRail, Rail, railDragPath } from '../sim/rail';
+import type { RailCurve } from '../render/atlas/rail';
 import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/systems/access';
 import { BALANCE } from '../shared/balance';
@@ -158,7 +159,8 @@ export function planTool(
   }
   switch (tool) {
     case 'rail':
-      return { kind: 'rail', tool, plan: planRail(world, roadPath(anchor.start, anchor.current, anchor.straight)) };
+      // A roughly diagonal drag lays a 45° staircase that's drawn as one diagonal line (D-089).
+      return { kind: 'rail', tool, plan: planRail(world, railDragPath(anchor.start, anchor.current, anchor.straight)) };
     case 'clear':
       return { kind: 'clear', tool, plan: planClear(world, rectTiles(anchor.start, anchor.current)) };
     case 'build':
@@ -256,11 +258,23 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
     // Track ghosts, auto-tiled as if the plan were already laid (masks turned into the view).
     const laid = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));
     const hasRail = (x: number, y: number) => world.inBounds(x, y) && (laid.has(world.index(x, y)) || isRail(world, world.index(x, y)));
+    const maskAt = (x: number, y: number) =>
+      (hasRail(x, y - 1) ? 1 : 0) | (hasRail(x + 1, y) ? 2 : 0) | (hasRail(x, y + 1) ? 4 : 0) | (hasRail(x - 1, y) ? 8 : 0);
+    const STEPS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
+    /** As the built track will bend (sim/rail.ts railCornerShape), with the plan counted in. */
+    const curveAt = (x: number, y: number, mask: number): RailCurve | null => {
+      if (!isCornerMask(mask)) return null;
+      const opposite = ~mask & 0b1111;
+      return STEPS.some(([dx, dy], d) => mask & (1 << d) && maskAt(x + dx, y + dy) === opposite) ? 'chord' : 'arc';
+    };
     return p.plan.tiles.map((t) => {
-      const mask = (hasRail(t.x, t.y - 1) ? 1 : 0) | (hasRail(t.x + 1, t.y) ? 2 : 0) | (hasRail(t.x, t.y + 1) ? 4 : 0) | (hasRail(t.x - 1, t.y) ? 8 : 0);
+      const mask = maskAt(t.x, t.y);
       const i = world.index(t.x, t.y);
-      const look = t.rail === Rail.Bridge ? 'bridge' : world.road[i] !== RoadType.None ? 'crossing' : 'track';
-      return { x: t.x, y: t.y, texture: tex.rail[look][view.mask(mask)], tint: t.valid ? 0xffffff : TINT_INVALID, alpha: t.valid ? 0.85 : 0.45 };
+      const over = world.road[i] !== RoadType.None;
+      const look = t.rail === Rail.Bridge ? 'bridge' : 'track';
+      const curve = look === 'track' && !over ? curveAt(t.x, t.y, mask) : null;
+      const texture = over ? tex.railOverpass[view.mask(mask)] : curve ? tex.railCurves[curve][view.mask(mask)] : tex.rail[look][view.mask(mask)];
+      return { x: t.x, y: t.y, texture, tint: t.valid ? 0xffffff : TINT_INVALID, alpha: t.valid ? 0.85 : 0.45 };
     });
   }
 

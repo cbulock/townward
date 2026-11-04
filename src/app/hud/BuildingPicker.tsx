@@ -29,7 +29,8 @@ function BuildingThumb({ id }: { id: BuildingId }) {
 }
 
 const GROUPS: readonly { id: CivicGroup; label: string; hint: string }[] = [
-  { id: 'services', label: 'Services', hint: 'Cover the area around them. Covered buildings fill up, and all four let towers grow.' },
+  { id: 'services', label: 'Services', hint: 'Each covers the area around it. Covered homes are happier, and police, fire, clinic and school together let towers grow.' },
+  { id: 'transport', label: 'Transport', hint: 'Stations beside rail track (Roads → Rail, Z). Homes and jobs near stations take the train when it beats driving.' },
   { id: 'utilities', label: 'Utilities', hint: 'Power, water and garbage trucks reach every building on the same connected roads, up to their capacity.' },
   { id: 'parks', label: 'Parks & Places', hint: 'Beautiful parks, markets, shopping and the town hall.' },
 ];
@@ -42,9 +43,25 @@ const ZONE_LINKS: readonly { tool: ZoneToolId; label: string; key: string; tone:
   { tool: 'zone-i', label: 'Industry', key: '5', tone: 'tone-i' },
 ];
 
+/** Sections within a tab (others show as one grid). */
+const SECTIONS: Readonly<Partial<Record<CivicGroup, readonly { label: string; ids: readonly BuildingId[] }[]>>> = {
+  services: [
+    { label: 'Safety', ids: ['police_station', 'fire_station'] },
+    { label: 'Health', ids: ['clinic', 'hospital'] },
+    { label: 'Education & research', ids: ['school', 'university', 'research_centre'] },
+  ],
+  utilities: [
+    { label: 'Power', ids: ['power_plant', 'gas_plant', 'wind_turbine', 'solar_farm', 'battery_bank', 'substation'] },
+    { label: 'Water', ids: ['water_tower'] },
+    { label: 'Garbage', ids: ['landfill', 'recycling_centre', 'incinerator'] },
+  ],
+};
+
 /** The key number on a card: coverage radius, utility capacity, or footprint. */
 function cardStat(d: BuildingDef): string {
   if (d.radius) return `${d.radius}-tile reach`;
+  if (d.garbage) return `${d.garbage.trucks} t/day`;
+  if (d.railStation) return 'by track';
   if (d.energy?.coverage) return `${d.energy.coverage}-tile reach`;
   if (d.substation) return `${d.substation.radius}-tile reach`;
   if (d.supplies?.power) return `${d.supplies.power} ⚡`;
@@ -79,6 +96,48 @@ export function BuildingPicker() {
     return d.group === tab;
   }).sort((a, b) => Number(isLocked(a)) - Number(isLocked(b)) || unlockStage(a) - unlockStage(b));
 
+  const card = (id: BuildingId) => {
+    const d: BuildingDef = BUILDINGS[id];
+    const affordable = d.cost <= funds;
+    const locked = isLocked(id);
+    const stage = STAGES[unlockStage(id)];
+    return (
+      <button
+        key={id}
+        type="button"
+        className={`building-card ${id === choice ? 'is-active' : ''} ${affordable ? '' : 'is-unaffordable'} ${locked ? 'is-locked' : ''}`}
+        title={
+          locked
+            ? unlockTech(id) && progress && unlockStage(id) <= progress.stage
+              ? `Needs the ${lockLabel(id)} research`
+              : `Unlocks when the city becomes a ${stage.name} (${stage.population.toLocaleString()} people and its basics)`
+            : d.description
+        }
+        aria-disabled={locked}
+        onClick={() => (locked ? undefined : game?.setBuilding(id))}
+      >
+        <BuildingThumb id={id} />
+        <span className="card-name">{d.name}</span>
+        <span className="card-meta">
+          {locked ? (
+            <span className="card-lock">🔒 {lockLabel(id)}</span>
+          ) : (
+            <>
+              <span className="card-cost">${d.cost.toLocaleString()}</span>
+              <span className="card-size">{cardStat(d)}</span>
+            </>
+          )}
+        </span>
+      </button>
+    );
+  };
+  // Headed sections where the tab has them; anything they don't list goes last.
+  const listed = new Set((SECTIONS[tab] ?? []).flatMap((sec) => sec.ids));
+  const sections = [
+    ...(SECTIONS[tab] ?? []).map((sec) => ({ label: sec.label, ids: ids.filter((id) => sec.ids.includes(id)) })),
+    { label: SECTIONS[tab] ? 'More' : '', ids: ids.filter((id) => !listed.has(id)) },
+  ].filter((sec) => sec.ids.length > 0);
+
   return (
     <div className="panel building-picker" role="dialog" aria-label="Choose a civic building">
       <div className="picker-tabs" role="tablist">
@@ -97,42 +156,14 @@ export function BuildingPicker() {
         ))}
       </div>
       <p className="picker-hint">{GROUPS.find((g) => g.id === tab)?.hint}</p>
-      <div className="picker-grid">
-        {ids.map((id) => {
-          const d: BuildingDef = BUILDINGS[id];
-          const affordable = d.cost <= funds;
-          const locked = isLocked(id);
-          const stage = STAGES[unlockStage(id)];
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`building-card ${id === choice ? 'is-active' : ''} ${affordable ? '' : 'is-unaffordable'} ${locked ? 'is-locked' : ''}`}
-              title={
-                locked
-                  ? unlockTech(id) && progress && unlockStage(id) <= progress.stage
-                    ? `Needs the ${lockLabel(id)} research`
-                    : `Unlocks when the city becomes a ${stage.name} (${stage.population.toLocaleString()} people and its basics)`
-                  : d.description
-              }
-              aria-disabled={locked}
-              onClick={() => (locked ? undefined : game?.setBuilding(id))}
-            >
-              <BuildingThumb id={id} />
-              <span className="card-name">{d.name}</span>
-              <span className="card-meta">
-                {locked ? (
-                  <span className="card-lock">🔒 {lockLabel(id)}</span>
-                ) : (
-                  <>
-                    <span className="card-cost">${d.cost.toLocaleString()}</span>
-                    <span className="card-size">{cardStat(d)}</span>
-                  </>
-                )}
-              </span>
-            </button>
-          );
-        })}
+      <div className="picker-sections">
+        {sections.map((sec) => (
+          // Small sections sit side by side; bigger ones take the full width.
+          <section key={sec.label} className={`picker-section ${sec.ids.length > 2 ? 'is-wide' : ''}`} aria-label={sec.label || undefined}>
+            {sec.label && <h3 className="picker-section-title">{sec.label}</h3>}
+            <div className="picker-grid">{sec.ids.map(card)}</div>
+          </section>
+        ))}
       </div>
       <div className="picker-note">
         <span>Houses, apartments, shops, offices and industry grow on zones next to roads.</span>

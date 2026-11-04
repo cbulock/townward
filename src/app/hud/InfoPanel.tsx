@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai';
 import type { ReactNode } from 'react';
 import { SERVICE_KINDS as ALL_SERVICES, type ServiceKind } from '../../sim/buildings/catalog';
 import type { NeedKind } from '../../sim/systems/needs';
-import type { InspectInfo } from '../../game/events';
+import type { InspectInfo, StationInfo } from '../../game/events';
 import { gameAtom, inspectAtom } from '../atoms';
 import { aqiBand } from '../../sim/systems/air';
 
@@ -98,6 +98,45 @@ function Stat({ label, value, children }: { label: string; value: string; childr
       <strong className="info-stat-value">{value}</strong>
       {children}
     </div>
+  );
+}
+
+/** A train station: its name, riders, and each line through it as a strip of stops. */
+function StationSection({ station }: { station: StationInfo }) {
+  return (
+    <section className="info-section station-section">
+      <h3 className="info-section-title">{station.name}</h3>
+      <div className="info-stats">
+        <Stat label="Riders a day" value={station.riders.toLocaleString()} />
+        <Stat label="Trains" value={station.lines.reduce((n, l) => n + l.trains, 0).toLocaleString()} />
+      </div>
+      {!station.onTrack ? (
+        <p className="info-note warn-text">The track beside it is gone: lay rail right next to the station.</p>
+      ) : station.lines.length === 0 ? (
+        <p className="info-note">Not on a line yet: build another station on the same track.</p>
+      ) : (
+        station.lines.map((line, k) => (
+          <div key={k} className="rail-line" aria-label={`Line ${k + 1}`}>
+            <div className="rail-line-head">
+              <span className="rail-line-badge">{k + 1}</span>
+              <span>
+                {line.stops.length} stops · {line.trains} train{line.trains === 1 ? '' : 's'} each way
+              </span>
+            </div>
+            <ol className="rail-stops">
+              {line.stops.map((s, n) => (
+                <li key={`${s.name}-${n}`} className={s.here ? 'is-here' : ''}>
+                  <i aria-hidden="true" />
+                  <span className="rail-stop-name">{s.name}</span>
+                  <span className="rail-stop-riders">{s.riders.toLocaleString()}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))
+      )}
+      <p className="info-note">Homes and jobs within 8 tiles of a station take the train when it beats driving.</p>
+    </section>
   );
 }
 
@@ -224,22 +263,7 @@ export function InfoPanel() {
         </section>
       )}
 
-      {info.station && (
-        <section className="info-section">
-          <h3 className="info-section-title">Trains</h3>
-          <div className="info-row">
-            <span>Riders a day</span>
-            <strong>{info.station.riders.toLocaleString()}</strong>
-          </div>
-          <p className="info-note">
-            {!info.station.onTrack
-              ? 'The track beside it is gone: lay rail next to the station.'
-              : info.station.riders === 0
-                ? 'No riders yet: it needs another station on the same track, with homes or jobs within 8 tiles of each.'
-                : 'Homes and jobs within 8 tiles of a station take the train when it beats driving.'}
-          </p>
-        </section>
-      )}
+      {info.station && <StationSection station={info.station} />}
       {(info.provides || info.facility || info.condition !== null) && (
         <section className="info-section">
           <h3 className="info-section-title">Provides</h3>

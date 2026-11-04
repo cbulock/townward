@@ -184,29 +184,6 @@ export const SERVICES = {
     {},
     { wall: '#b2643f', facade: 'brick', extras: ['smokestacks', 'loadingdock'] },
   ),
-  // 2×2: a low brick station hall with a long platform canopy and a clock on the roof.
-  train_station: variants(
-    {
-      floorH: 11,
-      masses: [
-        { floors: 1, box: { u0: 0.15, u1: 1.85, v0: 0.5, v1: 1.5 }, facade: 'lobby' },
-        { floors: 1, box: { u0: 0.7, u1: 1.3, v0: 0.7, v1: 1.3 } },
-      ],
-      wall: '#b8664d',
-      trim: '#efe3cf',
-      roof: 'gable',
-      roofH: 9,
-      roofColor: '#3f5560',
-      facade: 'brick',
-      ground: 'plaza',
-      extras: ['canopy', 'crown'],
-      sign: 'STATION',
-      signColor: '#1f6fb2',
-      trees: 1,
-    },
-    {},
-    { wall: '#e6e1d6', facade: 'punched', roofColor: '#44515a', signColor: '#c2410c' },
-  ),
   // 2×2: a glass lab block with a dome observatory crown and rooftop gear.
   research_centre: variants(
     {

@@ -1,9 +1,9 @@
 import { BALANCE } from '../shared/balance';
-import { BUILDINGS, footprintOrigin, type BuildingDef, type BuildingId } from './buildings/catalog';
+import { BUILDINGS, buildingDef, footprintOrigin, type BuildingDef, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
 import { isUnlocked } from './stages';
-import { isRail, Rail, railMask, railUnlocked, type RailId } from './rail';
+import { isRail, Rail, railMask, railUnlocked, trackSide, type RailId } from './rail';
 import { DIRS, BridgeAxis, roadMask, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
@@ -155,8 +155,9 @@ function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, la
       if (prevI === -1 || !isWater(world, prevI)) crossingOk = prevI !== -1 && bridgeRunValid(world, path, k);
       if (crossingOk && prev) bridge = p.x !== prev.x ? BridgeAxis.X : BridgeAxis.Y;
     }
-    // Track is crossed at right angles by single-width roads only (a level crossing), never followed.
-    const blockedByRail = isRail(world, i) && (spec.width !== 1 || !crossesAtRightAngle(railMask(world, p.x, p.y), path, k));
+    // Roads pass under track at right angles (it's carried on an overpass), never along it:
+    // trains and cars never meet at grade (user call, D-091).
+    const blockedByRail = isRail(world, i) && !crossesAtRightAngle(railMask(world, p.x, p.y), path, k);
     if (blockedByRail || (water ? !crossingOk : !roadableLand(world, i))) {
       tiles.push({ ...p, valid: false, cost: 0 });
       continue;
@@ -199,8 +200,8 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad, pave = 0)
 
 /**
  * Price rail track along `path` (docs/specs/evolution.md, E7b). Like roads: rock, buildings and
- * the map edge block their own tiles; water is crossed by straight bridges. Track crosses a
- * single-width road only at right angles (a level crossing) and never runs along one.
+ * the map edge block their own tiles; water is crossed by straight bridges. Track crosses a road
+ * only at right angles, on an overpass, and never runs along one (D-091).
  */
 export function planRail(world: World, path: readonly TilePos[]): Plan {
   const tiles: PlannedTile[] = [];
@@ -222,7 +223,8 @@ export function planRail(world: World, path: readonly TilePos[]): Plan {
       if (prevI === -1 || !isWater(world, prevI)) crossingOk = prevI !== -1 && bridgeRunValid(world, path, k);
     }
     const road = roadSpec(world.road[i]);
-    const crossing = road !== null && road.width === 1 && world.bridge[i] === BridgeAxis.None && crossesAtRightAngle(roadMask(world, p.x, p.y), path, k);
+    // Over a road the track rides an overpass (D-091): at right angles only, and not over a bridge.
+    const crossing = road !== null && world.bridge[i] === BridgeAxis.None && crossesAtRightAngle(roadMask(world, p.x, p.y), path, k);
     const ok = water ? crossingOk && world.road[i] === RoadType.None : world.terrain[i] !== Terrain.Rock && world.building[i] === -1 && (road === null || crossing);
     if (!ok) {
       tiles.push({ ...p, valid: false, cost: 0 });
@@ -396,7 +398,9 @@ export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyR
     // Placed buildings never sit on a zone (only grown ones do).
     w.zone[i] = ZoneType.None;
   }
-  w.addBuilding({ def: plan.building, x: plan.origin.x, y: plan.origin.y, variant }, size.w, size.h);
+  // A station faces its platform toward the track: its art variant is the track's side.
+  const side = buildingDef(plan.building).railStation ? trackSide(w, plan.origin.x, plan.origin.y, size.w, size.h) : -1;
+  w.addBuilding({ def: plan.building, x: plan.origin.x, y: plan.origin.y, variant: side >= 0 ? side : variant }, size.w, size.h);
   city.funds -= plan.cost;
   return { ok: true, changed: bounds(plan.tiles), tiles: plan.tiles };
 }

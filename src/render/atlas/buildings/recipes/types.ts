@@ -116,5 +116,6 @@ export type CustomArtId =
   | 'power_plant'
   | 'water_tower'
   | 'landfill'
+  | 'train_station'
   | EnergyArtId;
 export type RecipeId = Exclude<BuildingId, CustomArtId>;

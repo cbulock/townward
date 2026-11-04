@@ -7,7 +7,10 @@ import { DECOR_VARIANTS, paintDecor } from './nature/decor';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
-import { paintTrack, RAIL_LOOKS, type RailLook } from './rail';
+import { OVERPASS_LIFT, paintOverpass, paintTrack, paintTrackCurve, RAIL_CURVES, RAIL_LOOKS, type RailCurve, type RailLook } from './rail';
+
+/** The four corner masks (two arms at right angles), the only pieces drawn as curves. */
+const CORNER_MASKS: readonly number[] = [0b0011, 0b0110, 0b1100, 0b1001];
 import { inTileSpace } from './roads/kit';
 import { roadVariants } from './roads';
 import { BUILDABLE_ROADS } from '../../sim/roadTypes';
@@ -85,6 +88,10 @@ export interface TerrainTextures {
   roads: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Rail track by look (track, crossing over a road, bridge) and connection mask (render/atlas/rail.ts). */
   rail: Readonly<Record<RailLook, Texture[]>>;
+  /** Curved corner pieces of track on the ground, by curve and mask (only the four corner masks are painted). */
+  railCurves: Readonly<Record<RailCurve, Texture[]>>;
+  /** Overpass decks carrying track over roads, by connection mask (taller frames: OVERPASS_LIFT). */
+  railOverpass: Texture[];
   /** Bridge spans (taller frames: see BRIDGE_HEADROOM) by road type, then `variant * 3 + BridgeAxis` (use bridgeTexture). */
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Street furniture (streetArt.ts). Mask-indexed arrays hold Texture.EMPTY where a mask has none. */
@@ -391,6 +398,8 @@ export function buildTerrainTextures(): TerrainTextures {
     }
   }
   for (const look of RAIL_LOOKS) for (let m = 0; m < 16; m++) b.add(`rail_${look}_${m}`, W, H, (ctx) => inTileSpace(ctx, () => paintTrack(ctx, m, look)));
+  for (let m = 0; m < 16; m++) b.add(`rail_overpass_${m}`, W, H + OVERPASS_LIFT, (ctx) => paintOverpass(ctx, m));
+  for (const curve of RAIL_CURVES) for (const m of CORNER_MASKS) b.add(`rail_${curve}_${m}`, W, H, (ctx) => inTileSpace(ctx, () => paintTrackCurve(ctx, m, curve)));
   for (const [name, piece] of furniturePieces()) b.add(name, FURNITURE_FRAME_W, FURNITURE_FRAME_H, (ctx) => paintFurniture(ctx, piece));
   b.add('selection', W, H, paintSelection);
   b.add('zone_lot', W, H, paintZoneLot);
@@ -493,8 +502,13 @@ export function buildTerrainTextures(): TerrainTextures {
     warnRoad: get('warn_road'),
     rail: {
       track: range(16, (m) => get(`rail_track_${m}`)),
-      crossing: range(16, (m) => get(`rail_crossing_${m}`)),
       bridge: range(16, (m) => get(`rail_bridge_${m}`)),
+      shade: range(16, (m) => get(`rail_shade_${m}`)),
+    },
+    railOverpass: range(16, (m) => get(`rail_overpass_${m}`)),
+    railCurves: {
+      arc: range(16, (m) => (CORNER_MASKS.includes(m) ? get(`rail_arc_${m}`) : Texture.EMPTY)),
+      chord: range(16, (m) => (CORNER_MASKS.includes(m) ? get(`rail_chord_${m}`) : Texture.EMPTY)),
     },
     warnPower: get('warn_power'),
     taxCoin: get('tax_coin'),

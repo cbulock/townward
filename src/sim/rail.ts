@@ -2,6 +2,7 @@ import { BUILDINGS, type BuildingInstance } from './buildings/catalog';
 import type { City } from './City';
 import { hasTech } from './research';
 import { isWorking } from './systems/utilities';
+import { roadPath } from './roads';
 import type { World } from './World';
 
 /**
@@ -165,4 +166,146 @@ export function railPath(world: World, from: number, to: number): Int32Array | n
   for (let v = to; v !== from; v = prev[v]) out.push(v);
   out.push(from);
   return Int32Array.from(out.reverse());
+}
+
+/** The four corner masks: two arms at right angles. */
+const CORNERS: ReadonlySet<number> = new Set([0b0011, 0b0110, 0b1100, 0b1001]);
+
+export function isCornerMask(mask: number): boolean {
+  return CORNERS.has(mask);
+}
+
+/**
+ * How a corner piece of track is drawn and driven (curved track, D-089): a straight 45° chord
+ * when it's part of a staircase (a neighbour along an arm is the opposite corner, so the run
+ * reads as one diagonal), otherwise a quarter-turn arc. Null for anything but a corner.
+ */
+export function railCornerShape(world: World, x: number, y: number): 'arc' | 'chord' | null {
+  const mask = railMask(world, x, y);
+  if (!CORNERS.has(mask)) return null;
+  const opposite = ~mask & 0b1111;
+  for (let d = 0; d < 4; d++) {
+    if (!(mask & (1 << d))) continue;
+    const nx = x + STEPS[d][0];
+    const ny = y + STEPS[d][1];
+    if (world.inBounds(nx, ny) && railMask(world, nx, ny) === opposite) return 'chord';
+  }
+  return 'arc';
+}
+
+/**
+ * The tiles a rail drag lays: a 45° staircase when the drag is roughly diagonal (and not held
+ * straight), stepping across and along in turn and finishing in a straight run; otherwise
+ * like a road (an L, or one axis).
+ */
+export function railDragPath(a: { x: number; y: number }, b: { x: number; y: number }, straight: boolean): { x: number; y: number }[] {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  const diagonal = !straight && ax > 0 && ay > 0 && Math.min(ax, ay) / Math.max(ax, ay) >= 0.4;
+  if (!diagonal) return roadPath(a, b, straight);
+  const sx = Math.sign(dx);
+  const sy = Math.sign(dy);
+  const steps = Math.min(ax, ay);
+  const out = [{ x: a.x, y: a.y }];
+  let x = a.x;
+  let y = a.y;
+  for (let k = 0; k < steps; k++) {
+    x += sx;
+    out.push({ x, y });
+    y += sy;
+    out.push({ x, y });
+  }
+  while (x !== b.x) out.push({ x: (x += sx), y });
+  while (y !== b.y) out.push({ x, y: (y += sy) });
+  return out;
+}
+
+/**
+ * A point along a track path (tile indices, in order), `s` tiles from the first tile's centre,
+ * following the drawn track: straight through straight pieces, a chord or arc through corners.
+ * Returns world tile coordinates and the unit direction of travel along the path.
+ */
+export function pointOnTrack(world: World, path: Int32Array, s: number): { x: number; y: number; tx: number; ty: number } {
+  const n = path.length;
+  const w = world.width;
+  const cx = (k: number) => (path[k] % w) + 0.5;
+  const cy = (k: number) => Math.floor(path[k] / w) + 0.5;
+  const j = Math.max(0, Math.min(n - 1, Math.round(s)));
+  // Within tile j: from where the track enters it (the edge shared with the tile before, or its
+  // centre at the start) to where it leaves (the next shared edge, or its centre at the end).
+  const u = Math.max(0, Math.min(1, s - j + 0.5));
+  const ex = j > 0 ? (cx(j - 1) + cx(j)) / 2 : cx(j);
+  const ey = j > 0 ? (cy(j - 1) + cy(j)) / 2 : cy(j);
+  const xx = j < n - 1 ? (cx(j) + cx(j + 1)) / 2 : cx(j);
+  const xy = j < n - 1 ? (cy(j) + cy(j + 1)) / 2 : cy(j);
+  const shape = j > 0 && j < n - 1 ? railCornerShape(world, Math.floor(cx(j)), Math.floor(cy(j))) : null;
+  if (shape === 'arc') {
+    // Quadratic through the tile centre, as the arc is drawn.
+    const a = (1 - u) * (1 - u);
+    const b = 2 * u * (1 - u);
+    const c = u * u;
+    const px = a * ex + b * cx(j) + c * xx;
+    const py = a * ey + b * cy(j) + c * xy;
+    const tx = 2 * (1 - u) * (cx(j) - ex) + 2 * u * (xx - cx(j));
+    const ty = 2 * (1 - u) * (cy(j) - ey) + 2 * u * (xy - cy(j));
+    const len = Math.hypot(tx, ty) || 1;
+    return { x: px, y: py, tx: tx / len, ty: ty / len };
+  }
+  // Straight through (a chord on staircases). At the very ends E or X is the centre.
+  const fx = ex + (xx - ex) * u;
+  const fy = ey + (xy - ey) * u;
+  let tx = xx - ex;
+  let ty = xy - ey;
+  if (tx === 0 && ty === 0) {
+    tx = cx(Math.min(n - 1, j + 1)) - cx(Math.max(0, j - 1));
+    ty = cy(Math.min(n - 1, j + 1)) - cy(Math.max(0, j - 1));
+  }
+  const len = Math.hypot(tx, ty) || 1;
+  return { x: fx, y: fy, tx: tx / len, ty: ty / len };
+}
+
+const STATION_NAMES = [
+  'Central',
+  'Riverside',
+  'Market Street',
+  'Parkside',
+  'Old Mill',
+  'Northgate',
+  'Harbour Road',
+  'Elm Grove',
+  'Union Square',
+  'Hillcrest',
+  'Westfield',
+  'Kingsway',
+  'Brookside',
+  'Foundry Lane',
+  'Meadowbank',
+  'Station Road',
+] as const;
+
+/** A station's name, the same every time for the same building. */
+export function stationName(id: number): string {
+  // A multiplicative hash spreads neighbouring ids over the list.
+  const hash = Math.imul(id, 2654435761) >>> 0;
+  return STATION_NAMES[(hash >>> 28) % STATION_NAMES.length];
+}
+
+/**
+ * Which side of a footprint its track runs along, as an art variant: 0 north-east (y − 1),
+ * 1 south-east (x + w), 2 south-west (y + h), 3 north-west (x − 1); −1 with no track beside it.
+ */
+export function trackSide(world: World, x0: number, y0: number, w: number, h: number): number {
+  const hits = [0, 0, 0, 0];
+  for (let x = x0; x < x0 + w; x++) {
+    if (world.inBounds(x, y0 - 1) && isRail(world, world.index(x, y0 - 1))) hits[0]++;
+    if (world.inBounds(x, y0 + h) && isRail(world, world.index(x, y0 + h))) hits[2]++;
+  }
+  for (let y = y0; y < y0 + h; y++) {
+    if (world.inBounds(x0 + w, y) && isRail(world, world.index(x0 + w, y))) hits[1]++;
+    if (world.inBounds(x0 - 1, y) && isRail(world, world.index(x0 - 1, y))) hits[3]++;
+  }
+  const best = hits.indexOf(Math.max(...hits));
+  return hits[best] > 0 ? best : -1;
 }

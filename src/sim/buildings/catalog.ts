@@ -32,7 +32,7 @@ export interface EnergyDef {
 }
 
 /** Civic panel tabs. */
-export type CivicGroup = 'services' | 'utilities' | 'parks';
+export type CivicGroup = 'services' | 'transport' | 'utilities' | 'parks';
 
 export interface BuildingDef {
   name: string;
@@ -508,7 +508,7 @@ export const BUILDINGS = {
     cost: 8000,
     capacity: 20,
     description: 'Build it beside rail track. Homes and jobs within 8 tiles take the train when it beats driving, which takes cars off the roads.',
-    group: 'services',
+    group: 'transport',
     upkeep: 150,
     railStation: true,
   },

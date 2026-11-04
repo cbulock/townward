@@ -159,7 +159,8 @@ export type RailCarPart = (typeof RAIL_CAR_PARTS)[number];
 export function paintRailCar(ctx: CanvasRenderingContext2D, part: RailCarPart, dir: number) {
   const iso = new IsoFrame(ctx, GROUND_PAD + HALF_W, GROUND_PAD + VEHICLE_HEADROOM);
   const len = 0.86;
-  const wid = 0.24;
+  // Narrow enough that two trains pass side by side on the double track (lanes 0.22 apart).
+  const wid = 0.17;
   const alongU = dir === 1 || dir === 3;
   const a0 = 0.5 - len / 2;
   const a1 = 0.5 + len / 2;

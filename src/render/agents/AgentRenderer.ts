@@ -4,6 +4,7 @@ import type { World } from '../../sim/World';
 import type { RailCarPose } from '../../sim/systems/trains';
 import type { Rect } from '../Camera';
 import { VEHICLE_ANCHOR_Y } from '../atlas/agentArt';
+import { OVERPASS_LIFT } from '../atlas/rail';
 import { STOP_ANCHOR } from '../atlas/stopArt';
 import type { TerrainTextures } from '../atlas/tiles';
 import { tileToWorld } from '../iso';
@@ -26,6 +27,8 @@ const MARGIN = 40;
  */
 export class AgentRenderer {
   readonly container = new Container({ sortableChildren: true });
+  /** Trains up on overpass decks: above the objects layer, so the deck doesn't hide them. */
+  readonly raised = new Container({ sortableChildren: true });
   private readonly pool: Sprite[] = [];
   private readonly stopPool: Sprite[] = [];
   private readonly lampPool: Sprite[] = [];
@@ -89,11 +92,13 @@ export class AgentRenderer {
         s = new Sprite();
         s.anchor.set(0.5, VEHICLE_ANCHOR_Y);
         this.trainPool.push(s);
-        this.container.addChild(s);
       }
       used++;
+      // On an overpass the car rides the deck: lifted, and drawn over it.
+      const layer = c.raised ? this.raised : this.container;
+      if (s.parent !== layer) layer.addChild(s);
       s.texture = this.tex.trains[c.part][vt.dir(c.dir)];
-      s.position.set(p.x, p.y);
+      s.position.set(p.x, p.y - (c.raised ? OVERPASS_LIFT : 0));
       s.zIndex = vp.x + vp.y;
       s.visible = true;
     }

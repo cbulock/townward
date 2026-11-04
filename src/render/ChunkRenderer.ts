@@ -13,11 +13,12 @@ import { DECOR_VARIANTS } from './atlas/nature/decor';
 import { buildingHeadroom, buildingMarks } from './atlas/buildings';
 import type { BuildingRotation } from './atlas/core';
 import { BUILDINGS, type BuildingInstance } from '../sim/buildings/catalog';
-import { Rail, railMask } from '../sim/rail';
+import { Rail, railCornerShape, railMask } from '../sim/rail';
 import { constructionStage } from '../sim/systems/growth';
 import { isZoned } from '../sim/zones';
 import { siteHeadroom } from './atlas/constructionArt';
 import { BRIDGE_HEADROOM, GROUND_PAD, TREE_HEADROOM } from './atlas/geometry';
+import { OVERPASS_LIFT } from './atlas/rail';
 import { FURNITURE_HEADROOM } from './atlas/streetArt';
 import { WATER_PHASES } from './atlas/groundArt';
 import { GROUND_BASE, hexToNumber, ZONE_TINT } from './atlas/theme/palette';
@@ -253,9 +254,14 @@ export class ChunkRenderer {
         const i = w.index(x, y);
         const rail = w.rail[i];
         if (rail === Rail.None) continue;
-        const look = rail === Rail.Bridge ? 'bridge' : w.road[i] !== RoadType.None ? 'crossing' : 'track';
+        // Over a road the track rides an overpass (an object, buildObjects); the road gets its shade.
+        const look = rail === Rail.Bridge ? 'bridge' : w.road[i] !== RoadType.None ? 'shade' : 'track';
         const shade = shadeColor(1);
-        roads.add({ texture: this.tex.rail[look][railMask(w, x, y)], points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
+        const mask = railMask(w, x, y);
+        // Corners on the ground bend: a chord on staircases (a 45° line), an arc on single turns.
+        const curve = look === 'track' ? railCornerShape(w, x, y) : null;
+        const texture = curve ? this.tex.railCurves[curve][mask] : this.tex.rail[look][mask];
+        roads.add({ texture, points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
       }
     }
     if (!zones.empty) c.zones.addChild(zones.build());
@@ -348,6 +354,15 @@ export class ChunkRenderer {
     const bid = w.building[i];
     if (bid !== -1) {
       this.buildBuilding(x, y, bid, c);
+      return;
+    }
+    if (w.rail[i] !== Rail.None && w.road[i] !== RoadType.None) {
+      // Track over a road: the overpass deck, drawn with the objects so cars pass under it.
+      const p = tileToWorld(x, y);
+      const s = new Sprite(this.tex.railOverpass[railMask(w, x, y)]);
+      s.x = p.x - HALF_W - GROUND_PAD;
+      s.y = p.y - GROUND_PAD - OVERPASS_LIFT - tileLift(this.world, x, y);
+      this.addObject(c, s);
       return;
     }
     if (w.road[i] !== RoadType.None) {
