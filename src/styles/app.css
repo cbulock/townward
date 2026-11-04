@@ -1227,6 +1227,10 @@ button.funds:hover {
   left: 50%;
   transform: translateX(-50%);
   width: min(340px, calc(100vw - 32px));
+  /* Clear of the toolbar: it scrolls inside instead of covering it. */
+  max-height: calc(100dvh - 200px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;

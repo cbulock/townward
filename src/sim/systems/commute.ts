@@ -6,6 +6,7 @@ import type { World } from '../World';
 import { isActive } from './access';
 import { hasUtilities } from './utilities';
 import { roadSpec } from '../roadTypes';
+import { RAIL, railNetwork, servingStation } from '../rail';
 
 /**
  * Commute system (docs/specs/traffic.md): where people travel and how busy each road is.
@@ -46,6 +47,8 @@ export interface CommuteTrip {
 
 export interface CommuteReport {
   commuters: number;
+  /** Commuters a day who take the train instead of driving (docs/specs/evolution.md, E7b). */
+  trainRiders: number;
   /** Commuter-weighted average trip time, minutes. */
   avgMinutes: number;
   /** Road tiles over capacity (congestion > 1). */
@@ -135,7 +138,11 @@ export class CommuteSystem implements SimSystem {
   /** Average commute (minutes) per home building id. */
   readonly commuteMinutes = new Map<number, number>();
   trips: CommuteTrip[] = [];
-  report: CommuteReport = { commuters: 0, avgMinutes: 0, jammedTiles: 0 };
+  report: CommuteReport = { commuters: 0, trainRiders: 0, avgMinutes: 0, jammedTiles: 0 };
+  /** Train riders a day boarding or leaving at each station (building id). */
+  readonly stationRiders = new Map<number, number>();
+  /** Riders a day between pairs of stations (building ids), busiest first, for the visible trains. */
+  railTrips: { from: number; to: number; riders: number }[] = [];
   private computed = false;
   // Dijkstra scratch, reused between origins.
   private readonly dist: Float64Array;
@@ -234,6 +241,26 @@ export class CommuteSystem implements SimSystem {
     const jobWorkers = Float64Array.from(jobs.values());
     const reachTile = new Int32Array(jobTile.length);
     const reachFlow = new Float64Array(jobTile.length);
+    const reachMinutes = new Float64Array(jobTile.length);
+    /** −1 drive; otherwise the job's station index (the trip goes by train). */
+    const reachRail = new Int32Array(jobTile.length);
+    // The train option (sim/rail.ts): stations, track minutes between them, and who each serves.
+    const net = railNetwork(w);
+    const hasRail = net.stations.length >= 2;
+    const ns = net.stations.length;
+    const jobStation = new Int32Array(jobTile.length).fill(-1);
+    const jobWalk = new Float64Array(jobTile.length);
+    if (hasRail) {
+      for (let k = 0; k < jobTile.length; k++) {
+        const s = servingStation(net, w, jobTile[k]);
+        if (s) {
+          jobStation[k] = s.station;
+          jobWalk[k] = s.walk;
+        }
+      }
+    }
+    const riders = new Float64Array(ns * ns);
+    let trainRiders = 0;
     const picked = new Uint8Array(jobTile.length);
     const fresh = new Float64Array(n);
     const trips: CommuteTrip[] = [];
@@ -245,15 +272,27 @@ export class CommuteSystem implements SimSystem {
       const settled = this.shortestPaths(origin);
       const order = this.order;
       const stamp = this.stamp;
-      // Spread this group's commuters over reachable jobs: big and near ones attract most.
+      const home = hasRail ? servingStation(net, w, origin) : null;
+      // Spread this group's commuters over reachable jobs: big and near ones attract most, by
+      // the faster of driving and (where both ends are near stations on one line) the train.
       let total = 0;
       let reached = 0;
       for (let k = 0; k < jobTile.length; k++) {
         const tile = jobTile[k];
-        if (seen[tile] !== stamp) continue;
-        const weight = jobWorkers[k] * Math.exp(-dist[tile] / COMMUTE.decayMinutes);
+        const drive = seen[tile] === stamp ? dist[tile] : Infinity;
+        let train = Infinity;
+        const js = jobStation[k];
+        if (home && js !== -1 && js !== home.station) {
+          const ride = net.minutes[home.station * ns + js];
+          if (ride !== Infinity) train = home.walk + RAIL.waitMinutes + ride + jobWalk[k];
+        }
+        const best = Math.min(drive, train);
+        if (best === Infinity) continue;
+        const weight = jobWorkers[k] * Math.exp(-best / COMMUTE.decayMinutes);
         if (weight <= 0) continue;
         reachTile[reached] = tile;
+        reachMinutes[reached] = best;
+        reachRail[reached] = train < drive ? js : -1;
         reachFlow[reached++] = weight;
         total += weight;
       }
@@ -261,8 +300,13 @@ export class CommuteSystem implements SimSystem {
       let minutes = 0;
       for (let r = 0; r < reached; r++) {
         const flow = (o.commuters * reachFlow[r]) / total;
-        load[reachTile[r]] += flow;
-        minutes += flow * dist[reachTile[r]];
+        // Train trips put nothing on the roads; they count as riders between the two stations.
+        if (reachRail[r] === -1) load[reachTile[r]] += flow;
+        else if (home) {
+          riders[home.station * ns + reachRail[r]] += flow;
+          trainRiders += flow;
+        }
+        minutes += flow * reachMinutes[r];
         reachFlow[r] = flow;
       }
       // Push flow down the shortest-path tree, from the furthest tiles back to the origin.
@@ -280,10 +324,12 @@ export class CommuteSystem implements SimSystem {
       minutesSum += minutes;
       // The biggest destinations become trips for the visible cars: the top few by flow, ties in
       // reach order (what a stable descending sort would give, without sorting them all).
-      picked.fill(0, 0, reached);
+      // Visible cars only drive the trips that go by road.
+      for (let r = 0; r < reached; r++) picked[r] = reachRail[r] === -1 ? 0 : 1;
       for (let t = 0; t < Math.min(COMMUTE.tripsPerOrigin, reached); t++) {
         let best = -1;
         for (let r = 0; r < reached; r++) if (!picked[r] && (best === -1 || reachFlow[r] > reachFlow[best])) best = r;
+        if (best === -1) break;
         picked[best] = 1;
         if (reachTile[best] === origin) continue;
         trips.push({ path: this.pathTo(origin, reachTile[best]), weight: reachFlow[best] });
@@ -305,7 +351,22 @@ export class CommuteSystem implements SimSystem {
     this.computed = true;
     trips.sort((a, b) => b.weight - a.weight);
     this.trips = trips.slice(0, COMMUTE.maxTrips);
-    this.report = { commuters: Math.round(commuters), avgMinutes: commuters > 0 ? minutesSum / commuters : 0, jammedTiles: jammed };
+    // Riders per station and per station pair (both directions together), busiest pairs first.
+    this.stationRiders.clear();
+    const pairs: { from: number; to: number; riders: number }[] = [];
+    for (let a = 0; a < ns; a++) {
+      for (let b = a + 1; b < ns; b++) {
+        const r = riders[a * ns + b] + riders[b * ns + a];
+        if (r <= 0) continue;
+        const from = net.stations[a].id;
+        const to = net.stations[b].id;
+        this.stationRiders.set(from, (this.stationRiders.get(from) ?? 0) + r);
+        this.stationRiders.set(to, (this.stationRiders.get(to) ?? 0) + r);
+        pairs.push({ from, to, riders: r });
+      }
+    }
+    this.railTrips = pairs.sort((a, b) => b.riders - a.riders);
+    this.report = { commuters: Math.round(commuters), trainRiders: Math.round(trainRiders), avgMinutes: commuters > 0 ? minutesSum / commuters : 0, jammedTiles: jammed };
   }
 
   /** Today's adjacency and entry minutes (see `first`, `next`, `enter`). */

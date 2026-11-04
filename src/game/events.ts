@@ -10,6 +10,7 @@ import type { ServiceKind } from '../sim/buildings/catalog';
 import type { StageRequirement } from '../sim/progression';
 import type { Stage } from '../sim/stages';
 import type { AirReport } from '../sim/systems/air';
+import type { TechId } from '../sim/research';
 import type { MaterialsReport } from '../sim/systems/materials';
 import type { ToolId } from './tools';
 
@@ -84,6 +85,8 @@ export interface ProgressInfo {
   residents: readonly [number, number, number];
   /** Research (E7): the project under way, finished ones, and points a day; null before any research. */
   research: { current: { name: string; effect: string; points: number; needed: number } | null; done: readonly string[]; rate: number } | null;
+  /** Finished research projects (some buildings need one, e.g. stations need Rapid transit). */
+  techs: readonly TechId[];
 }
 
 export interface BudgetInfo {

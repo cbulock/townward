@@ -45,6 +45,7 @@ export class ViewWorld extends World {
         this.lane[vi] = world.lane[wi] === 0 ? 0 : turnDir[world.lane[wi] - 1] + 1;
         this.pave[vi] = world.pave[wi];
         this.zone[vi] = world.zone[wi];
+        this.rail[vi] = world.rail[wi];
         this.building[vi] = world.building[wi];
       }
     }

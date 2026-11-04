@@ -7,6 +7,8 @@ import { DECOR_VARIANTS, paintDecor } from './nature/decor';
 import { BRIDGE_FRAME_H, diamondPath, GROUND_FRAME_H, GROUND_FRAME_W, TREE_FRAME_H } from './geometry';
 import { paintGround, WATER_PHASES } from './groundArt';
 import { paintBridge, paintRoad } from './roadArt';
+import { paintTrack, RAIL_LOOKS, type RailLook } from './rail';
+import { inTileSpace } from './roads/kit';
 import { roadVariants } from './roads';
 import { BUILDABLE_ROADS } from '../../sim/roadTypes';
 import { AVENUE_STYLES } from './roads/avenueFurniture';
@@ -78,6 +80,8 @@ export interface TerrainTextures {
   decor: Texture[][];
   /** Road pieces by road type, then `variant * 16 + mask` (use roadTexture). */
   roads: Readonly<Record<BuildableRoad, Texture[]>>;
+  /** Rail track by look (track, crossing over a road, bridge) and connection mask (render/atlas/rail.ts). */
+  rail: Readonly<Record<RailLook, Texture[]>>;
   /** Bridge spans (taller frames: see BRIDGE_HEADROOM) by road type, then `variant * 3 + BridgeAxis` (use bridgeTexture). */
   bridges: Readonly<Record<BuildableRoad, Texture[]>>;
   /** Street furniture (streetArt.ts). Mask-indexed arrays hold Texture.EMPTY where a mask has none. */
@@ -381,6 +385,7 @@ export function buildTerrainTextures(): TerrainTextures {
       for (const axis of [BridgeAxis.X, BridgeAxis.Y]) b.add(`bridge_${t}_${v}_${axis}`, W, BRIDGE_FRAME_H, (ctx) => paintBridge(ctx, t, axis, v));
     }
   }
+  for (const look of RAIL_LOOKS) for (let m = 0; m < 16; m++) b.add(`rail_${look}_${m}`, W, H, (ctx) => inTileSpace(ctx, () => paintTrack(ctx, m, look)));
   for (const [name, piece] of furniturePieces()) b.add(name, FURNITURE_FRAME_W, FURNITURE_FRAME_H, (ctx) => paintFurniture(ctx, piece));
   b.add('selection', W, H, paintSelection);
   b.add('zone_lot', W, H, paintZoneLot);
@@ -479,6 +484,11 @@ export function buildTerrainTextures(): TerrainTextures {
     people: range(PERSON_VARIANTS, (v) => range(2, (f) => get(`person_${v}_${f}`))),
     busStops: range(4, (side) => get(`stop_${side}`)),
     warnRoad: get('warn_road'),
+    rail: {
+      track: range(16, (m) => get(`rail_track_${m}`)),
+      crossing: range(16, (m) => get(`rail_crossing_${m}`)),
+      bridge: range(16, (m) => get(`rail_bridge_${m}`)),
+    },
     warnPower: get('warn_power'),
     taxCoin: get('tax_coin'),
     warnWater: get('warn_water'),

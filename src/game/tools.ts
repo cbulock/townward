@@ -5,7 +5,8 @@ import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } fro
 import { roadVariant } from '../render/atlas/roads';
 import type { ViewTransform } from '../render/view/ViewTransform';
 import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
-import { planClear, planMove, planPlace, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
+import { planClear, planMove, planPlace, planRail, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
+import { isRail, Rail } from '../sim/rail';
 import { ZoneType, type ZonedType } from '../sim/zones';
 import { findEntrance } from '../sim/systems/access';
 import { BALANCE } from '../shared/balance';
@@ -32,7 +33,7 @@ export function isRoadTool(tool: ToolId): tool is RoadToolId {
   return tool in ROAD_TOOLS;
 }
 
-export type ToolId = 'select' | 'clear' | 'move' | RoadToolId | 'build' | ZoneToolId;
+export type ToolId = 'select' | 'clear' | 'move' | RoadToolId | 'rail' | 'build' | ZoneToolId;
 
 /** What each zone tool paints. Removing a zone is done with Clear (D-051). */
 export const ZONE_TOOLS: Readonly<Record<ZoneToolId, ZonedType>> = {
@@ -52,6 +53,7 @@ export const TOOL_KEYS: Readonly<Record<ToolId, string>> = {
   select: 'KeyQ',
   clear: 'KeyB',
   move: 'KeyP',
+  rail: 'KeyZ',
   pedestrian: 'KeyK',
   road: 'KeyR',
   avenue: 'KeyV',
@@ -79,7 +81,8 @@ export type ToolPlan =
   | { kind: 'clear'; tool: 'clear'; plan: Plan }
   | { kind: 'zone'; tool: ZoneToolId; plan: Plan; zone: ZonedType }
   | { kind: 'place'; tool: 'build'; plan: PlacePlan }
-  | { kind: 'move'; tool: 'move'; plan: MovePlan };
+  | { kind: 'move'; tool: 'move'; plan: MovePlan }
+  | { kind: 'rail'; tool: 'rail'; plan: Plan };
 
 const TINT_VALID = 0x8ff7ec;
 const TINT_INVALID = 0xff5a5a;
@@ -154,6 +157,8 @@ export function planTool(
     return { kind: 'road', tool, plan: planRoad(world, path, roadType), roadType };
   }
   switch (tool) {
+    case 'rail':
+      return { kind: 'rail', tool, plan: planRail(world, roadPath(anchor.start, anchor.current, anchor.straight)) };
     case 'clear':
       return { kind: 'clear', tool, plan: planClear(world, rectTiles(anchor.start, anchor.current)) };
     case 'build':
@@ -245,6 +250,18 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
       alpha: ok ? 0.8 : 0.55,
     };
     return [...coveragePreviewTiles(world, tex, building, origin), ...footprint, ghost];
+  }
+
+  if (p.kind === 'rail') {
+    // Track ghosts, auto-tiled as if the plan were already laid (masks turned into the view).
+    const laid = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));
+    const hasRail = (x: number, y: number) => world.inBounds(x, y) && (laid.has(world.index(x, y)) || isRail(world, world.index(x, y)));
+    return p.plan.tiles.map((t) => {
+      const mask = (hasRail(t.x, t.y - 1) ? 1 : 0) | (hasRail(t.x + 1, t.y) ? 2 : 0) | (hasRail(t.x, t.y + 1) ? 4 : 0) | (hasRail(t.x - 1, t.y) ? 8 : 0);
+      const i = world.index(t.x, t.y);
+      const look = t.rail === Rail.Bridge ? 'bridge' : world.road[i] !== RoadType.None ? 'crossing' : 'track';
+      return { x: t.x, y: t.y, texture: tex.rail[look][view.mask(mask)], tint: t.valid ? 0xffffff : TINT_INVALID, alpha: t.valid ? 0.85 : 0.45 };
+    });
   }
 
   const planned = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));

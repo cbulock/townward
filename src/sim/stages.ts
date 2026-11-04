@@ -1,5 +1,6 @@
 import { BUILDING_IDS, type BuildingId } from './buildings/catalog';
 import type { City } from './City';
+import { hasTech, type TechId } from './research';
 
 /**
  * City stages (docs/specs/evolution.md, E0; D-086): the city climbs them as its population
@@ -73,7 +74,17 @@ export function isStage(n: number): n is Stage {
   return STAGE_ORDER.some((s) => s === n);
 }
 
-/** Whether the city may place `id` now (always, unless the city locks buildings by stage). */
-export function isUnlocked(city: Pick<City, 'locked' | 'stage'>, id: BuildingId): boolean {
-  return !city.locked || city.stage >= unlockStage(id);
+/** Buildings that also need a research project (sim/research.ts). */
+const NEEDS_TECH: Readonly<Partial<Record<BuildingId, TechId>>> = { train_station: 'rapidTransit' };
+
+/** The research project a building needs, if any. */
+export function unlockTech(id: BuildingId): TechId | null {
+  return NEEDS_TECH[id] ?? null;
+}
+
+/** Whether the city may place `id` now (always, unless the city locks buildings by stage and research). */
+export function isUnlocked(city: Pick<City, 'locked' | 'stage' | 'research'>, id: BuildingId): boolean {
+  if (!city.locked) return true;
+  const tech = NEEDS_TECH[id];
+  return city.stage >= unlockStage(id) && (!tech || hasTech(city, tech));
 }

@@ -6,6 +6,7 @@ import { BridgeAxis, RoadType } from './roads';
 import { PAVEMENTS, roadSpec } from './roadTypes';
 import { isStage, Stage } from './stages';
 import { TECHS } from './research';
+import { Rail } from './rail';
 import { GENERATOR_VERSION, generateTerrain } from './terrain/generate';
 import { PRESET_IDS, type PresetId, type TerrainSettings } from './terrain/presets';
 import { Decor, Terrain } from './terrain/types';
@@ -86,6 +87,8 @@ export interface SavedLayers {
    */
   readonly ground?: string;
   readonly elev?: string;
+  /** Rail track (docs/specs/evolution.md, E7b); absent in older saves. */
+  readonly rail?: string;
 }
 
 /**
@@ -191,6 +194,7 @@ export function serialize(city: City, terrain: TerrainSettings, name: string, si
       pave: encodeLayer(w.pave),
       ground: encodeLayer(w.terrain),
       elev: encodeLayer(w.elevation),
+      rail: encodeLayer(w.rail),
     },
     buildings,
     buildingTiles,
@@ -234,6 +238,7 @@ export function deserialize(data: SaveData): City {
   const cleared = decodeLayer(data.layers.cleared, n);
   const lane = data.layers.lane ? decodeLayer(data.layers.lane, n) : null;
   const pave = data.layers.pave ? decodeLayer(data.layers.pave, n) : null;
+  const rail = data.layers.rail ? decodeLayer(data.layers.rail, n) : null;
   if (data.layers.ground && data.layers.elev) {
     const ground = decodeLayer(data.layers.ground, n);
     for (let i = 0; i < n; i++) if (TERRAIN_VALUES.has(ground[i])) world.terrain[i] = ground[i];
@@ -246,6 +251,7 @@ export function deserialize(data: SaveData): City {
     // Directions only on wide roads; styles only where there's a road.
     world.lane[i] = lane && world.road[i] !== RoadType.None && lane[i] <= 4 && roadSpec(world.road[i])?.width === 2 ? lane[i] : 0;
     world.pave[i] = pave && world.road[i] !== RoadType.None && pave[i] <= PAVEMENTS.length ? pave[i] : 0;
+    world.rail[i] = rail && rail[i] <= Rail.Bridge ? rail[i] : Rail.None;
     if (cleared[i] === 1) {
       world.tree[i] = 0;
       world.decor[i] = Decor.None;
@@ -488,6 +494,7 @@ export function parseSave(json: unknown): SaveData {
       ...(typeof l.lane === 'string' && { lane: l.lane }),
       ...(typeof l.pave === 'string' && { pave: l.pave }),
       ...(typeof l.ground === 'string' && typeof l.elev === 'string' && { ground: l.ground, elev: l.elev }),
+      ...(typeof l.rail === 'string' && { rail: l.rail }),
     },
     buildings,
     ...(buildingTiles && { buildingTiles }),

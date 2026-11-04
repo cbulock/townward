@@ -277,9 +277,40 @@ runs **automatically** through a fixed order; there is nothing to pick.
   day, and the finished ones; the Research Centre's info panel shows the same.
 - Saved as `city.research` (`points`, `done`: how many projects are finished).
 
-## E7b: Trains (planned next; user choice: rail, stations and commuting)
+## E7b: Trains (`sim/rail.ts`; user choice D-090: rail, stations and commuting)
 
-See "Trains" below; unlocked by the Rapid transit project.
+**Unlock:** rail track and train stations need the Rapid transit project in cities that lock
+by stage; unlocked cities (/demo, old saves) can build them any time.
+
+**Track** (`World.rail`, one byte per tile, saved as a layer):
+- The **Rail** tool (in the road picker, key `Z`) drags like a road: an L, or one axis with Shift.
+  $60 a tile on land, $150 over water (straight spans only, at most 12 tiles, like bridges).
+- Track joins track in all four directions (corners, junctions). Where it crosses a road at a
+  right angle it becomes a **level crossing** (both stay); it can't run along a road tile.
+- Clearing removes track like roads. Upkeep $0.8 a tile a month.
+
+**Stations** (Civic → Services, 2×2, $8,000, $150/month, 20 jobs): placed with track within 1
+tile of the footprint (the platform) and, like everything, a road within reach. Stations on the
+same connected track form a **line network**.
+
+**Commuting by train (in the commute model):**
+- A home or job is **served** by the nearest station within 8 tiles of its entrance; walking
+  costs 1.5 minutes a tile.
+- Between two stations on the same track: 3 minutes waiting plus 0.3 minutes a tile of track
+  (rail time from a breadth-first search over the track from each station, once per day).
+- For each home group and job, the trip by train is walk + wait + ride + walk. When it's faster
+  than the drive, that flow goes **by train**: it puts nothing on the roads (so less congestion
+  and less smog, E4), and counts as riders at both stations. Job attraction uses the faster of
+  the two times, so good rail draws commuters further.
+- Reported: train riders a day (`commute.report.trainRiders`) and per station.
+
+**Showing it:** track drawn as ballast, sleepers and two rails, autotiled like roads (straight,
+corner, T, cross), and as a crossing with barriers over roads; stations as a platform canopy
+building; **visible trains** (an engine and carriages) run back and forth between the stations
+with the most riders, sampled like cars; the station's info panel shows riders a day; the
+traffic view keeps showing roads only.
+
+**Done when** a line between a suburb and downtown takes 15%+ of car commutes off the roads.
 
 ## Planned steps (user requests, 2026-11-04)
 

@@ -9,17 +9,18 @@ import { HALF_H, SIM_TICK_HZ } from '../shared/constants';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
-import { applyClear, applyMove, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import { applyClear, applyMove, applyRail, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
 import { buildingDef, isPlaceable, Lifestyle, type BuildingInstance } from '../sim/buildings/catalog';
 import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
-import { nextStage, STAGES, unlockedAt, unlockStage } from '../sim/stages';
+import { nextStage, STAGES, unlockedAt, unlockStage, unlockTech } from '../sim/stages';
 import { stageRequirements } from '../sim/progression';
 import { lifestyleReport } from '../sim/systems/lifestyle';
 import { currentTech, researchRate, TECHS } from '../sim/research';
+import { materialStorage } from '../sim/systems/materials';
 import { collectTaxes, townHall } from '../sim/systems/budget';
 import { inspectInfo } from './inspect';
 import { aqiBand } from '../sim/systems/air';
@@ -418,6 +419,7 @@ export class Game {
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
     else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
     else if (p.kind === 'move') result = applyMove(this.city, p.plan);
+    else if (p.kind === 'rail') result = applyRail(this.city, p.plan);
     else result = applyPlace(this.city, p.plan, Math.floor(Math.random() * BUILDING_VARIANTS));
 
     if (p.kind === 'move' && !p.plan.ok) {
@@ -425,7 +427,7 @@ export class Game {
       this.notify('error', "Can't move it there: needs clear land, no roads, water or other buildings");
     } else if (p.kind === 'place' && !p.plan.ok) {
       this.sound.play('error');
-      this.notify('error', "Can't build there: needs clear land, no roads or water");
+      this.notify('error', p.plan.note ?? "Can't build there: needs clear land, no roads or water");
     } else if (result.ok && result.changed) {
       this.edits++;
       const c = result.changed;
@@ -436,14 +438,25 @@ export class Game {
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
       if (p.kind === 'zone') this.warnUnreachableZones(result.tiles ?? []);
-      this.afterWorldChange(p.kind === 'road' || p.kind === 'clear');
+      // Track changes the train network the commute model plans over, like roads.
+      this.afterWorldChange(p.kind === 'road' || p.kind === 'clear' || p.kind === 'rail');
     } else if (result.reason === 'insufficient-funds') {
       this.sound.play('error');
       this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
+    } else if (result.reason === 'locked' && p.kind === 'rail') {
+      this.sound.play('error');
+      this.notify('error', 'Rail track needs the Rapid transit research (Research Centre, Metropolis stage)');
     } else if (result.reason === 'locked' && p.kind === 'place') {
       const stage = STAGES[unlockStage(p.plan.building)];
+      const tech = unlockTech(p.plan.building);
+      const name = buildingDef(p.plan.building).name;
       this.sound.play('error');
-      this.notify('error', `${buildingDef(p.plan.building).name} unlocks at ${stage.name} (${stage.population.toLocaleString()} people)`);
+      this.notify(
+        'error',
+        this.city.stage >= unlockStage(p.plan.building) && tech
+          ? `${name} needs the ${TECHS.find((t) => t.id === tech)?.name ?? tech} research`
+          : `${name} unlocks at ${stage.name} (${stage.population.toLocaleString()} people)`,
+      );
     }
   }
 
@@ -781,7 +794,7 @@ export class Game {
       water: u.water,
       hour: Math.floor(this.city.hour),
       taxes: this.city.collectsTaxes ? { waiting: Math.round(this.city.uncollected), hasTownHall: townHall(this.world) !== null } : null,
-      materials: this.city.needsMaterials ? { ...this.sim.materials.report, stock: this.city.materials } : null,
+      materials: this.city.needsMaterials ? { ...this.sim.materials.report, stock: this.city.materials, storage: materialStorage(this.city) } : null,
     });
   }
 
@@ -859,6 +872,7 @@ export class Game {
       next: next === null ? null : { name: STAGES[next].name, requirements: stageRequirements(this.world, next) },
       residents: lifestyleReport(this.city).residents,
       research: this.researchInfo(),
+      techs: TECHS.slice(0, this.city.research.done).map((t) => t.id),
     };
   }
 
@@ -901,7 +915,12 @@ export class Game {
     const r = collectTaxes(this.city);
     if (!r.ok) {
       this.sound.play('error');
-      this.notify('error', r.reason === 'no-town-hall' ? 'Build a Town Hall to collect taxes' : 'No taxes waiting yet: they arrive at the end of each month');
+      const why = {
+        'no-town-hall': 'Build a Town Hall to collect taxes',
+        'town-hall-off-road': 'Connect the Town Hall to a road to collect taxes',
+        'nothing-waiting': 'No taxes waiting yet: they arrive at the end of each month',
+      } as const;
+      this.notify('error', why[r.reason]);
       return;
     }
     this.sound.play('coin');

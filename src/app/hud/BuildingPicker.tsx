@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { buildingFrameSize, paintBuilding } from '../../render/atlas/buildings';
 import { BUILDINGS, PLACEABLE_IDS, type BuildingDef, type BuildingId, type CivicGroup } from '../../sim/buildings/catalog';
 import type { ZoneToolId } from '../../game/tools';
-import { STAGES, unlockStage } from '../../sim/stages';
+import { STAGES, unlockStage, unlockTech } from '../../sim/stages';
+import { TECHS } from '../../sim/research';
 import { activeToolAtom, buildingChoiceAtom, cityAtom, fundsAtom, gameAtom } from '../atoms';
 
 const THUMB = 64;
@@ -62,7 +63,17 @@ export function BuildingPicker() {
 
   if (tool !== 'build') return null;
   // Locked buildings (D-086) come last, greyed, with the stage that unlocks them.
-  const isLocked = (id: BuildingId) => progress !== undefined && progress.locked && unlockStage(id) > progress.stage;
+  const isLocked = (id: BuildingId) => {
+    if (!progress?.locked) return false;
+    const tech = unlockTech(id);
+    return unlockStage(id) > progress.stage || (tech !== null && !progress.techs.includes(tech));
+  };
+  /** What a locked card waits for: a stage, or a research project. */
+  const lockLabel = (id: BuildingId) => {
+    const tech = unlockTech(id);
+    if (progress && unlockStage(id) <= progress.stage && tech) return TECHS.find((t) => t.id === tech)?.name ?? tech;
+    return STAGES[unlockStage(id)].name;
+  };
   const ids = PLACEABLE_IDS.filter((id) => {
     const d: BuildingDef = BUILDINGS[id];
     return d.group === tab;
@@ -97,7 +108,13 @@ export function BuildingPicker() {
               key={id}
               type="button"
               className={`building-card ${id === choice ? 'is-active' : ''} ${affordable ? '' : 'is-unaffordable'} ${locked ? 'is-locked' : ''}`}
-              title={locked ? `Unlocks when the city becomes a ${stage.name} (${stage.population.toLocaleString()} people and its basics)` : d.description}
+              title={
+                locked
+                  ? unlockTech(id) && progress && unlockStage(id) <= progress.stage
+                    ? `Needs the ${lockLabel(id)} research`
+                    : `Unlocks when the city becomes a ${stage.name} (${stage.population.toLocaleString()} people and its basics)`
+                  : d.description
+              }
               aria-disabled={locked}
               onClick={() => (locked ? undefined : game?.setBuilding(id))}
             >
@@ -105,7 +122,7 @@ export function BuildingPicker() {
               <span className="card-name">{d.name}</span>
               <span className="card-meta">
                 {locked ? (
-                  <span className="card-lock">🔒 {stage.name}</span>
+                  <span className="card-lock">🔒 {lockLabel(id)}</span>
                 ) : (
                   <>
                     <span className="card-cost">${d.cost.toLocaleString()}</span>

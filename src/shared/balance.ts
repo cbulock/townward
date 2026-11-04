@@ -18,6 +18,10 @@ export const BALANCE = {
   rampCost: 30,
   rampBridgeCost: 120,
   pedestrianCost: 20,
+  /** Rail track per tile, on land and over water (docs/specs/evolution.md, E7b), and its monthly upkeep. */
+  railCost: 60,
+  railBridgeCost: 150,
+  railUpkeep: 0.8,
   /** Moving a building costs this share of its price (plus clearing the new lot). */
   moveCostShare: 0.2,
   /** Bridges replace the per-tile road cost while over water. */

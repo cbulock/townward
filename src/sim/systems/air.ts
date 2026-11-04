@@ -59,7 +59,7 @@ export interface TrafficVolume {
 }
 
 export interface AirReport {
-  /** Residents' average AQI (0 with no residents). */
+  /** Residents' average AQI (the map's average before anyone lives here). */
   cityAqi: number;
   /** The worst cell's AQI. */
   worstAqi: number;
@@ -71,7 +71,7 @@ export class AirSystem implements SimSystem {
   readonly aqi: Float32Array;
   readonly cols: number;
   readonly rows: number;
-  report: AirReport = { cityAqi: 0, worstAqi: 0 };
+  report: AirReport = { cityAqi: BACKGROUND, worstAqi: BACKGROUND };
   private readonly world: World;
   private readonly traffic: TrafficVolume | null;
   private readonly field: Float32Array;
@@ -148,12 +148,14 @@ export class AirSystem implements SimSystem {
 
     let people = 0;
     let weighted = 0;
+    let mapSum = 0;
+    for (const v of this.aqi) mapSum += v;
     for (const b of w.buildings.values()) {
       if (BUILDINGS[b.def].category !== 'residential' || b.occupants === 0 || b.abandoned) continue;
       people += b.occupants;
       weighted += b.occupants * this.aqiOf(b);
     }
-    this.report = { cityAqi: people === 0 ? 0 : weighted / people, worstAqi: worst };
+    this.report = { cityAqi: people === 0 ? mapSum / this.aqi.length : weighted / people, worstAqi: worst };
   }
 
   /** One 3×3 box blur of the field (edges average over the cells that exist). */

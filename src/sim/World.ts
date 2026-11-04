@@ -22,6 +22,8 @@ export class World {
   /** Pavement style of a road's footpaths: 0 = the road type's default, else style + 1 (cosmetic). */
   readonly pave: Uint8Array;
   readonly zone: Uint8Array;
+  /** Rail track (sim/rail.ts): 0 none, 1 track on land, 2 track on a bridge over water. */
+  readonly rail: Uint8Array;
   /** Building instance id covering each tile, −1 if none. */
   readonly building: Int32Array;
   readonly buildings = new Map<number, BuildingInstance>();
@@ -42,6 +44,7 @@ export class World {
     this.lane = new Uint8Array(n);
     this.pave = new Uint8Array(n);
     this.zone = new Uint8Array(n);
+    this.rail = new Uint8Array(n);
     this.building = new Int32Array(n).fill(-1);
   }
 

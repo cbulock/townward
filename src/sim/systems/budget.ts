@@ -44,6 +44,8 @@ export function monthlyBudget(world: World, taxRate: number = BALANCE.baseTaxRat
     if (r === RoadType.None) continue;
     roads += world.bridge[i] !== BridgeAxis.None ? BALANCE.bridgeUpkeep : (roadSpec(r)?.upkeep ?? BALANCE.roadUpkeep);
   }
+  // Rail track (E7b) is paid with the roads.
+  for (let i = 0; i < world.rail.length; i++) if (world.rail[i] !== 0) roads += BALANCE.railUpkeep;
   let services = 0;
   let utilities = 0;
   let parks = 0;
@@ -99,9 +101,12 @@ export function townHall(world: World): BuildingInstance | null {
 }
 
 /** Collect the taxes waiting at the Town Hall. Returns the amount, or why it couldn't. */
-export function collectTaxes(city: City): { ok: true; amount: number } | { ok: false; reason: 'nothing-waiting' | 'no-town-hall' } {
+export function collectTaxes(city: City): { ok: true; amount: number } | { ok: false; reason: 'nothing-waiting' | 'no-town-hall' | 'town-hall-off-road' } {
   if (city.uncollected <= 0) return { ok: false, reason: 'nothing-waiting' };
-  if (!townHall(city.world)) return { ok: false, reason: 'no-town-hall' };
+  if (!townHall(city.world)) {
+    const any = [...city.world.buildings.values()].some((b) => b.def === 'town_hall' && b.construction === 0);
+    return { ok: false, reason: any ? 'town-hall-off-road' : 'no-town-hall' };
+  }
   const amount = Math.round(city.uncollected);
   city.funds += amount;
   city.uncollected = 0;

@@ -13,6 +13,7 @@ import { DECOR_VARIANTS } from './atlas/nature/decor';
 import { buildingHeadroom, buildingMarks } from './atlas/buildings';
 import type { BuildingRotation } from './atlas/core';
 import { BUILDINGS, type BuildingInstance } from '../sim/buildings/catalog';
+import { Rail, railMask } from '../sim/rail';
 import { constructionStage } from '../sim/systems/growth';
 import { isZoned } from '../sim/zones';
 import { siteHeadroom } from './atlas/constructionArt';
@@ -244,6 +245,17 @@ export class ChunkRenderer {
         s.x = p.x - HALF_W - GROUND_PAD;
         s.y = p.y - GROUND_PAD - BRIDGE_HEADROOM - this.deckLevel(x, y, bridge) * HEIGHT_STEP;
         c.roads.addChild(s);
+      }
+    }
+    // Rail track (E7b) on top of the roads it crosses, and over water as a bridge.
+    for (let y = c.y0; y < c.y1; y++) {
+      for (let x = c.x0; x < c.x1; x++) {
+        const i = w.index(x, y);
+        const rail = w.rail[i];
+        if (rail === Rail.None) continue;
+        const look = rail === Rail.Bridge ? 'bridge' : w.road[i] !== RoadType.None ? 'crossing' : 'track';
+        const shade = shadeColor(1);
+        roads.add({ texture: this.tex.rail[look][railMask(w, x, y)], points: tileQuadPoints(w, x, y), colors: [shade, shade, shade, shade, shade], grow: 0.5 });
       }
     }
     if (!zones.empty) c.zones.addChild(zones.build());

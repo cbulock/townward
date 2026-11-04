@@ -60,6 +60,8 @@ export interface BuildingDef {
   energy?: EnergyDef;
   /** Garbage facilities (sim/systems/garbage.ts): tons collected per day, reach in tiles, and (landfills) how much it holds. */
   garbage?: { readonly trucks: number; readonly reach: number; readonly holds?: number; readonly recycles?: number };
+  /** Train stations: must be built with track beside the footprint (sim/rail.ts). */
+  railStation?: boolean;
   /** Power corridor node: buildings on the same road island within this reach can connect. */
   substation?: { readonly radius: number; readonly capacity: number };
   /** Resident/customer profile this building attracts. */
@@ -495,6 +497,20 @@ export const BUILDINGS = {
     group: 'utilities',
     upkeep: 260,
     garbage: { trucks: 300, reach: 28 },
+  },
+  train_station: {
+    name: 'Train Station',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 2, h: 2 },
+    cost: 8000,
+    capacity: 20,
+    description: 'Build it beside rail track. Homes and jobs within 8 tiles take the train when it beats driving, which takes cars off the roads.',
+    group: 'services',
+    upkeep: 150,
+    railStation: true,
   },
   research_centre: {
     name: 'Research Centre',

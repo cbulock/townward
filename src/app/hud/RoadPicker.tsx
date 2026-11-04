@@ -1,3 +1,4 @@
+import { BALANCE } from '../../shared/balance';
 import { useAtomValue } from 'jotai';
 import type { ReactNode } from 'react';
 import {
@@ -161,8 +162,8 @@ export function RoadPicker() {
   const game = useAtomValue(gameAtom);
   const tool = useAtomValue(activeToolAtom);
   const pavement = useAtomValue(pavementAtom);
-  if (!isRoadTool(tool)) return null;
-  const spec = ROAD_SPECS[ROAD_TOOLS[tool]];
+  if (!isRoadTool(tool) && tool !== 'rail') return null;
+  const spec = isRoadTool(tool) ? ROAD_SPECS[ROAD_TOOLS[tool]] : null;
 
   return (
     <div className="panel road-picker" role="dialog" aria-label="Choose a road">
@@ -197,8 +198,31 @@ export function RoadPicker() {
             </button>
           );
         })}
+        <button
+          type="button"
+          className={`road-card ${tool === 'rail' ? 'is-active' : ''}`}
+          aria-pressed={tool === 'rail'}
+          onClick={() => game?.setTool('rail')}
+          title="Rail: trains between stations take commuters off the roads. Crosses streets at right angles. Needs the Rapid transit research in new cities."
+        >
+          <svg viewBox="0 0 40 24" width="56" height="34" aria-hidden="true" className="road-section">
+            <rect x="4" y="9" width="32" height="6" rx="1" fill="#968b79" />
+            {[7, 12, 17, 22, 27, 32].map((x) => (
+              <rect key={x} x={x} y="8" width="2" height="8" fill="#6e4b30" />
+            ))}
+            <rect x="4" y="10" width="32" height="1" fill="#cfd5dc" />
+            <rect x="4" y="13" width="32" height="1" fill="#cfd5dc" />
+          </svg>
+          <span className="road-name">Rail</span>
+          <span className="road-blurb">Trains between stations</span>
+          <span className="road-meta">
+            <span className="card-cost">${BALANCE.railCost}</span>
+            <span className="road-unit">/tile</span>
+            <kbd>Z</kbd>
+          </span>
+        </button>
       </div>
-      {spec.pavement && (
+      {spec?.pavement && (
         <div className="pavement-row" role="radiogroup" aria-label="Footpath paving">
           <span className="pavement-label">Paving</span>
           <button
@@ -227,7 +251,9 @@ export function RoadPicker() {
         </div>
       )}
       <p className="road-hint">
-        {spec.width === 2
+        {!spec
+          ? 'Drag to lay track (Shift for straight). It crosses streets at right angles and bridges water in straight runs. Build a Train Station beside it (Civic → Services).'
+          : spec.width === 2
           ? 'Drag in a straight line: the row you drag carries traffic your way, the row beside it comes back. Drag over a road to upgrade it.'
           : tool === 'ramp'
             ? 'Join an expressway to local roads with a ramp; nothing else connects to an expressway.'

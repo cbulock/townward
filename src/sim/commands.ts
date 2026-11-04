@@ -3,7 +3,8 @@ import { BUILDINGS, footprintOrigin, type BuildingDef, type BuildingId } from '.
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
 import { isUnlocked } from './stages';
-import { DIRS, BridgeAxis, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
+import { isRail, Rail, railMask, railUnlocked, type RailId } from './rail';
+import { DIRS, BridgeAxis, roadMask, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
 import { ZoneType, zoneOf, type ZoneTypeId } from './zones';
@@ -22,6 +23,8 @@ export interface PlannedTile extends TilePos {
   bridge?: BridgeAxisId;
   /** One-way carriageways: travel direction (sim/roads.ts DIRS index). */
   lane?: number;
+  /** Rail tiles: track on land or on a bridge (sim/rail.ts Rail). */
+  rail?: RailId;
 }
 
 export interface Plan {
@@ -152,7 +155,9 @@ function planRow(world: World, path: readonly TilePos[], type: BuildableRoad, la
       if (prevI === -1 || !isWater(world, prevI)) crossingOk = prevI !== -1 && bridgeRunValid(world, path, k);
       if (crossingOk && prev) bridge = p.x !== prev.x ? BridgeAxis.X : BridgeAxis.Y;
     }
-    if (water ? !crossingOk : !roadableLand(world, i)) {
+    // Track is crossed at right angles by single-width roads only (a level crossing), never followed.
+    const blockedByRail = isRail(world, i) && (spec.width !== 1 || !crossesAtRightAngle(railMask(world, p.x, p.y), path, k));
+    if (blockedByRail || (water ? !crossingOk : !roadableLand(world, i))) {
       tiles.push({ ...p, valid: false, cost: 0 });
       continue;
     }
@@ -192,6 +197,63 @@ export function applyRoad(city: City, plan: Plan, type: BuildableRoad, pave = 0)
   return { ok: true, changed: bounds(real), tiles: real };
 }
 
+/**
+ * Price rail track along `path` (docs/specs/evolution.md, E7b). Like roads: rock, buildings and
+ * the map edge block their own tiles; water is crossed by straight bridges. Track crosses a
+ * single-width road only at right angles (a level crossing) and never runs along one.
+ */
+export function planRail(world: World, path: readonly TilePos[]): Plan {
+  const tiles: PlannedTile[] = [];
+  let cost = 0;
+  let count = 0;
+  let crossingOk = false;
+  for (let k = 0; k < path.length; k++) {
+    const p = path[k];
+    if (!world.inBounds(p.x, p.y)) continue;
+    const i = world.index(p.x, p.y);
+    if (isRail(world, i)) {
+      tiles.push({ ...p, valid: true, cost: 0 });
+      continue;
+    }
+    const water = isWater(world, i);
+    if (water) {
+      const prev = k > 0 ? path[k - 1] : null;
+      const prevI = prev && world.inBounds(prev.x, prev.y) ? world.index(prev.x, prev.y) : -1;
+      if (prevI === -1 || !isWater(world, prevI)) crossingOk = prevI !== -1 && bridgeRunValid(world, path, k);
+    }
+    const road = roadSpec(world.road[i]);
+    const crossing = road !== null && road.width === 1 && world.bridge[i] === BridgeAxis.None && crossesAtRightAngle(roadMask(world, p.x, p.y), path, k);
+    const ok = water ? crossingOk && world.road[i] === RoadType.None : world.terrain[i] !== Terrain.Rock && world.building[i] === -1 && (road === null || crossing);
+    if (!ok) {
+      tiles.push({ ...p, valid: false, cost: 0 });
+      continue;
+    }
+    const c = water ? BALANCE.railBridgeCost : BALANCE.railCost + (road ? 0 : clearCost(world, i));
+    tiles.push({ ...p, valid: true, cost: c, rail: water ? Rail.Bridge : Rail.Track });
+    cost += c;
+    count++;
+  }
+  return { tiles, cost, count };
+}
+
+/** Lay planned track (needs the Rapid transit research in cities that lock by stage). */
+export function applyRail(city: City, plan: Plan): ApplyResult {
+  const real = plan.tiles.filter((t) => t.valid && t.cost > 0);
+  if (real.length === 0) return { ok: false, reason: 'nothing-to-do' };
+  if (!railUnlocked(city)) return { ok: false, reason: 'locked' };
+  if (plan.cost > city.funds) return { ok: false, reason: 'insufficient-funds' };
+  const w = city.world;
+  for (const t of real) {
+    const i = w.index(t.x, t.y);
+    w.rail[i] = t.rail ?? Rail.Track;
+    w.tree[i] = 0;
+    w.decor[i] = Decor.None;
+    w.zone[i] = ZoneType.None;
+  }
+  city.funds -= plan.cost;
+  return { ok: true, changed: bounds(real), tiles: real };
+}
+
 /** Price clearing a region: trees, decorations, roads, buildings and zones. Empty tiles are listed as invalid (no-op). */
 export function planClear(world: World, region: readonly TilePos[]): Plan {
   const tiles: PlannedTile[] = [];
@@ -204,6 +266,7 @@ export function planClear(world: World, region: readonly TilePos[]): Plan {
       world.tree[i] > 0 ||
       world.decor[i] !== Decor.None ||
       world.road[i] !== RoadType.None ||
+      world.rail[i] !== Rail.None ||
       world.building[i] !== -1 ||
       world.zone[i] !== ZoneType.None;
     const c = hasSomething ? clearCost(world, i) : 0;
@@ -230,6 +293,7 @@ export function applyClear(city: City, plan: Plan): ApplyResult {
     w.bridge[i] = BridgeAxis.None;
     w.lane[i] = 0;
     w.pave[i] = 0;
+    w.rail[i] = Rail.None;
     // Clear is the one "remove" tool: zones go too (there's no separate Dezone, D-051).
     w.zone[i] = ZoneType.None;
     // Selecting any tile of a building removes the whole building.
@@ -259,6 +323,8 @@ export interface PlacePlan extends Plan {
   origin: TilePos;
   /** Every footprint tile is valid. */
   ok: boolean;
+  /** Why it can't be built here beyond the tiles (e.g. a station with no track beside it). */
+  note?: string;
 }
 
 /** Price placing `id` with its footprint centred on (cx, cy). Trees and decorations are auto-cleared. */
@@ -279,6 +345,7 @@ export function planPlace(world: World, id: BuildingId, cx: number, cy: number):
         !isWater(world, i) &&
         world.terrain[i] !== Terrain.Rock &&
         world.road[i] === RoadType.None &&
+        world.rail[i] === Rail.None &&
         world.building[i] === -1 &&
         // Buildings need a flat footprint (docs/specs/elevation.md).
         world.elevation[i] === world.elevation[world.index(origin.x, origin.y)];
@@ -288,7 +355,32 @@ export function planPlace(world: World, id: BuildingId, cx: number, cy: number):
       if (!valid) ok = false;
     }
   }
-  return { tiles, cost: def.cost + clearing, count: ok ? 1 : 0, building: id, origin, ok };
+  // A station needs track beside it for its platform (sim/rail.ts).
+  const def2: BuildingDef = def;
+  const needsTrack = def2.railStation === true && !trackAround(world, origin.x, origin.y, def.size.w, def.size.h);
+  if (needsTrack) ok = false;
+  return { tiles, cost: def.cost + clearing, count: ok ? 1 : 0, building: id, origin, ok, ...(needsTrack && { note: 'A station needs rail track right beside it' }) };
+}
+
+/** Any track in the ring of tiles around a footprint. */
+function trackAround(world: World, x0: number, y0: number, w: number, h: number): boolean {
+  for (let y = y0 - 1; y <= y0 + h; y++) {
+    for (let x = x0 - 1; x <= x0 + w; x++) {
+      const inside = x >= x0 && x < x0 + w && y >= y0 && y < y0 + h;
+      if (!inside && world.inBounds(x, y) && isRail(world, world.index(x, y))) return true;
+    }
+  }
+  return false;
+}
+
+/** Does the path at step k run across a straight (or end) piece whose arms are all on the other axis? */
+function crossesAtRightAngle(mask: number, path: readonly TilePos[], k: number): boolean {
+  const a = path[Math.max(0, k - 1)];
+  const b = path[Math.min(path.length - 1, k + 1)];
+  // Path along x (SE–NW, bits 1 and 3) crosses pieces on the y axis (bits 0 and 2), and vice versa.
+  const alongX = a.x !== b.x;
+  const other = alongX ? 0b0101 : 0b1010;
+  return mask !== 0 && (mask & ~other) === 0;
 }
 
 export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyResult {
@@ -331,7 +423,8 @@ export function planMove(world: World, id: number, cx: number, cy: number): Move
       }
       const i = world.index(x, y);
       const occupant = world.building[i];
-      const valid = !isWater(world, i) && world.terrain[i] !== Terrain.Rock && world.road[i] === RoadType.None && (occupant === -1 || occupant === id);
+      const valid =
+        !isWater(world, i) && world.terrain[i] !== Terrain.Rock && world.road[i] === RoadType.None && world.rail[i] === Rail.None && (occupant === -1 || occupant === id);
       const c = valid ? clearCost(world, i) : 0;
       tiles.push({ x, y, valid, cost: c });
       clearing += c;
@@ -400,6 +493,7 @@ export function planZone(world: World, region: readonly TilePos[], zone: ZoneTyp
       !isWater(world, i) &&
       world.terrain[i] !== Terrain.Rock &&
       world.road[i] === RoadType.None &&
+      world.rail[i] === Rail.None &&
       (b === undefined || b.grown);
     const c = valid && zone !== ZoneType.None ? BALANCE.zoneCost : 0;
     tiles.push({ ...p, valid, cost: c });
