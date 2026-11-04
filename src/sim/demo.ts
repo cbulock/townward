@@ -30,6 +30,8 @@ const DAYS = 640;
 const GROWTH_STEPS = 3;
 /** Days simulated after the empty lots are built out. */
 const SETTLE_DAYS = 40;
+/** The block that holds the bus station (south-west of downtown). */
+const BUS_BLOCK = { bx: 3, by: 6 } as const;
 /** The row of blocks the rail line runs through (north of the town hall). */
 const RAIL_ROW = 2;
 /** Power plants for this much more than the evening peak (the city keeps growing). */
@@ -100,6 +102,8 @@ export function buildDemoCity(city: City, seed: number): DemoCity {
       // Power substations on a 12-tile grid (every other block's south corner, by the street):
       // every building is within a substation's 12-tile reach (docs/specs/energy.md).
       if (bx % 2 === 0 && by % 2 === 0) place('substation', ix + 4, iy + 4);
+      // A bus station whose fleet runs across town (it faces the street north-east of the block).
+      if (bx === BUS_BLOCK.bx && by === BUS_BLOCK.by && use.kind === 'zone') place('bus_station', ix + 1, iy + 1);
       if (use.kind === 'zone') zone(ix, iy, ix + 4, iy + 4, use.zone);
       else if (use.kind === 'park') for (let y = iy; y < iy + 5; y++) for (let x = ix; x < ix + 5; x++) place('park', x, y);
       else if (use.kind === 'hall') {

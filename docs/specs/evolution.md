@@ -96,11 +96,24 @@ so adding a need shrinks the others' share to fit.
 
 A hospital also counts as clinic coverage.
 
+### Transit and research expectations (user request, 2026-11-04)
+
+Two more expectations arrive when they make sense, weighed into happiness and asked for like
+the hospital and university:
+
+| Need | Who expects it | Met by | Weight | Request |
+|---|---|---|---|---|
+| **transit** | from the Town stage (when bus stations unlock): Comfortable and Prosperous homes, and apartments | a bus station within 10 tiles or a train station within 8 | 0.08 | "We need a bus or train station nearby" |
+| **research** | from the Metropolis stage (when it unlocks): Prosperous homes, for their graduates | a research centre anywhere in the city | 0.06 | "Our graduates need a research centre to work in" |
+
+On /demo (a City) this puts transit among the top requests (218 homes after 60 days) and city
+happiness at 85%.
+
 ### Requests ("We'd love a university")
 
 The Phase 9 rule only complains below 0.6 happiness, but people who are doing well ask for
-things too. A home that isn't complaining **asks for its tier's expectation** when that need
-scores below 0.5. Requests go in the same "Citizens say…" panel and speech bubbles:
+things too. A home that isn't complaining **asks for an expectation it has** (hospital,
+university, transit, research, in that order) when that need scores below 0.5. Requests go in the same "Citizens say…" panel and speech bubbles:
 
 | Kind | Message |
 |---|---|
@@ -317,9 +330,25 @@ northern blocks with five stations: about 485 riders a day (3%, a compact downto
 is usually quick) and six visible trains. With no stations the commute model's results are
 byte-identical to before.
 
-Simplifications in this first version: stations on the same connected track form one network
-(no line tool or timetables yet); trains are a visual sample and don't block level crossings;
-track is straight runs and right-angle corners (diagonals come with curved roads, D-089).
+**Rebuilt (D-091):** track and roads never meet at grade: track crosses a road only at right
+angles on a raised **overpass** (cars pass under, trains ride over). Track is **double**, each
+direction on its own side. Stations form **lines** (longest station-to-station run, then
+branches); each line runs 1–4 push-pull trains (one per 250 riders) that accelerate, brake to a
+stop at every platform, wait 3 s, and change ends at a terminus once the other track is clear;
+a train never closes within 3 tiles of the one ahead on its track. Track can be laid diagonally
+(a 45° staircase drawn as one diagonal line) and single turns bend as arcs; trains follow the
+drawn curves. Stations have generated names, face their track, and their info panel shows each
+line as a strip of stops with riders.
+
+## Bus stations (D-092)
+
+A 3×3 **Bus Station** (Civic → Transport, Town stage, $12,000, $220/month) faces the street it's
+built against: a driveway turns off the street through IN and OUT openings into three bays with
+canopies and parked buses, in front of a glass terminal. Each station keeps a fleet of four
+buses on the road: one leaves every 5 sim seconds while fewer are out, waits in its bay, runs a
+round trip over the roads to a stop across town (stopping on the way) and comes back. Homes
+within 10 tiles send 15% of their drives by bus, which takes those cars off the roads; the info
+panel shows riders a day and buses out. /demo has one south-west of downtown.
 
 ## Planned steps (user requests, 2026-11-04)
 

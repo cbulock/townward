@@ -62,6 +62,8 @@ export interface BuildingDef {
   garbage?: { readonly trucks: number; readonly reach: number; readonly holds?: number; readonly recycles?: number };
   /** Train stations: must be built with track beside the footprint (sim/rail.ts). */
   railStation?: boolean;
+  /** Bus stations: a fleet of buses runs from it, and nearby homes commute by bus (sim/systems/traffic.ts, commute.ts). */
+  busStation?: { readonly fleet: number; readonly reach: number };
   /** Power corridor node: buildings on the same road island within this reach can connect. */
   substation?: { readonly radius: number; readonly capacity: number };
   /** Resident/customer profile this building attracts. */
@@ -511,6 +513,20 @@ export const BUILDINGS = {
     group: 'transport',
     upkeep: 150,
     railStation: true,
+  },
+  bus_station: {
+    name: 'Bus Station',
+    category: 'civic',
+    zone: null,
+    density: null,
+    level: 0,
+    size: { w: 3, h: 3 },
+    cost: 12000,
+    capacity: 30,
+    description: 'A terminal with bays for a fleet of buses that run across town. Homes within 10 tiles send some commuters by bus instead of driving.',
+    group: 'transport',
+    upkeep: 220,
+    busStation: { fleet: 4, reach: 10 },
   },
   research_centre: {
     name: 'Research Centre',

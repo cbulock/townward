@@ -309,3 +309,19 @@ export function trackSide(world: World, x0: number, y0: number, w: number, h: nu
   const best = hits.indexOf(Math.max(...hits));
   return hits[best] > 0 ? best : -1;
 }
+
+/** Which side of a footprint has the most road beside it (0 north-east … 3 north-west), or −1. */
+export function roadSide(world: World, x0: number, y0: number, w: number, h: number): number {
+  const hits = [0, 0, 0, 0];
+  const road = (x: number, y: number) => world.inBounds(x, y) && world.road[world.index(x, y)] !== 0;
+  for (let x = x0; x < x0 + w; x++) {
+    if (road(x, y0 - 1)) hits[0]++;
+    if (road(x, y0 + h)) hits[2]++;
+  }
+  for (let y = y0; y < y0 + h; y++) {
+    if (road(x0 + w, y)) hits[1]++;
+    if (road(x0 - 1, y)) hits[3]++;
+  }
+  const best = hits.indexOf(Math.max(...hits));
+  return hits[best] > 0 ? best : -1;
+}

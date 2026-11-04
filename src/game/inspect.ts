@@ -63,6 +63,14 @@ export function inspectInfo(sim: Simulation, b: BuildingInstance): InspectInfo {
           holds: d.garbage.holds ?? null,
         }
       : null,
+    busStation: d.busStation
+      ? {
+          riders: Math.round(sim.commute.busStationRiders.get(b.id) ?? 0),
+          out: sim.traffic.traffic.fleetOut(b.entrance),
+          fleet: d.busStation.fleet,
+          reach: d.busStation.reach,
+        }
+      : null,
     aqi: Math.round(sim.air.aqiOf(b)),
     taxesWaiting: b.def === 'town_hall' && sim.city.collectsTaxes ? Math.round(sim.city.uncollected) : null,
     station: d.railStation

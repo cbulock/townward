@@ -14,6 +14,8 @@ const TONE: Readonly<Record<ComplaintKind, string>> = {
   hospital: '#d23b5a',
   university: '#5b4fc4',
   garbage: '#7d8a3a',
+  transit: '#2f7fd6',
+  research: '#22b8cf',
   commute: '#f08a24',
   traffic: '#ef6c43',
   air: '#8b9097',

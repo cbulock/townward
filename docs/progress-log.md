@@ -2,6 +2,17 @@
 
 Newest first. One entry per work session.
 
+## 2026-11-04 (later): Citizens ask for transport and a research centre
+- Needs `transit` (from Town: Comfortable/Prosperous homes and apartments; met by a bus station within 10 tiles or a train station within 8; weight 0.08) and `research` (from Metropolis: Prosperous homes; met by any research centre; weight 0.06). Content homes ask for any unmet expectation (hospital, university, transit, research). Labels, hints, colours and bubble icons (a bus, a flask). Tests: who expects transit and what meets it; research at Metropolis. /demo: 85% happiness, transit second among requests. 257 tests pass.
+
+## 2026-11-04 (later): Trains rebuilt, curved track, bus stations, Civic picker (D-089, D-091, D-092)
+- Rail: overpasses instead of level crossings (deck drawn with the objects, shade on the road, trains raised over it); any road type passes under at right angles. Double track art. Diagonal laying (`railDragPath`), staircases drawn as 45° chords and single turns as arcs (`railCornerShape`, `paintTrackCurve`), trains following the drawn track (`pointOnTrack`).
+- Trains: `systems/trains.ts` rebuilt on lines (`railLines`): 1–4 push-pull trains per line by riders, acceleration and braking to every platform, signalled terminus turnarounds, moving-block headway; each direction on its own track. Tests: no overlap over 4,000 frames, whole train on the track through 6,000, one line through every station.
+- Stations: generated names, custom art facing the track (platform, canopy, hall, clock tower), info panel with riders, trains and a strip of stops per line.
+- Bus stations: catalog, Town unlock, road-facing variant and driveway art, fleets in the traffic system, bus share in the commute model, info panel; one in /demo (4 buses out, ~258 riders). Tests (`tests/bus.test.ts`, 3).
+- Civic picker: a Transport tab; Services in Safety / Health / Education & research, Utilities in Power / Water / Garbage, small sections side by side; the picker sits above the side panels and scrolls instead of growing past the top bar.
+- 255 tests pass.
+
 ## 2026-11-04 (later): E7b Trains
 - Sim: `World.rail` layer (saved), `sim/rail.ts` (track masks, platforms, station-to-station minutes by BFS, serving station within 8 tiles, track paths), `planRail` / `applyRail` (right-angle level crossings with single-width roads, straight bridges over water, Rapid transit research in locked cities), track upkeep $0.8/tile. Buildings, zones and moves stay off track; a station needs track beside it ("A station needs rail track right beside it").
 - Commute model: per home group and job, walk + 3 min wait + 0.3 min/tile + walk; when faster than driving the flow goes by train (nothing on the roads), counts riders per station and station pair; job attraction uses the faster mode. `commute.report.trainRiders`. No stations: byte-identical history.

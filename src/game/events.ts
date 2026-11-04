@@ -160,6 +160,8 @@ export interface InspectInfo {
   taxesWaiting: number | null;
   /** Train stations (E7b): its name, riders a day here, track beside it, and the lines it's on. */
   station: StationInfo | null;
+  /** Bus stations: riders a day, and buses out of its fleet. */
+  busStation: { riders: number; out: number; fleet: number; reach: number } | null;
 }
 
 export interface StationInfo {

@@ -9,6 +9,7 @@ import { cityStats } from './population';
 import { roadSpec } from '../roadTypes';
 import { Stage } from '../stages';
 import { garbageScore } from './garbage';
+import { RAIL } from '../rail';
 import { airScore, aqiBand, type AirSystem } from './air';
 
 /**
@@ -28,6 +29,8 @@ export type NeedKind =
   | 'hospital'
   | 'university'
   | 'garbage'
+  | 'transit'
+  | 'research'
   | 'commute'
   | 'traffic'
   | 'air'
@@ -44,6 +47,8 @@ export const NEED_KINDS: readonly NeedKind[] = [
   'hospital',
   'university',
   'garbage',
+  'transit',
+  'research',
   'commute',
   'traffic',
   'air',
@@ -64,6 +69,8 @@ export const COMPLAINT_TEXT: Readonly<Record<ComplaintKind, string>> = {
   hospital: 'Our families need a proper hospital',
   university: 'Our kids want to go to university',
   garbage: 'Garbage is piling up on our street',
+  transit: 'We need a bus or train station nearby',
+  research: 'Our graduates need a research centre to work in',
   commute: 'The commute is terrible',
   traffic: 'Traffic is making it hard to reach customers',
   air: 'Too much smoke and noise',
@@ -101,12 +108,14 @@ const WEIGHTS = {
   industrial: { workers: 0.6, safety: 0.4 },
 } as const satisfies Record<string, Weights>;
 const GARBAGE_WEIGHT = { residential: 0.08, commercial: 0.1, industrial: 0.1 } as const;
-/** The expectation each tier adds, asked for even by happy homes (docs/specs/evolution.md, "Requests"). */
-const REQUESTS: Readonly<Record<Lifestyle, readonly NeedKind[]>> = {
-  [Lifestyle.Basic]: [],
-  [Lifestyle.Comfortable]: ['hospital'],
-  [Lifestyle.Prosperous]: ['hospital', 'university'],
-};
+/**
+ * Expectations that come with a better life or a bigger city (docs/specs/evolution.md,
+ * "Requests"): asked for even by content homes when they aren't met, in this order.
+ */
+const EXPECTATIONS: readonly NeedKind[] = ['hospital', 'university', 'transit', 'research'];
+/** Transit joins from the Town stage for better-off homes and apartments; research at Metropolis for Prosperous homes. */
+const TRANSIT_WEIGHT = 0.08;
+const RESEARCH_WEIGHT = 0.06;
 
 const RADIUS = { shopping: 12, parks: 6, highway: 2 } as const;
 
@@ -139,10 +148,18 @@ export interface NeedsReport {
   complaints: Complaint[];
 }
 
-function needWeights(def: BuildingDef, b: BuildingInstance, garbage: boolean): Weights | null {
+function needWeights(def: BuildingDef, b: BuildingInstance, stage: Stage): Weights | null {
   if (def.category === 'civic') return null;
+  const home = def.category === 'residential';
   const base = def.category === 'residential' ? HOME_WEIGHTS[b.lifestyle] : WEIGHTS[def.category];
-  return garbage ? { ...base, garbage: GARBAGE_WEIGHT[def.category] } : base;
+  return {
+    ...base,
+    // Garbage from the Village; transit when bus stations unlock (Town) for homes that want it;
+    // a research centre at Metropolis, for the graduates in Prosperous homes.
+    ...(stage >= Stage.Village && { garbage: GARBAGE_WEIGHT[def.category] }),
+    ...(home && stage >= Stage.Town && (b.lifestyle >= Lifestyle.Comfortable || def.density === 'high') && { transit: TRANSIT_WEIGHT }),
+    ...(home && stage >= Stage.Metropolis && b.lifestyle === Lifestyle.Prosperous && { research: RESEARCH_WEIGHT }),
+  };
 }
 
 const centre = (b: BuildingInstance) => {
@@ -219,15 +236,21 @@ export class NeedsSystem implements SimSystem {
     const education = serviceBit('education');
     const hospital = serviceBit('hospital');
     const university = serviceBit('university');
-    const garbage = this.stage() >= Stage.Village;
+    const stage = this.stage();
 
     // Places that matter to neighbours, with their centres.
     const shops: { x: number; y: number; jobs: number }[] = [];
     const homes: { x: number; y: number; people: number }[] = [];
     const parks: { x: number; y: number }[] = [];
+    /** Bus and train stations with how far they serve (transit), and whether the city has a research centre. */
+    const stations: { x: number; y: number; reach: number }[] = [];
+    let researchCentre = false;
     for (const b of all) {
       const d: BuildingDef = BUILDINGS[b.def];
       const c = centre(b);
+      if (d.busStation && isActive(b)) stations.push({ ...c, reach: d.busStation.reach });
+      if (d.railStation && isActive(b)) stations.push({ ...c, reach: RAIL.walkTiles });
+      if (b.def === 'research_centre' && isActive(b)) researchCentre = true;
       if (!isActive(b) || b.abandoned) continue;
       if (d.category === 'commercial') shops.push({ ...c, jobs: d.capacity });
       if (d.category === 'residential') homes.push({ ...c, people: b.occupants });
@@ -238,7 +261,7 @@ export class NeedsSystem implements SimSystem {
     this.byBuilding.clear();
     for (const b of all) {
       const d: BuildingDef = BUILDINGS[b.def];
-      const weights = needWeights(d, b, garbage);
+      const weights = needWeights(d, b, stage);
       if (!weights || !isActive(b)) continue;
       const c = centre(b);
       const scores: Partial<Record<NeedKind, number>> = {};
@@ -252,6 +275,8 @@ export class NeedsSystem implements SimSystem {
           education: b.services & education ? 1 : 0,
           hospital: b.services & hospital ? 1 : 0,
           university: b.services & university ? 1 : 0,
+          transit: stations.some((st) => near(c, st, st.reach)) ? 1 : 0,
+          research: researchCentre ? 1 : 0,
           shops: () => shops.filter((s) => near(c, s, RADIUS.shopping)).reduce((n, s) => n + s.jobs, 0),
           residents: () => (b.entrance === -1 ? 0 : homes.reduce((n, h) => n + h.people, 0)),
           traffic,
@@ -278,7 +303,7 @@ export class NeedsSystem implements SimSystem {
       happiness = total === 0 ? 1 : happiness / total;
       b.happiness = happiness;
       // Unhappy homes complain about their worst need; content ones still ask for their tier's expectation.
-      const request = d.category === 'residential' ? REQUESTS[b.lifestyle].find((k) => (scores[k] ?? 1) < BALANCE.requestLine) : undefined;
+      const request = d.category === 'residential' ? EXPECTATIONS.find((k) => weights[k] !== undefined && (scores[k] ?? 1) < BALANCE.requestLine) : undefined;
       const complaint: ComplaintKind | null = b.abandoned ? 'abandoned' : happiness < BALANCE.complainLine ? worst : (request ?? null);
       this.byBuilding.set(b.id, { scores, happiness, complaint });
     }
@@ -297,6 +322,8 @@ export class NeedsSystem implements SimSystem {
       education: number;
       hospital: number;
       university: number;
+      transit: number;
+      research: number;
       shops: () => number;
       residents: () => number;
       parks: () => number;
@@ -321,6 +348,10 @@ export class NeedsSystem implements SimSystem {
         return ctx.hospital;
       case 'university':
         return ctx.university;
+      case 'transit':
+        return ctx.transit;
+      case 'research':
+        return ctx.research;
       case 'garbage':
         return garbageScore(b);
       case 'commute': {

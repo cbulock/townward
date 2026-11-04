@@ -1,5 +1,5 @@
 import { mulberry32 } from '../../shared/rng';
-import { BUILDINGS } from '../buildings/catalog';
+import { BUILDINGS, buildingDef } from '../buildings/catalog';
 import { isActive } from './access';
 import { speedFactor, type CommuteTrip } from './commute';
 import { DIRS as DIR_STEP, roadMask, RoadType, stepAllowed } from '../roads';
@@ -92,6 +92,10 @@ export const TRAFFIC = {
   lightPhase: 5,
   /** Bus stops (docs/specs/simulation.md). */
   busDwell: 2,
+  /** Bus stations (docs/specs/evolution.md, "Bus stations"): a bus leaves this often (sim s) while
+   *  fewer than the fleet are out, and waits this long in its bay first. */
+  fleetInterval: 5,
+  fleetBayDwell: 3,
   busMinPopulation: 150,
   stopMinCapacity: 12,
   stopSpacing: 6,
@@ -340,6 +344,8 @@ export class Traffic {
   private homes: number[] = [];
   private destinations: number[] = [];
   private population = 0;
+  /** Bus stations: their entrance road tile, fleet size, and time until the next departure. */
+  private busStations: { entrance: number; fleet: number; timer: number }[] = [];
   /** Bus stops, recomputed with demand. */
   stops: readonly BusStop[] = [];
   private stopTiles = new Set<number>();
@@ -456,6 +462,13 @@ export class Traffic {
         this.destinations.push(b.entrance);
       }
     }
+    // Bus stations keep their departure timers across refreshes.
+    const timers = new Map(this.busStations.map((st) => [st.entrance, st.timer]));
+    this.busStations = [];
+    for (const b of this.world.buildings.values()) {
+      const fleet = buildingDef(b.def).busStation?.fleet;
+      if (fleet && isActive(b)) this.busStations.push({ entrance: b.entrance, fleet, timer: timers.get(b.entrance) ?? 0 });
+    }
     this.stops = this.population >= TRAFFIC.busMinPopulation ? computeBusStops(this.world) : [];
     this.stopTiles = new Set(this.stops.map((s) => s.tile));
     let sum = 0;
@@ -561,8 +574,37 @@ export class Traffic {
     }
   }
 
-  private addVehicle(kind: AgentKind, path: Int32Array, speed: number) {
-    this.agents.push({ kind, path, seg: 0, t: 0, speed, variant: Math.floor(this.rng() * 6), age: 0, wait: 0, dwell: 0, stopSeg: -1 });
+  private addVehicle(kind: AgentKind, path: Int32Array, speed: number, dwell = 0) {
+    this.agents.push({ kind, path, seg: 0, t: 0, speed, variant: Math.floor(this.rng() * 6), age: 0, wait: 0, dwell, stopSeg: dwell > 0 ? 0 : -1 });
+  }
+
+  /** Buses out from a station: those whose round trip starts and ends at its entrance. */
+  fleetOut(entrance: number): number {
+    let n = 0;
+    for (const a of this.agents) if (a.kind === 'bus' && a.path[0] === entrance && a.path[a.path.length - 1] === entrance) n++;
+    return n;
+  }
+
+  /**
+   * A bus leaves a station: it waits in its bay, then runs a round trip over the roads to a stop
+   * across town (or any destination before there are stops), stopping on the way, and back.
+   */
+  private departFrom(entrance: number) {
+    const w = this.world.width;
+    const targets = this.stops.length > 0 ? this.stops.map((st) => st.tile) : this.destinations;
+    for (let attempt = 0; attempt < 6 && targets.length > 0; attempt++) {
+      const dest = targets[Math.floor(this.rng() * targets.length)];
+      const d = Math.abs((dest % w) - (entrance % w)) + Math.abs(Math.floor(dest / w) - Math.floor(entrance / w));
+      if (d < TRAFFIC.busMinTrip) continue;
+      const out = this.route(entrance, dest);
+      const back = this.route(dest, entrance);
+      if (!out || !back || out.length < 3) continue;
+      const path = new Int32Array(out.length + back.length - 1);
+      path.set(out);
+      path.set(back.subarray(1), out.length);
+      this.addVehicle('bus', path, TRAFFIC.carSpeed * 0.8, TRAFFIC.fleetBayDwell);
+      return;
+    }
   }
 
   /** A short stroll on the footpaths: a random walk along connected streets (never highways or bridges) from a home or shop. */
@@ -626,6 +668,13 @@ export class Traffic {
         this.spawnCar(hour);
         cars++;
       }
+    }
+    // Bus stations send out their fleets, one bus at a time.
+    for (const st of this.busStations) {
+      st.timer -= dt;
+      if (st.timer > 0) continue;
+      st.timer = TRAFFIC.fleetInterval;
+      if (this.fleetOut(st.entrance) < st.fleet) this.departFrom(st.entrance);
     }
     // Fewer strollers at night.
     const night = hour < 6 || hour >= 22 ? 0.3 : 1;

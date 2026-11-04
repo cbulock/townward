@@ -10,6 +10,7 @@ import { paintTownHall } from './townHall';
 import { paintPowerPlant, powerPlantSmoke } from './utilities/powerPlant';
 import { paintLandfill } from './utilities/landfill';
 import { paintTrainStation } from './transport/trainStation';
+import { paintBusStation } from './transport/busStation';
 import { paintWaterTower } from './utilities/waterTower';
 
 /**
@@ -29,5 +30,7 @@ export const CIVIC_ART: Readonly<Record<CustomArtId, CivicArt>> = {
   landfill: { variants: 3, headroom: () => 34, paint: paintLandfill },
   // Variant = the side its track runs along (set when placed), so the platform faces the rails.
   train_station: { variants: 4, headroom: () => 58, paint: paintTrainStation },
+  // Variant = the side its street runs along, so the driveway turns off it.
+  bus_station: { variants: 4, headroom: () => 46, paint: paintBusStation },
   ...ENERGY_ART,
 };

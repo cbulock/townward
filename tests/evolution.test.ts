@@ -411,3 +411,53 @@ describe('research (E7)', () => {
     expect(loaded.research).toEqual({ points: 42.5, done: 3 });
   });
 });
+
+describe('transit and research expectations', () => {
+  /** A content neighbourhood around one home, as in the lifestyle test. */
+  function neighbourhood() {
+    const { w, city, place } = town();
+    place('walkup', 4, 19);
+    place('cottage', 6, 19);
+    place('police_station', 5, 21);
+    place('fire_station', 6, 21);
+    place('clinic', 7, 21);
+    place('school', 8, 21);
+    place('corner_shop', 10, 21);
+    place('small_office', 11, 21);
+    place('park', 3, 19);
+    place('park', 2, 19);
+    place('hospital', 13, 22);
+    place('university', 17, 23);
+    return { w, city, place };
+  }
+
+  it('from the Town stage, better-off homes and apartments ask for a bus or train station; a bus station in reach answers', () => {
+    const { w, city, place } = neighbourhood();
+    city.stage = Stage.Town;
+    const flat = only(w, 'walkup');
+    const house = only(w, 'cottage');
+    flat.lifestyle = Lifestyle.Comfortable;
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    for (let d = 0; d < 10; d++) sim.day();
+    expect(sim.needs.byBuilding.get(flat.id)?.scores.transit).toBe(0);
+    expect(sim.needs.byBuilding.get(house.id)?.scores.transit).toBeUndefined(); // a Basic house doesn't expect it
+    expect(sim.needs.report.complaints.some((c) => c.kind === 'transit')).toBe(true);
+    place('bus_station', 4, 23);
+    sim.worldChanged({ roads: false });
+    expect(sim.needs.byBuilding.get(flat.id)?.scores.transit).toBe(1);
+  });
+
+  it('at Metropolis, Prosperous homes ask for a research centre until the city has one', () => {
+    const { w, city, place } = neighbourhood();
+    city.stage = Stage.Metropolis;
+    const flat = only(w, 'walkup');
+    flat.lifestyle = Lifestyle.Prosperous;
+    const sim = new Simulation(city);
+    sim.worldChanged({ roads: true });
+    expect(sim.needs.byBuilding.get(flat.id)?.scores.research).toBe(0);
+    place('research_centre', 30, 22);
+    sim.worldChanged({ roads: false });
+    expect(sim.needs.byBuilding.get(flat.id)?.scores.research).toBe(1);
+  });
+});

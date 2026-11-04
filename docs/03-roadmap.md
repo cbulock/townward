@@ -218,7 +218,10 @@ We focus on **one** terrain and make it look great before adding presets or menu
   - [x] E5 Taxes collected by hand at the Town Hall (new cities): six-month chest, coin badge, collect buttons
   - [x] E6 Industry makes construction materials that new buildings and upgrades consume (new cities): imports at a price, warehouse storage, export of surplus
   - [x] E7 Research (D-090): Research Centre at Metropolis, automatic projects (cleaner coal, garbage trucks, modern construction, wider care, green industry, rapid transit)
-  - [x] E7b Trains: rail track (Rail tool `Z`, level crossings, bridges), train stations, commuters switching from car to train, visible trains; a line across /demo
+  - [x] E7b Trains: rail track (Rail tool `Z`, overpasses over roads, bridges, diagonal and curved track), train stations, commuters switching from car to train; lines with double track, signalled push-pull trains (D-091); a line across /demo
+  - [x] Bus stations (D-092): 3×3, Town stage, facing their street with a driveway, a fleet of four buses, 15% of nearby drives by bus
+  - [x] Civic picker: Transport tab, sectioned Services and Utilities
+  - [x] Citizens ask for transit (from Town) and a research centre (from Metropolis)
   - [ ] Power made understandable (a "how power works" explainer, power view on the map)
   - [ ] Server-run cities (D-085): the server ticks each open city, the browser sends commands
 - [ ] **D + E. Transport** → [specs/transport.md](specs/transport.md) (D-069), steps T1–T7:

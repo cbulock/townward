@@ -1,5 +1,5 @@
 import { BALANCE } from '../../shared/balance';
-import { BUILDINGS } from '../buildings/catalog';
+import { BUILDINGS, buildingDef } from '../buildings/catalog';
 import type { SimSystem, WorldChange } from '../core/System';
 import { roadMask, RoadType, stepAllowed } from '../roads';
 import type { World } from '../World';
@@ -28,6 +28,8 @@ export const COMMUTE = {
   smoothing: 0.4,
   /** Trips kept for the visible cars. */
   maxTrips: 500,
+  /** Share of drives that go by bus from homes near a bus station. */
+  busShare: 0.15,
   /** Trips kept per group of homes (its biggest destinations). */
   tripsPerOrigin: 4,
 } as const;
@@ -49,6 +51,8 @@ export interface CommuteReport {
   commuters: number;
   /** Commuters a day who take the train instead of driving (docs/specs/evolution.md, E7b). */
   trainRiders: number;
+  /** Commuters a day who take the bus from a bus station instead of driving. */
+  busRiders: number;
   /** Commuter-weighted average trip time, minutes. */
   avgMinutes: number;
   /** Road tiles over capacity (congestion > 1). */
@@ -138,7 +142,9 @@ export class CommuteSystem implements SimSystem {
   /** Average commute (minutes) per home building id. */
   readonly commuteMinutes = new Map<number, number>();
   trips: CommuteTrip[] = [];
-  report: CommuteReport = { commuters: 0, trainRiders: 0, avgMinutes: 0, jammedTiles: 0 };
+  report: CommuteReport = { commuters: 0, trainRiders: 0, busRiders: 0, avgMinutes: 0, jammedTiles: 0 };
+  /** Bus riders a day from each bus station (building id). */
+  readonly busStationRiders = new Map<number, number>();
   /** Train riders a day boarding or leaving at each station (building id). */
   readonly stationRiders = new Map<number, number>();
   /** Riders a day between pairs of stations (building ids), busiest first, for the visible trains. */
@@ -261,6 +267,16 @@ export class CommuteSystem implements SimSystem {
     }
     const riders = new Float64Array(ns * ns);
     let trainRiders = 0;
+    // Bus stations: homes in reach send a share of their drives by bus.
+    const busStations: { id: number; x: number; y: number; reach: number }[] = [];
+    for (const b of w.buildings.values()) {
+      const bus = buildingDef(b.def).busStation;
+      if (!bus || !isActive(b)) continue;
+      const { w: bw, h: bh } = BUILDINGS[b.def].size;
+      busStations.push({ id: b.id, x: b.x + bw / 2, y: b.y + bh / 2, reach: bus.reach });
+    }
+    this.busStationRiders.clear();
+    let busRiders = 0;
     const picked = new Uint8Array(jobTile.length);
     const fresh = new Float64Array(n);
     const trips: CommuteTrip[] = [];
@@ -273,6 +289,15 @@ export class CommuteSystem implements SimSystem {
       const order = this.order;
       const stamp = this.stamp;
       const home = hasRail ? servingStation(net, w, origin) : null;
+      // The nearest bus station in reach, if any: a share of this group's drives go by bus.
+      const ox = (origin % w.width) + 0.5;
+      const oy = Math.floor(origin / w.width) + 0.5;
+      let busStop: (typeof busStations)[number] | null = null;
+      for (const b of busStations) {
+        const d = Math.hypot(b.x - ox, b.y - oy);
+        if (d <= b.reach && (!busStop || d < Math.hypot(busStop.x - ox, busStop.y - oy))) busStop = b;
+      }
+      const busShare = busStop ? COMMUTE.busShare : 0;
       // Spread this group's commuters over reachable jobs: big and near ones attract most, by
       // the faster of driving and (where both ends are near stations on one line) the train.
       let total = 0;
@@ -301,7 +326,13 @@ export class CommuteSystem implements SimSystem {
       for (let r = 0; r < reached; r++) {
         const flow = (o.commuters * reachFlow[r]) / total;
         // Train trips put nothing on the roads; they count as riders between the two stations.
-        if (reachRail[r] === -1) load[reachTile[r]] += flow;
+        if (reachRail[r] === -1) {
+          load[reachTile[r]] += flow * (1 - busShare);
+          if (busStop) {
+            busRiders += flow * busShare;
+            this.busStationRiders.set(busStop.id, (this.busStationRiders.get(busStop.id) ?? 0) + flow * busShare);
+          }
+        }
         else if (home) {
           riders[home.station * ns + reachRail[r]] += flow;
           trainRiders += flow;
@@ -366,7 +397,7 @@ export class CommuteSystem implements SimSystem {
       }
     }
     this.railTrips = pairs.sort((a, b) => b.riders - a.riders);
-    this.report = { commuters: Math.round(commuters), trainRiders: Math.round(trainRiders), avgMinutes: commuters > 0 ? minutesSum / commuters : 0, jammedTiles: jammed };
+    this.report = { commuters: Math.round(commuters), trainRiders: Math.round(trainRiders), busRiders: Math.round(busRiders), avgMinutes: commuters > 0 ? minutesSum / commuters : 0, jammedTiles: jammed };
   }
 
   /** Today's adjacency and entry minutes (see `first`, `next`, `enter`). */

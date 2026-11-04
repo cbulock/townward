@@ -4,7 +4,7 @@ import type { ComplaintKind } from '../../sim/systems/needs';
 
 export const BUBBLE_W = 22;
 export const BUBBLE_H = 22;
-export const BUBBLE_KINDS: readonly ComplaintKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers', 'hospital', 'university', 'garbage', 'abandoned'];
+export const BUBBLE_KINDS: readonly ComplaintKind[] = ['jobs', 'shopping', 'safety', 'health', 'education', 'commute', 'air', 'parks', 'workers', 'customers', 'hospital', 'university', 'garbage', 'transit', 'research', 'abandoned'];
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -167,6 +167,33 @@ export function paintBubble(ctx: CanvasRenderingContext2D, kind: ComplaintKind) 
       ctx.fillRect(8, 8.5, 1, 4.5);
       ctx.fillRect(10, 8.5, 1, 4.5);
       ctx.fillRect(12, 8.5, 1, 4.5);
+      break;
+    case 'transit': // a bus, front on
+      fill('#2f7fd6');
+      ctx.fillRect(5.5, 4.5, 10, 9);
+      fill('#bfe3ff');
+      ctx.fillRect(6.5, 5.5, 8, 4);
+      fill('#fff3b0');
+      ctx.fillRect(6.5, 11, 1.6, 1.4);
+      ctx.fillRect(12.9, 11, 1.6, 1.4);
+      fill('#2b2f36');
+      ctx.fillRect(6.5, 13.5, 2, 1.5);
+      ctx.fillRect(12.5, 13.5, 2, 1.5);
+      break;
+    case 'research': // a flask
+      fill('#22b8cf');
+      ctx.beginPath();
+      ctx.moveTo(9.3, 4);
+      ctx.lineTo(11.7, 4);
+      ctx.lineTo(11.7, 8);
+      ctx.lineTo(15, 14.5);
+      ctx.lineTo(6, 14.5);
+      ctx.lineTo(9.3, 8);
+      ctx.closePath();
+      ctx.fill();
+      fill('#ffffff');
+      ctx.fillRect(8.8, 3.5, 3.4, 1);
+      ctx.fillRect(8, 11.5, 2, 1.2);
       break;
     case 'abandoned': // boarded window
       fill('#5a4a3a');

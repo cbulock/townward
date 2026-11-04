@@ -15,6 +15,8 @@ const NEED_LABEL: Readonly<Record<NeedKind, string>> = {
   hospital: 'Hospital',
   university: 'University',
   garbage: 'Garbage',
+  transit: 'Transit',
+  research: 'Research',
   commute: 'Commute',
   traffic: 'Traffic',
   air: 'Clean air',
@@ -33,6 +35,8 @@ const NEED_HINT: Readonly<Record<NeedKind, string>> = {
   hospital: 'Build a hospital in reach',
   university: 'Build a university in reach',
   garbage: 'Build a landfill, recycling centre or incinerator in reach',
+  transit: 'Build a bus station within 10 tiles or a train station within 8',
+  research: 'Build a research centre (Civic → Services)',
   commute: 'Wider roads, or jobs closer to home',
   traffic: 'Wider roads around here',
   air: 'Keep factories, power plants and landfills further away',
@@ -264,6 +268,20 @@ export function InfoPanel() {
       )}
 
       {info.station && <StationSection station={info.station} />}
+      {info.busStation && (
+        <section className="info-section">
+          <h3 className="info-section-title">Buses</h3>
+          <div className="info-stats">
+            <Stat label="Riders a day" value={info.busStation.riders.toLocaleString()} />
+            <Stat label="Buses out" value={`${info.busStation.out} of ${info.busStation.fleet}`} />
+          </div>
+          <p className="info-note">
+            {info.hasRoad
+              ? `Buses leave from its bays for stops across town and come back. Homes within ${info.busStation.reach} tiles send some commuters by bus instead of driving.`
+              : 'Build it against a street: its driveway turns off there.'}
+          </p>
+        </section>
+      )}
       {(info.provides || info.facility || info.condition !== null) && (
         <section className="info-section">
           <h3 className="info-section-title">Provides</h3>

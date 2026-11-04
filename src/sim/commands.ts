@@ -3,7 +3,7 @@ import { BUILDINGS, buildingDef, footprintOrigin, type BuildingDef, type Buildin
 import type { City } from './City';
 import { ROAD_SPECS, roadSpec } from './roadTypes';
 import { isUnlocked } from './stages';
-import { isRail, Rail, railMask, railUnlocked, trackSide, type RailId } from './rail';
+import { isRail, Rail, railMask, railUnlocked, roadSide, trackSide, type RailId } from './rail';
 import { DIRS, BridgeAxis, roadMask, RoadType, type BridgeAxisId, type BuildableRoad, type TilePos } from './roads';
 import { Decor, Terrain } from './terrain/types';
 import type { World } from './World';
@@ -398,8 +398,14 @@ export function applyPlace(city: City, plan: PlacePlan, variant: number): ApplyR
     // Placed buildings never sit on a zone (only grown ones do).
     w.zone[i] = ZoneType.None;
   }
-  // A station faces its platform toward the track: its art variant is the track's side.
-  const side = buildingDef(plan.building).railStation ? trackSide(w, plan.origin.x, plan.origin.y, size.w, size.h) : -1;
+  // Stations face what they serve: a train station its track, a bus station its street (its
+  // driveway turns off there). The side is the art variant.
+  const pd = buildingDef(plan.building);
+  const side = pd.railStation
+    ? trackSide(w, plan.origin.x, plan.origin.y, size.w, size.h)
+    : pd.busStation
+      ? roadSide(w, plan.origin.x, plan.origin.y, size.w, size.h)
+      : -1;
   w.addBuilding({ def: plan.building, x: plan.origin.x, y: plan.origin.y, variant: side >= 0 ? side : variant }, size.w, size.h);
   city.funds -= plan.cost;
   return { ok: true, changed: bounds(plan.tiles), tiles: plan.tiles };
