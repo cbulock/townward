@@ -5,3 +5,8 @@ dist
 
 server/data/
 .env
+.tools/
+dist-native/
+artifacts/
+playwright-report/
+test-results/

@@ -480,3 +480,7 @@ Newest first. One entry per work session.
 - Created docs: vision, architecture, roadmap, UI/UX, specs (terrain, roads, buildings), decision log.
 - Open decisions D-001 (name), D-002 (iso vs top-down) and D-003 (rotation) need sign-off.
 - **Next:** Phase 1, engine foundation (scaffold, iso grid, camera, picking, debug overlay).
+
+## 2026-11-05 — Android client
+
+Prepared the Capacitor Android shell, responsive phone/foldable HUD, customizable summary rows, placement-safe pinch gestures, construction confirmation, lifecycle saves, Back handling, and local cloud recovery copies. Kept original branding and existing API endpoints; backend and deployment changes are excluded. See ANDROID.md for validation and pending physical-device checks.

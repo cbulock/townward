@@ -29,12 +29,14 @@ export interface InputCallbacks {
   onPointer: (screen: ScreenPoint | null) => void;
   onKey: (code: string) => void;
   /** Left button pressed. Return true if the active tool takes the drag; false lets it pan the camera. */
-  onPrimaryDown: (screen: ScreenPoint, shift: boolean) => boolean;
+  onPrimaryDown: (screen: ScreenPoint, shift: boolean, touch: boolean) => boolean;
   onPrimaryMove: (screen: ScreenPoint, shift: boolean) => void;
   /** The drag ended; `touch` when a finger made it (touch drags wait for a confirm). */
   onPrimaryUp: (screen: ScreenPoint, shift: boolean, touch: boolean) => void;
   /** Right click without dragging: cancel the current tool action. */
   onCancel: () => void;
+  /** Interrupted input (resize, app background) discards a draft without deselecting the tool. */
+  onInterrupt?: () => void;
   /** Left click without dragging while no tool takes the drag (e.g. inspect). */
   onClick: (screen: ScreenPoint) => void;
 }
@@ -65,6 +67,8 @@ export class InputController {
   private readonly touches = new Map<number, { x: number; y: number }>();
   /** Two-finger gesture: last midpoint and finger spread. */
   private pinch: { midX: number; midY: number; spread: number } | null = null;
+  /** Once a pinch starts, every remaining finger belongs to navigation until all lift. */
+  private zoomGesture = false;
   private readonly cleanup: (() => void)[] = [];
 
   constructor(
@@ -77,11 +81,24 @@ export class InputController {
     this.listen(el, 'pointerup', this.onPointerUp);
     this.listen(el, 'pointercancel', this.onPointerUp);
     this.listen(el, 'pointerleave', this.onPointerLeave);
+    // A second finger can land on the HUD while the first is on the map. Capture it for
+    // navigation before a toolbar or placement-confirmation button can receive the press.
+    this.listen(
+      window,
+      'pointerdown',
+      (e: PointerEvent) => {
+        if (e.pointerType !== 'touch' || e.target === this.el || this.touches.size === 0) return;
+        e.stopPropagation();
+        this.onPointerDown(e);
+      },
+      { capture: true },
+    );
     this.listen(el, 'wheel', this.onWheel, { passive: false });
     this.listen(el, 'contextmenu', (e: Event) => e.preventDefault());
     this.listen(window, 'keydown', this.onKeyDown);
     this.listen(window, 'keyup', this.onKeyUp);
     this.listen(window, 'blur', () => this.held.clear());
+    this.listen(window, 'resize', () => this.cancelInteraction());
   }
 
   private listen<E extends Event>(
@@ -104,29 +121,45 @@ export class InputController {
     const p = this.local(e);
     this.el.setPointerCapture(e.pointerId);
     if (e.pointerType === 'touch') {
+      // Do not synthesize mouse presses onto an inspector that opens beneath the lifted finger.
+      e.preventDefault();
       this.touches.set(e.pointerId, p);
       if (this.touches.size === 2) {
         this.startPinch();
         return;
       }
-      if (this.touches.size > 2) return;
+      if (this.touches.size > 2 || this.zoomGesture) return;
     }
-    if (e.button === 0 && this.cb.onPrimaryDown(p, e.shiftKey)) {
+    if (e.button === 0 && this.cb.onPrimaryDown(p, e.shiftKey, e.pointerType === 'touch')) {
       this.toolPointer = e.pointerId;
       return;
     }
-    this.drag = { id: e.pointerId, button: e.button, lastX: p.x, lastY: p.y, startX: p.x, startY: p.y, moved: false };
+    this.drag = {
+      id: e.pointerId,
+      button: e.button,
+      lastX: p.x,
+      lastY: p.y,
+      startX: p.x,
+      startY: p.y,
+      moved: false,
+    };
   };
 
   /** A second finger landed: whatever the first finger started becomes a pinch. */
   private startPinch() {
-    if (this.toolPointer !== null) {
-      this.toolPointer = null;
-      this.cb.onCancel();
-    }
+    this.zoomGesture = true;
+    this.toolPointer = null;
     this.drag = null;
+    // This also discards a previously finished draft, not just a drag still under a finger.
+    if (this.cb.onInterrupt) this.cb.onInterrupt();
+    else this.cb.onCancel();
+    this.clearTouchPointer();
     const [a, b] = [...this.touches.values()];
-    this.pinch = { midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2, spread: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) };
+    this.pinch = {
+      midX: (a.x + b.x) / 2,
+      midY: (a.y + b.y) / 2,
+      spread: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+    };
   }
 
   private movePinch() {
@@ -144,10 +177,12 @@ export class InputController {
   private onPointerMove = (e: PointerEvent) => {
     const p = this.local(e);
     if (e.pointerType === 'touch') {
-      if (!this.touches.has(e.pointerId)) return;
+      const previous = this.touches.get(e.pointerId);
+      if (!previous) return;
       this.touches.set(e.pointerId, p);
-      if (this.pinch) {
-        this.movePinch();
+      if (this.zoomGesture) {
+        if (this.pinch) this.movePinch();
+        else if (this.touches.size === 1) this.camera.dragBy(p.x - previous.x, p.y - previous.y);
         return;
       }
     }
@@ -173,10 +208,13 @@ export class InputController {
   private onPointerUp = (e: PointerEvent) => {
     if (e.pointerType === 'touch') {
       this.touches.delete(e.pointerId);
-      if (this.pinch) {
-        // Lifting one finger ends the pinch; the other doesn't start a new drag.
+      if (this.zoomGesture) {
+        // Lifting one finger ends scaling, but the rest of the gesture is still navigation.
         if (this.touches.size < 2) this.pinch = null;
-        if (this.touches.size === 0) this.clearTouchPointer();
+        if (this.touches.size === 0) {
+          this.zoomGesture = false;
+          this.clearTouchPointer();
+        }
         return;
       }
     }
@@ -286,6 +324,20 @@ export class InputController {
   destroy() {
     this.cleanup.forEach((fn) => fn());
     this.cleanup.length = 0;
+  }
+
+  /** Forget captured input as well as its draft, so a later pointerup cannot place anything. */
+  cancelInteraction() {
+    this.toolPointer = null;
+    this.drag = null;
+    this.pinch = null;
+    this.zoomGesture = false;
+    this.touches.clear();
+    this.held.clear();
+    this.el.style.cursor = '';
+    this.clearTouchPointer();
+    if (this.cb.onInterrupt) this.cb.onInterrupt();
+    else this.cb.onCancel();
   }
 }
 

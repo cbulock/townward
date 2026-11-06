@@ -25,6 +25,10 @@ bun run test         # unit tests (server tests use in-process PGlite: no Docker
 bun run typecheck && bun run lint
 ```
 
+## Android
+
+See [Android build and acceptance](ANDROID.md) for the native app workflow.
+
 ## Index
 
 | Doc | What it covers |

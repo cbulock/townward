@@ -2,11 +2,13 @@
  * Guest trial, client side (D-083). The server keeps the clock; the device only keeps a copy of
  * the guest id (in case the cookie goes) and whether the reminder was closed.
  */
+import { NATIVE_APP } from '../platform';
+
 const ID_KEY = 'citybuilder.guestId';
 const NUDGED_KEY = 'citybuilder.guestNudged';
 
 /** On in production builds; `VITE_GUEST_TRIAL=on` turns it on in development. */
-export const GUEST_TRIAL_ON: boolean = import.meta.env.PROD || import.meta.env.VITE_GUEST_TRIAL === 'on';
+export const GUEST_TRIAL_ON: boolean = !NATIVE_APP && (import.meta.env.PROD || import.meta.env.VITE_GUEST_TRIAL === 'on');
 
 /** The server counts the time between beats, so they go only while the tab is visible. */
 export const HEARTBEAT_MS = 30_000;

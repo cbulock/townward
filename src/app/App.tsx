@@ -1,4 +1,4 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useStore } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import type { GameOptions } from '../game/Game';
 import { hasJournal } from '../save/journal';
@@ -6,13 +6,25 @@ import { loadCity, recoverNewCity } from '../save/loadCity';
 import type { CityRef } from '../save/SaveStore';
 import { AuthDialog } from './account/AuthDialog';
 import { track, trackVisit } from './analytics';
-import { authAtom } from './atoms';
+import { authAtom, authDialogAtom } from './atoms';
 import { useAuthBootstrap } from './auth';
-import { clearUrlOptions, demoOptions, isDemoRoute, readCityRef, readUrlOptions, writeCityUrl, writeDemoUrl, writeUrlOptions } from './options';
+import {
+  clearUrlOptions,
+  demoOptions,
+  isDemoRoute,
+  readCityRef,
+  readUrlOptions,
+  writeCityUrl,
+  writeDemoUrl,
+  writeUrlOptions,
+} from './options';
 import { GameScreen } from './screens/GameScreen';
 import { NewGameScreen } from './screens/NewGameScreen';
 import { guestAtom, setChoseGuest } from './screens/landing/guest';
 import { LandingScreen } from './screens/landing/LandingScreen';
+import { NATIVE_APP } from './platform';
+import { App as AndroidApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 /** What's on screen. A playing city knows its save (null for a new or demo city). */
 type Screen =
@@ -36,10 +48,27 @@ function initialScreen(): Screen {
  * one, then the game. `/demo` opens a planned, fully grown city straight away.
  */
 export function App() {
+  const store = useStore();
   useAuthBootstrap();
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const auth = useAtomValue(authAtom);
   const [guest, setGuest] = useAtom(guestAtom);
+
+  useEffect(() => {
+    if (!NATIVE_APP || !Capacitor.isNativePlatform()) return;
+    const listener = AndroidApp.addListener('backButton', () => {
+      if (store.get(authDialogAtom) !== null) {
+        store.set(authDialogAtom, null);
+        return;
+      }
+      const event = new Event('openpolis-back', { cancelable: true });
+      window.dispatchEvent(event);
+      if (!event.defaultPrevented) void AndroidApp.exitApp();
+    });
+    return () => {
+      void listener.then((handle) => handle.remove());
+    };
+  }, [store]);
 
   useEffect(() => trackVisit(), []);
   // Every city that goes into play (new, opened, demo, or straight from a URL) counts once.
@@ -61,7 +90,11 @@ export function App() {
     let cancelled = false;
     loadCity(loadingRef)
       .then(
-        (data): Screen => ({ kind: 'play', options: { terrain: data.terrain, name: data.name, save: data }, ref: loadingRef }),
+        (data): Screen => ({
+          kind: 'play',
+          options: { terrain: data.terrain, name: data.name, save: data },
+          ref: loadingRef,
+        }),
         (err: unknown): Screen => {
           clearUrlOptions();
           const reason = err instanceof Error ? err.message : 'unknown error';
@@ -115,13 +148,15 @@ export function App() {
   };
   // Visitors who aren't signed in meet the landing page first; signing in or choosing guest moves on.
   const menu = screen.kind === 'menu';
-  const landing = menu && auth.status === 'guest' && !guest;
+  const landing = !NATIVE_APP && menu && auth.status === 'guest' && !guest;
 
   return (
     <>
       {menu && auth.status === 'checking' && <div className="landing-blank" />}
       {landing && <LandingScreen onPlay={playAsGuest} onDemo={() => start(demoOptions())} />}
-      {menu && !landing && auth.status !== 'checking' && <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />}
+      {menu && !landing && auth.status !== 'checking' && (
+        <NewGameScreen onStart={start} onOpen={open} notice={screen.notice} />
+      )}
       {(screen.kind === 'loading' || screen.kind === 'recovering') && (
         <div className="loading-screen" role="status">
           <div className="panel loading-card">Loading your city…</div>

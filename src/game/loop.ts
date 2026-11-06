@@ -46,4 +46,9 @@ export class GameLoop {
     this.running = false;
     cancelAnimationFrame(this.raf);
   }
+
+  resetTime() {
+    this.last = performance.now();
+    this.acc = 0;
+  }
 }

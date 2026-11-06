@@ -17,6 +17,8 @@ import type {
   TourResponse,
   TrackRequest,
 } from '../shared/api';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { NATIVE_APP, NATIVE_API_ORIGIN } from '../app/platform';
 
 /** Typed client for the save server (docs/specs/saving.md, "Server"). */
 
@@ -44,7 +46,6 @@ function isErrorBody(v: unknown): v is ApiErrorBody {
   return typeof v === 'object' && v !== null && 'error' in v && typeof v.error === 'string';
 }
 
-
 /**
  * Small bodies go out with `keepalive`, so a save started as the tab closes still arrives
  * (browsers cap keepalive bodies at 64 KB).
@@ -55,32 +56,62 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = body === undefined ? undefined : JSON.stringify(body);
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
-      method,
-      headers: text === undefined ? undefined : { 'content-type': 'application/json' },
-      body: text,
-      credentials: 'same-origin',
-      keepalive: text !== undefined && text.length < KEEPALIVE_MAX,
-    });
+    const url = `${NATIVE_APP ? NATIVE_API_ORIGIN : ''}/api${path}`;
+    if (NATIVE_APP && Capacitor.isNativePlatform()) {
+      // Native HTTP uses Android's cookie manager; the app does not copy tokens into web storage.
+      const reply = await CapacitorHttp.request({
+        url,
+        method,
+        headers: body === undefined ? {} : { 'content-type': 'application/json' },
+        data: body,
+        responseType: 'json',
+        connectTimeout: 8_000,
+        readTimeout: 20_000,
+        disableRedirects: true,
+      });
+      const data: unknown = reply.data;
+      res = new Response(reply.status === 204 ? null : JSON.stringify(data), {
+        status: reply.status,
+        headers: reply.headers,
+      });
+    } else
+      res = await fetch(url, {
+        method,
+        headers: text === undefined ? undefined : { 'content-type': 'application/json' },
+        body: text,
+        credentials: NATIVE_APP ? 'include' : 'same-origin',
+        ...(NATIVE_APP ? { signal: AbortSignal.timeout(8_000) } : {}),
+        keepalive: text !== undefined && text.length < KEEPALIVE_MAX,
+      });
   } catch {
     throw new ApiError(0, "Can't reach the server");
   }
   if (res.status === 204) return undefined as T; // only used with T = void
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, isErrorBody(json) ? json.error : `Server error (${res.status})`, res.status === 429 ? retryAfterOf(res, json) : null);
+  if (!res.ok)
+    throw new ApiError(
+      res.status,
+      isErrorBody(json) ? json.error : `Server error (${res.status})`,
+      res.status === 429 ? retryAfterOf(res, json) : null,
+    );
   // Our own server's responses, typed by src/shared/api.ts. Save data is validated separately (parseSave).
   return json as T;
 }
 
 export const api = {
   me: () => request<MeResponse>('GET', '/auth/me'),
-  signup: (email: string, password: string, human: HumanProof = {}) => request<SignupResponse>('POST', '/auth/signup', { email, password, ...human }),
+  signup: (email: string, password: string, human: HumanProof = {}) =>
+    request<SignupResponse>('POST', '/auth/signup', { email, password, ...human }),
   verifySignup: (email: string, code: string): Promise<ApiUser> =>
     request<AuthResponse>('POST', '/auth/signup/verify', { email, code }).then((r) => r.user),
-  forgotPassword: (email: string, human: HumanProof = {}) => request<CodeSentResponse>('POST', '/auth/password/forgot', { email, ...human }),
+  forgotPassword: (email: string, human: HumanProof = {}) =>
+    request<CodeSentResponse>('POST', '/auth/password/forgot', { email, ...human }),
   resetPassword: (email: string, code: string, password: string): Promise<ApiUser> =>
-    request<AuthResponse>('POST', '/auth/password/reset', { email, code, password }).then((r) => r.user),
-  resendCode: (purpose: CodePurpose, email: string) => request<CodeSentResponse>('POST', '/auth/code/resend', { email, purpose }),
+    request<AuthResponse>('POST', '/auth/password/reset', { email, code, password }).then(
+      (r) => r.user,
+    ),
+  resendCode: (purpose: CodePurpose, email: string) =>
+    request<CodeSentResponse>('POST', '/auth/code/resend', { email, purpose }),
   login: (email: string, password: string): Promise<ApiUser> =>
     request<AuthResponse>('POST', '/auth/login', { email, password }).then((r) => r.user),
   logout: () => request<void>('POST', '/auth/logout'),
@@ -88,14 +119,14 @@ export const api = {
   listSaves: () => request<SaveListResponse>('GET', '/saves').then((r) => r.saves),
   loadSave: (id: number) => request<SaveLoadResponse>('GET', `/saves/${id}`),
   createSave: (body: SaveWriteRequest): Promise<SaveMeta> => request<SaveWriteResponse>('POST', '/saves', body).then((r) => r.meta),
-  updateSave: (id: number, body: SaveWriteRequest): Promise<SaveMeta> =>
-    request<SaveWriteResponse>('PUT', `/saves/${id}`, body).then((r) => r.meta),
+  updateSave: (id: number, body: SaveWriteRequest): Promise<SaveMeta> => request<SaveWriteResponse>('PUT', `/saves/${id}`, body).then((r) => r.meta),
   deleteSave: (id: number) => request<void>('DELETE', `/saves/${id}`),
 
   getTour: () => request<TourResponse>('GET', '/tour').then((r) => r.progress),
   putTour: (body: TourProgress) => request<void>('PUT', '/tour', body),
 
-  guestHeartbeat: (guestId: string | null) => request<GuestHeartbeatResponse>('POST', '/guest/heartbeat', guestId ? { guestId } : {}),
+  guestHeartbeat: (guestId: string | null) =>
+    request<GuestHeartbeatResponse>('POST', '/guest/heartbeat', guestId ? { guestId } : {}),
 
   track: (body: TrackRequest) => request<void>('POST', '/events', body),
 };

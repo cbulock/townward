@@ -31,7 +31,7 @@ function zoneIcon(letter: string): ReactNode {
 
 const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 
-const TOOLS: readonly ToolDef[] = [
+export const HUD_TOOLS: readonly ToolDef[] = [
   {
     id: 'select',
     group: 'edit',
@@ -139,9 +139,9 @@ export function Toolbar() {
 
   return (
     <div className="panel toolbar" role="toolbar" aria-label="Build tools">
-      {TOOLS.map((t, k) => (
+      {HUD_TOOLS.map((t, k) => (
         <Fragment key={t.id}>
-        {k > 0 && TOOLS[k - 1].group !== t.group && <span className="toolbar-divider" aria-hidden="true" />}
+        {k > 0 && HUD_TOOLS[k - 1].group !== t.group && <span className="toolbar-divider" aria-hidden="true" />}
         <button
           type="button"
           className={`tool-button ${t.tone ?? ''} ${isActive(t.id) ? 'is-active' : ''}`}

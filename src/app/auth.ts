@@ -1,14 +1,23 @@
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import type { HumanProof } from '../shared/api';
 import { api, ApiError } from '../save/api';
-import { authAtom, authDialogAtom, authNoticeAtom, authProvidersAtom, type AuthState } from './atoms';
+import {
+  authAtom,
+  authDialogAtom,
+  authNoticeAtom,
+  authProvidersAtom,
+  authRefreshAtom,
+  type AuthState,
+} from './atoms';
 import { guestAtom, setChoseGuest } from './screens/landing/guest';
+import { NATIVE_APP } from './platform';
 
 /** Signed-in state for the whole app (docs/specs/saving.md, "Player Experience"). */
 
 /** Ask the server who we are, once at startup. No server means guest mode, saving on this device. */
 export function useAuthBootstrap() {
+  const refresh = useAtomValue(authRefreshAtom);
   const [, setAuth] = useAtom(authAtom);
   const [, setProviders] = useAtom(authProvidersAtom);
   const [, setDialog] = useAtom(authDialogAtom);
@@ -27,7 +36,7 @@ export function useAuthBootstrap() {
     api
       .me()
       .then(({ user, providers }): AuthState => {
-        if (!cancelled) setProviders(providers);
+        if (!cancelled) setProviders(NATIVE_APP ? { ...providers, github: false } : providers);
         return user ? { status: 'user', user } : { status: 'guest', online: true };
       })
       .catch((): AuthState => ({ status: 'guest', online: false }))
@@ -37,7 +46,7 @@ export function useAuthBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [setAuth, setProviders, setDialog, setNotice]);
+  }, [setAuth, setProviders, setDialog, setNotice, refresh]);
 }
 
 export interface AuthActions {
@@ -57,7 +66,8 @@ export function useAuth(): AuthActions {
   const [auth, setAuth] = useAtom(authAtom);
   const [, setGuest] = useAtom(guestAtom);
   const login = useCallback(
-    async (email: string, password: string) => setAuth({ status: 'user', user: await api.login(email, password) }),
+    async (email: string, password: string) =>
+      setAuth({ status: 'user', user: await api.login(email, password) }),
     [setAuth],
   );
   const signup = useCallback(
@@ -70,11 +80,13 @@ export function useAuth(): AuthActions {
     [setAuth],
   );
   const verifySignup = useCallback(
-    async (email: string, code: string) => setAuth({ status: 'user', user: await api.verifySignup(email, code) }),
+    async (email: string, code: string) =>
+      setAuth({ status: 'user', user: await api.verifySignup(email, code) }),
     [setAuth],
   );
   const resetPassword = useCallback(
-    async (email: string, code: string, password: string) => setAuth({ status: 'user', user: await api.resetPassword(email, code, password) }),
+    async (email: string, code: string, password: string) =>
+      setAuth({ status: 'user', user: await api.resetPassword(email, code, password) }),
     [setAuth],
   );
   const logout = useCallback(async () => {

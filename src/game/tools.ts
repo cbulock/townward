@@ -1,12 +1,32 @@
 import type { PreviewTile } from '../render/overlays/ToolPreview';
 import { buildingHeadroom } from '../render/atlas/buildings';
 import { BRIDGE_HEADROOM } from '../render/atlas/geometry';
-import { bridgeTexture, buildingTexture, roadTexture, type TerrainTextures } from '../render/atlas/tiles';
+import {
+  bridgeTexture,
+  buildingTexture,
+  roadTexture,
+  type TerrainTextures,
+} from '../render/atlas/tiles';
 import { roadVariant } from '../render/atlas/roads';
 import { DECK_LIFT } from '../render/atlas/roadArt';
 import type { ViewTransform } from '../render/view/ViewTransform';
-import { BUILDINGS, type BuildingDef, type BuildingId, type ServiceKind } from '../sim/buildings/catalog';
-import { planClear, planMove, planPlace, planRail, planRoad, planZone, type MovePlan, type Plan, type PlacePlan } from '../sim/commands';
+import {
+  BUILDINGS,
+  type BuildingDef,
+  type BuildingId,
+  type ServiceKind,
+} from '../sim/buildings/catalog';
+import {
+  planClear,
+  planMove,
+  planPlace,
+  planRail,
+  planRoad,
+  planZone,
+  type MovePlan,
+  type Plan,
+  type PlacePlan,
+} from '../sim/commands';
 import { isCornerMask, isRail, Rail, railDragPath } from '../sim/rail';
 import type { RailCurve } from '../render/atlas/rail';
 import { ZoneType, type ZonedType } from '../sim/zones';
@@ -87,6 +107,17 @@ export type ToolPlan =
   | { kind: 'rail'; tool: 'rail'; plan: Plan };
 
 const TINT_VALID = 0x8ff7ec;
+/** Revalidate a draft as a whole; empty clearing cells and existing zones are harmless no-ops. */
+export function toolPlanCanCommit(world: World, p: ToolPlan, funds: number): boolean {
+  if (p.plan.count === 0 || p.plan.cost > funds) return false;
+  if (p.kind === 'place' || p.kind === 'move') return p.plan.ok;
+  if (p.kind === 'clear') return true;
+  return p.plan.tiles.every(
+    (tile) =>
+      tile.valid || (p.kind === 'zone' && world.zone[world.index(tile.x, tile.y)] === p.zone),
+  );
+}
+
 const TINT_INVALID = 0xff5a5a;
 const TINT_CLEAR = 0xff9a4d;
 const TINT_NO_ROAD = 0xffb547;
@@ -107,7 +138,12 @@ const SERVICE_TINT: Readonly<Record<ServiceKind, number>> = {
 };
 
 /** Coverage tint for a service, water or power building, used by placement and inspection previews. */
-export function coveragePreviewTiles(world: World, tex: TerrainTextures, id: BuildingId, origin: TilePos): PreviewTile[] {
+export function coveragePreviewTiles(
+  world: World,
+  tex: TerrainTextures,
+  id: BuildingId,
+  origin: TilePos,
+): PreviewTile[] {
   const d: BuildingDef = BUILDINGS[id];
   const water = d.supplies?.water !== undefined;
   const radius = d.service || water ? d.radius : (d.energy?.coverage ?? d.substation?.radius);
@@ -119,7 +155,13 @@ export function coveragePreviewTiles(world: World, tex: TerrainTextures, id: Bui
   for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       if (!world.inBounds(x, y) || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
-      const tint = d.service ? SERVICE_TINT[d.service] : water ? 0x3a9bf0 : d.substation ? 0x55b7ff : 0xf2c94c;
+      const tint = d.service
+        ? SERVICE_TINT[d.service]
+        : water
+          ? 0x3a9bf0
+          : d.substation
+            ? 0x55b7ff
+            : 0xf2c94c;
       out.push({ x, y, texture: tex.selection, tint, alpha: 0.32 });
     }
   }
@@ -149,7 +191,11 @@ export function planTool(
 ): ToolPlan | null {
   if (tool === 'select') return null;
   if (tool === 'move') {
-    const plan = carrying !== null && hovered ? planMove(world, carrying, hovered.x, hovered.y) : null;
+    const destination = drag?.current ?? hovered;
+    const plan =
+      carrying !== null && destination
+        ? planMove(world, carrying, destination.x, destination.y)
+        : null;
     return plan ? { kind: 'move', tool, plan } : null;
   }
   const anchor = drag ?? (hovered ? { start: hovered, current: hovered, straight: false } : null);
@@ -165,18 +211,35 @@ export function planTool(
   switch (tool) {
     case 'rail':
       // A roughly diagonal drag lays a 45° staircase that's drawn as one diagonal line (D-089).
-      return { kind: 'rail', tool, plan: planRail(world, railDragPath(anchor.start, anchor.current, anchor.straight)) };
+      return {
+        kind: 'rail',
+        tool,
+        plan: planRail(world, railDragPath(anchor.start, anchor.current, anchor.straight)),
+      };
     case 'clear':
-      return { kind: 'clear', tool, plan: planClear(world, rectTiles(anchor.start, anchor.current)) };
+      return {
+        kind: 'clear',
+        tool,
+        plan: planClear(world, rectTiles(anchor.start, anchor.current)),
+      };
     case 'build':
-      return { kind: 'place', tool, plan: planPlace(world, building, anchor.current.x, anchor.current.y) };
+      return {
+        kind: 'place',
+        tool,
+        plan: planPlace(world, building, anchor.current.x, anchor.current.y),
+      };
     case 'zone-r':
     case 'zone-rh':
     case 'zone-c':
     case 'zone-ch':
     case 'zone-i': {
       const zone = ZONE_TOOLS[tool];
-      return { kind: 'zone', tool, plan: planZone(world, rectTiles(anchor.start, anchor.current), zone), zone };
+      return {
+        kind: 'zone',
+        tool,
+        plan: planZone(world, rectTiles(anchor.start, anchor.current), zone),
+        zone,
+      };
     }
   }
 }
@@ -185,7 +248,13 @@ export function planTool(
  * Ghost sprites for a plan, in world tiles (ToolPreview places them in the view).
  * Road ghosts are auto-tiled as if the plan were already built, then rotated into the view.
  */
-export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, view: ViewTransform, pave = 0): PreviewTile[] {
+export function previewTiles(
+  world: World,
+  tex: TerrainTextures,
+  p: ToolPlan,
+  view: ViewTransform,
+  pave = 0,
+): PreviewTile[] {
   if (p.kind === 'zone') {
     const tint = ZONE_TINT[p.zone];
     return p.plan.tiles.map((t) => {
@@ -217,7 +286,12 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
     const { w, h } = BUILDINGS[building].size;
     // The lot it's leaving, dimmed, then the new footprint and a ghost of the building itself.
     const leaving: PreviewTile[] = b
-      ? rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }).map((t) => ({ ...t, texture: tex.selection, tint: 0x4fd1c5, alpha: 0.3 }))
+      ? rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }).map((t) => ({
+          ...t,
+          texture: tex.selection,
+          tint: 0x4fd1c5,
+          alpha: 0.3,
+        }))
       : [];
     const footprint: PreviewTile[] = p.plan.tiles.map((t) => ({
       x: t.x,
@@ -262,15 +336,26 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
   if (p.kind === 'rail') {
     // Track ghosts, auto-tiled as if the plan were already laid (masks turned into the view).
     const laid = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));
-    const hasRail = (x: number, y: number) => world.inBounds(x, y) && (laid.has(world.index(x, y)) || isRail(world, world.index(x, y)));
+    const hasRail = (x: number, y: number) =>
+      world.inBounds(x, y) && (laid.has(world.index(x, y)) || isRail(world, world.index(x, y)));
     const maskAt = (x: number, y: number) =>
-      (hasRail(x, y - 1) ? 1 : 0) | (hasRail(x + 1, y) ? 2 : 0) | (hasRail(x, y + 1) ? 4 : 0) | (hasRail(x - 1, y) ? 8 : 0);
-    const STEPS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
+      (hasRail(x, y - 1) ? 1 : 0) |
+      (hasRail(x + 1, y) ? 2 : 0) |
+      (hasRail(x, y + 1) ? 4 : 0) |
+      (hasRail(x - 1, y) ? 8 : 0);
+    const STEPS = [
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+    ] as const;
     /** As the built track will bend (sim/rail.ts railCornerShape), with the plan counted in. */
     const curveAt = (x: number, y: number, mask: number): RailCurve | null => {
       if (!isCornerMask(mask)) return null;
       const opposite = ~mask & 0b1111;
-      return STEPS.some(([dx, dy], d) => mask & (1 << d) && maskAt(x + dx, y + dy) === opposite) ? 'chord' : 'arc';
+      return STEPS.some(([dx, dy], d) => mask & (1 << d) && maskAt(x + dx, y + dy) === opposite)
+        ? 'chord'
+        : 'arc';
     };
     return p.plan.tiles.map((t) => {
       const mask = maskAt(t.x, t.y);
@@ -278,18 +363,32 @@ export function previewTiles(world: World, tex: TerrainTextures, p: ToolPlan, vi
       const over = world.road[i] !== RoadType.None;
       const look = t.rail === Rail.Bridge ? 'bridge' : 'track';
       const curve = look === 'track' && !over ? curveAt(t.x, t.y, mask) : null;
-      const texture = over ? tex.railOverpass[view.mask(mask)] : curve ? tex.railCurves[curve][view.mask(mask)] : tex.rail[look][view.mask(mask)];
-      return { x: t.x, y: t.y, texture, tint: t.valid ? 0xffffff : TINT_INVALID, alpha: t.valid ? 0.85 : 0.45 };
+      const texture = over
+        ? tex.railOverpass[view.mask(mask)]
+        : curve
+          ? tex.railCurves[curve][view.mask(mask)]
+          : tex.rail[look][view.mask(mask)];
+      return {
+        x: t.x,
+        y: t.y,
+        texture,
+        tint: t.valid ? 0xffffff : TINT_INVALID,
+        alpha: t.valid ? 0.85 : 0.45,
+      };
     });
   }
 
   const planned = new Set(p.plan.tiles.filter((t) => t.valid).map((t) => world.index(t.x, t.y)));
   const hasRoad = (x: number, y: number) =>
-    world.inBounds(x, y) && (planned.has(world.index(x, y)) || world.road[world.index(x, y)] !== RoadType.None);
+    world.inBounds(x, y) &&
+    (planned.has(world.index(x, y)) || world.road[world.index(x, y)] !== RoadType.None);
   const roadType = p.roadType;
   return p.plan.tiles.map((t) => {
     let mask =
-      (hasRoad(t.x, t.y - 1) ? 1 : 0) | (hasRoad(t.x + 1, t.y) ? 2 : 0) | (hasRoad(t.x, t.y + 1) ? 4 : 0) | (hasRoad(t.x - 1, t.y) ? 8 : 0);
+      (hasRoad(t.x, t.y - 1) ? 1 : 0) |
+      (hasRoad(t.x + 1, t.y) ? 2 : 0) |
+      (hasRoad(t.x, t.y + 1) ? 4 : 0) |
+      (hasRoad(t.x - 1, t.y) ? 8 : 0);
     // One-way rows preview as plain carriageways: end-to-end links only.
     if (t.lane !== undefined) mask &= (1 << t.lane) | (1 << ((t.lane + 2) % 4));
     // The look the renderer will use: the direction turned into the view, or the pavement.

@@ -58,10 +58,11 @@ export class SoundBoard {
     return this.mutedState;
   }
 
-  setMuted(muted: boolean) {
+  setMuted(muted: boolean, persist = true) {
     this.mutedState = muted;
-    writeMuted(muted);
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, this.ctx.currentTime, 0.02);
+    if (persist) writeMuted(muted);
+    if (this.master && this.ctx)
+      this.master.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, this.ctx.currentTime, 0.02);
   }
 
   private unlock() {
@@ -155,9 +156,16 @@ export class SoundBoard {
     const base = 2600 + Math.random() * 1400;
     const notes = 2 + Math.floor(Math.random() * 2);
     for (let k = 0; k < notes; k++) {
-      this.tone('sine', base * (1 + k * 0.08), base * (1.25 + k * 0.05), t + k * 0.09, 0.07, 0.012 * this.birdLevel);
+      this.tone(
+        'sine',
+        base * (1 + k * 0.08),
+        base * (1.25 + k * 0.05),
+        t + k * 0.09,
+        0.07,
+        0.012 * this.birdLevel,
+      );
     }
-    this.nextBird = t + 1.5 + Math.random() * 6 / this.birdLevel;
+    this.nextBird = t + 1.5 + (Math.random() * 6) / this.birdLevel;
   }
 
   /** Oscillator sweeping from f0 to f1 with a fast attack and exponential decay. */
@@ -177,7 +185,14 @@ export class SoundBoard {
   }
 
   /** Filtered noise burst; optional sweep of the filter down to `sweepTo`. */
-  private burst(t: number, dur: number, freq: number, type: BiquadFilterType, gain: number, sweepTo?: number) {
+  private burst(
+    t: number,
+    dur: number,
+    freq: number,
+    type: BiquadFilterType,
+    gain: number,
+    sweepTo?: number,
+  ) {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;

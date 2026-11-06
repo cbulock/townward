@@ -1,6 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 import { cityAtom } from '../atoms';
+import { useBackDismiss } from '../mobile/useBackDismiss';
 
 /**
  * The city's stage in the top bar (docs/specs/evolution.md, E0): its name and a ring for
@@ -10,6 +11,7 @@ import { cityAtom } from '../atoms';
 export function StageChip() {
   const city = useAtomValue(cityAtom);
   const [open, setOpen] = useState(false);
+  useBackDismiss(open, () => setOpen(false));
   const wrap = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -41,7 +43,15 @@ export function StageChip() {
         onClick={() => setOpen((o) => !o)}
       >
         <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true">
-          <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2.4" />
+          <circle
+            cx="9"
+            cy="9"
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity="0.2"
+            strokeWidth="2.4"
+          />
           <circle
             cx="9"
             cy="9"
@@ -62,7 +72,9 @@ export function StageChip() {
           {p.next ? (
             <>
               <span className="stage-menu-sub">
-                {p.locked ? `To become a ${p.next.name}, the city needs:` : `Next: ${p.next.name} (this city has every building unlocked)`}
+                {p.locked
+                  ? `To become a ${p.next.name}, the city needs:`
+                  : `Next: ${p.next.name} (this city has every building unlocked)`}
               </span>
               <ul className="stage-reqs">
                 {(p.locked ? reqs : reqs.slice(0, 1)).map((q) => (
@@ -72,7 +84,10 @@ export function StageChip() {
                     </span>
                     <span className="stage-req-detail">{q.detail}</span>
                     <span className="meter">
-                      <span className="meter-fill" style={{ width: `${Math.round(q.have * 100)}%` }} />
+                      <span
+                        className="meter-fill"
+                        style={{ width: `${Math.round(q.have * 100)}%` }}
+                      />
                     </span>
                   </li>
                 ))}
@@ -87,29 +102,41 @@ export function StageChip() {
               {p.research.current ? (
                 <>
                   <span className="stage-req-label">
-                    {p.research.current.name}: {p.research.current.points} / {p.research.current.needed}
+                    {p.research.current.name}: {p.research.current.points} /{' '}
+                    {p.research.current.needed}
                   </span>
                   <span className="meter">
-                    <span className="meter-fill" style={{ width: `${Math.round((p.research.current.points / p.research.current.needed) * 100)}%` }} />
+                    <span
+                      className="meter-fill"
+                      style={{
+                        width: `${Math.round((p.research.current.points / p.research.current.needed) * 100)}%`,
+                      }}
+                    />
                   </span>
                   <span className="stage-life-legend">{p.research.current.effect}</span>
                 </>
               ) : (
                 <span className="stage-life-legend">Every project is finished.</span>
               )}
-              {p.research.done.length > 0 && <span className="stage-life-legend">Done: {p.research.done.join(' · ')}</span>}
+              {p.research.done.length > 0 && (
+                <span className="stage-life-legend">Done: {p.research.done.join(' · ')}</span>
+              )}
             </span>
           )}
           {residents > 0 && (
             <span className="stage-life">
               <span>Lifestyle</span>
-              <span className="stage-life-bar" aria-label={`Basic ${share(basic)}%, Comfortable ${share(comfortable)}%, Prosperous ${share(prosperous)}%`}>
+              <span
+                className="stage-life-bar"
+                aria-label={`Basic ${share(basic)}%, Comfortable ${share(comfortable)}%, Prosperous ${share(prosperous)}%`}
+              >
                 <i className="tier-0" style={{ width: `${share(basic)}%` }} />
                 <i className="tier-1" style={{ width: `${share(comfortable)}%` }} />
                 <i className="tier-2" style={{ width: `${share(prosperous)}%` }} />
               </span>
               <span className="stage-life-legend">
-                Basic {share(basic)}% · Comfortable {share(comfortable)}% · Prosperous {share(prosperous)}%
+                Basic {share(basic)}% · Comfortable {share(comfortable)}% · Prosperous{' '}
+                {share(prosperous)}%
               </span>
             </span>
           )}

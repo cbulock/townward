@@ -11,23 +11,43 @@ const LABEL_ROOM_X = 220;
 const LABEL_ROOM_Y = 60;
 
 function verbFor(p: ToolPreviewInfo): string {
-  return p.label ?? (p.tool === 'clear' ? 'Clear' : isRoadTool(p.tool) ? ROAD_SPECS[ROAD_TOOLS[p.tool]].name : 'Build');
+  return (
+    p.label ??
+    (p.tool === 'clear'
+      ? 'Clear'
+      : isRoadTool(p.tool)
+        ? ROAD_SPECS[ROAD_TOOLS[p.tool]].name
+        : 'Build')
+  );
 }
 
 /** A finished touch drag (D-080): what it is and costs, with Build and Cancel. */
 function ConfirmBar({ p }: { p: ToolPreviewInfo }) {
   const game = useAtomValue(gameAtom);
   const blocked = p.blocked || p.count === 0;
-  const action = p.tool === 'clear' ? 'Clear' : isZoneTool(p.tool) ? 'Zone' : 'Build';
+  const action =
+    p.tool === 'clear'
+      ? 'Clear'
+      : p.tool === 'move'
+        ? 'Move'
+        : isZoneTool(p.tool)
+          ? 'Zone'
+          : 'Build';
   return (
-    <div className={`panel draft-confirm ${p.affordable && !blocked ? '' : 'is-unaffordable'}`} role="dialog" aria-label="Confirm">
+    <div
+      className={`panel draft-confirm ${p.affordable && !blocked ? '' : 'is-unaffordable'}`}
+      role="dialog"
+      aria-label="Confirm"
+    >
       <span className="draft-what">
         <span className="cost-verb">{verbFor(p)}</span>
         {blocked ? (
           <span className="cost-dim">{p.blocked ? "can't build here" : 'nothing to change'}</span>
         ) : (
           <>
-            <span className="cost-value">{p.cost === 0 ? 'Free' : `$${p.cost.toLocaleString()}`}</span>
+            <span className="cost-value">
+              {p.cost === 0 ? 'Free' : `$${p.cost.toLocaleString()}`}
+            </span>
             {p.tool !== 'build' && (
               <span className="cost-dim">
                 {p.count} tile{p.count === 1 ? '' : 's'}
@@ -37,10 +57,15 @@ function ConfirmBar({ p }: { p: ToolPreviewInfo }) {
         )}
         {p.note && <span className="cost-note">{p.note}</span>}
       </span>
-      <button type="button" className="draft-cancel" onClick={() => game?.cancel()}>
+      <button type="button" className="draft-cancel" onClick={() => game?.cancelInteraction()}>
         Cancel
       </button>
-      <button type="button" className="draft-build" disabled={blocked || !p.affordable} onClick={() => game?.confirmDraft()}>
+      <button
+        type="button"
+        className="draft-build"
+        disabled={!p.awaitingConfirm || blocked || !p.affordable}
+        onClick={() => game?.confirmDraft()}
+      >
         {action}
       </button>
     </div>
@@ -51,7 +76,8 @@ function ConfirmBar({ p }: { p: ToolPreviewInfo }) {
 export function CostLabel() {
   const p = useAtomValue(toolPreviewAtom);
   if (!p) return null;
-  if (p.awaitingConfirm) return <ConfirmBar p={p} />;
+  if (p.awaitingConfirm || window.matchMedia('(pointer: coarse)').matches)
+    return <ConfirmBar p={p} />;
 
   const verb = verbFor(p);
   const empty = p.count === 0;
@@ -70,12 +96,16 @@ export function CostLabel() {
       {p.blocked ? (
         <span className="cost-dim">can't build here</span>
       ) : empty ? (
-        <span className="cost-dim">nothing to {p.tool === 'clear' ? 'clear' : isZoneTool(p.tool) ? 'zone' : 'build'}</span>
+        <span className="cost-dim">
+          nothing to {p.tool === 'clear' ? 'clear' : isZoneTool(p.tool) ? 'zone' : 'build'}
+        </span>
       ) : p.tool === 'build' ? (
         <span className="cost-value">${p.cost.toLocaleString()}</span>
       ) : (
         <>
-          <span className="cost-value">{p.cost === 0 ? 'Free' : `$${p.cost.toLocaleString()}`}</span>
+          <span className="cost-value">
+            {p.cost === 0 ? 'Free' : `$${p.cost.toLocaleString()}`}
+          </span>
           <span className="cost-dim">
             {p.count} tile{p.count === 1 ? '' : 's'}
           </span>

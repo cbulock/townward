@@ -9,10 +9,25 @@ import { HALF_H, SIM_TICK_HZ } from '../shared/constants';
 import { BUILDINGS, type BuildingId } from '../sim/buildings/catalog';
 import { City } from '../sim/City';
 import type { BurstKind } from '../render/fx/Effects';
-import { applyClear, applyMove, applyRail, applyPlace, applyRoad, applyZone, planClear, type ApplyResult, type PlannedTile } from '../sim/commands';
+import {
+  applyClear,
+  applyMove,
+  applyRail,
+  applyPlace,
+  applyRoad,
+  applyZone,
+  planClear,
+  type ApplyResult,
+  type PlannedTile,
+} from '../sim/commands';
 import { buildDemoCity } from '../sim/demo';
 import { tileToWorld } from '../render/iso';
-import { buildingDef, isPlaceable, Lifestyle, type BuildingInstance } from '../sim/buildings/catalog';
+import {
+  buildingDef,
+  isPlaceable,
+  Lifestyle,
+  type BuildingInstance,
+} from '../sim/buildings/catalog';
 import { Simulation } from '../sim/core/Simulation';
 import type { DayOutcome } from '../sim/core/System';
 import { findEntrance } from '../sim/systems/access';
@@ -40,10 +55,29 @@ import type { World } from '../sim/World';
 import { SoundBoard } from './audio';
 import { daylightTint, nightness } from '../render/daylight';
 import type { Point, ViewTransform } from '../render/view/ViewTransform';
-import { EventBus, type DayNightMode, type GameEventMap, type Notice, type ProgressInfo } from './events';
+import {
+  EventBus,
+  type DayNightMode,
+  type GameEventMap,
+  type Notice,
+  type ProgressInfo,
+} from './events';
 import { InputController, type ScreenPoint } from './input/InputController';
 import { GameLoop } from './loop';
-import { coveragePreviewTiles, isRoadTool, isZoneTool, planTool, type RoadToolId, strandedZoneTiles, previewTiles, TOOL_KEYS, type ToolDrag, type ToolId, type ToolPlan } from './tools';
+import {
+  coveragePreviewTiles,
+  isRoadTool,
+  isZoneTool,
+  planTool,
+  toolPlanCanCommit,
+  type RoadToolId,
+  strandedZoneTiles,
+  previewTiles,
+  TOOL_KEYS,
+  type ToolDrag,
+  type ToolId,
+  type ToolPlan,
+} from './tools';
 
 export interface GameOptions {
   /** Preset, seed, size and sliders (see sim/terrain/presets.ts). */
@@ -100,7 +134,20 @@ const TOOL_LABEL = {
 } as const;
 /** Toast ids, unique across game instances (dev mode mounts a game twice, sharing one HUD store). */
 let noticeSeq = 0;
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
 /** Owns City + Renderer + input + loop. The React layer only talks to it via `events` and public methods. */
 export class Game {
@@ -161,10 +208,11 @@ export class Game {
     this.input = new InputController(renderer.app.canvas, renderer.camera, {
       onPointer: (p) => this.updateHover(p),
       onKey: (code) => this.onKey(code),
-      onPrimaryDown: (p, shift) => this.onPrimaryDown(p, shift),
+      onPrimaryDown: (p, shift, touch) => this.onPrimaryDown(p, shift, touch),
       onPrimaryMove: (p, shift) => this.onPrimaryMove(p, shift),
       onPrimaryUp: (_p, _shift, touch) => this.onPrimaryUp(touch),
       onCancel: () => this.cancel(),
+      onInterrupt: () => this.discardDraft(),
       onClick: (p) => this.onClick(p),
     });
     renderer.setAgentSource(
@@ -175,7 +223,12 @@ export class Game {
     );
     renderer.setNeedsSource(() => this.sim.needs.byBuilding);
     // Blades turn with the day's wind, faster at higher game speeds, and stop when paused.
-    renderer.setRotorSpin(() => Math.min(ROTOR_SPIN_MAX, GAME_SPEEDS[this.speedIndex] * ROTOR_SPIN * windFactor(this.world.seed, this.city.day)));
+    renderer.setRotorSpin(() =>
+      Math.min(
+        ROTOR_SPIN_MAX,
+        GAME_SPEEDS[this.speedIndex] * ROTOR_SPIN * windFactor(this.world.seed, this.city.day),
+      ),
+    );
     this.loop = new GameLoop(
       SIM_TICK_HZ,
       () => this.tick(),
@@ -252,7 +305,15 @@ export class Game {
   }
 
   private plan(drag: ToolDrag | null, hovered: TilePos | null) {
-    return planTool(this.world, this.toolId, drag, hovered, this.buildingChoice, this.carrying, this.flyoverMode);
+    return planTool(
+      this.world,
+      this.toolId,
+      drag,
+      hovered,
+      this.buildingChoice,
+      this.carrying,
+      this.flyoverMode,
+    );
   }
 
   // ---------------------------------------------------------------- tools
@@ -300,12 +361,15 @@ export class Game {
       if (!b) return;
       if (b.construction > 0) {
         this.sound.play('error');
-        this.notify('error', 'That one is still being built: move it once it\'s finished');
+        this.notify('error', "That one is still being built: move it once it's finished");
         return;
       }
       this.carrying = b.id;
       this.sound.play('tool');
-      this.notify('info', `Moving the ${BUILDINGS[b.def].name}: click where it should go (Esc to cancel)`);
+      this.notify(
+        'info',
+        `Moving the ${BUILDINGS[b.def].name}: click where it should go (Esc to cancel)`,
+      );
       this.updatePreview();
       return;
     }
@@ -367,11 +431,18 @@ export class Game {
     this.updatePreview();
   }
 
-  private onPrimaryDown(screen: ScreenPoint, shift: boolean): boolean {
+  private onPrimaryDown(screen: ScreenPoint, shift: boolean, touch: boolean): boolean {
     if (this.toolId === 'select') return false;
+    // A pending draft is immutable until the player confirms or cancels; dragging pans.
+    if (this.awaitingConfirm) return false;
     const t = this.tileAt(screen);
     if (this.toolId === 'move') {
       this.lastPointer = screen;
+      if (touch && this.carrying !== null) {
+        this.drag = { start: t, current: t, straight: false };
+        this.updatePreview();
+        return true;
+      }
       this.moveClick(t);
       return true;
     }
@@ -386,7 +457,11 @@ export class Game {
     if (!this.drag) return;
     const t = this.tileAt(screen);
     this.lastPointer = screen;
-    if (t.x === this.drag.current.x && t.y === this.drag.current.y && shift === this.drag.straight) {
+    if (
+      t.x === this.drag.current.x &&
+      t.y === this.drag.current.y &&
+      shift === this.drag.straight
+    ) {
       this.emitPreviewLabel();
       return;
     }
@@ -412,9 +487,16 @@ export class Game {
 
   private commitDrag() {
     const p = this.drag ? this.plan(this.drag, null) : null;
+    if (this.awaitingConfirm && p && !toolPlanCanCommit(this.world, p, this.city.funds)) {
+      this.notify('error', 'Cannot apply this draft: check the location and available funds');
+      this.awaitingConfirm = true;
+      this.updatePreview();
+      return;
+    }
     this.drag = null;
     this.awaitingConfirm = false;
     if (p) this.execute(p);
+    if (p?.kind === 'move') this.carrying = null;
     this.updatePreview();
   }
 
@@ -430,7 +512,8 @@ export class Game {
       }
     }
     let result: ApplyResult;
-    if (p.kind === 'road') result = applyRoad(this.city, p.plan, p.roadType, this.pavementFor(p.roadType));
+    if (p.kind === 'road')
+      result = applyRoad(this.city, p.plan, p.roadType, this.pavementFor(p.roadType));
     else if (p.kind === 'clear') result = applyClear(this.city, p.plan);
     else if (p.kind === 'zone') result = applyZone(this.city, p.plan, p.zone);
     else if (p.kind === 'move') result = applyMove(this.city, p.plan);
@@ -439,7 +522,10 @@ export class Game {
 
     if (p.kind === 'move' && !p.plan.ok) {
       this.sound.play('error');
-      this.notify('error', "Can't move it there: needs clear land, no roads, water or other buildings");
+      this.notify(
+        'error',
+        "Can't move it there: needs clear land, no roads, water or other buildings",
+      );
     } else if (p.kind === 'place' && !p.plan.ok) {
       this.sound.play('error');
       this.notify('error', p.plan.note ?? "Can't build there: needs clear land, no roads or water");
@@ -448,7 +534,12 @@ export class Game {
       const c = result.changed;
       // Roads change which zoned lots can grow up to roadAccessRange tiles away; refresh that far.
       const g = p.kind === 'road' || p.kind === 'clear' ? BALANCE.roadAccessRange : 0;
-      const rect = { x: c.minX - g, y: c.minY - g, w: c.maxX - c.minX + 1 + 2 * g, h: c.maxY - c.minY + 1 + 2 * g };
+      const rect = {
+        x: c.minX - g,
+        y: c.minY - g,
+        w: c.maxX - c.minX + 1 + 2 * g,
+        h: c.maxY - c.minY + 1 + 2 * g,
+      };
       this.renderer.refreshWorld(rect);
       this.events.emit('funds', this.city.funds);
       this.buildFeedback(p, result.tiles ?? [], debris);
@@ -460,7 +551,10 @@ export class Game {
       this.notify('error', `Not enough money: needs $${p.plan.cost.toLocaleString()}`);
     } else if (result.reason === 'locked' && p.kind === 'rail') {
       this.sound.play('error');
-      this.notify('error', 'Rail track needs the Rapid transit research (Research Centre, Metropolis stage)');
+      this.notify(
+        'error',
+        'Rail track needs the Rapid transit research (Research Centre, Metropolis stage)',
+      );
     } else if (result.reason === 'locked' && p.kind === 'place') {
       const stage = STAGES[unlockStage(p.plan.building)];
       const tech = unlockTech(p.plan.building);
@@ -477,7 +571,9 @@ export class Game {
 
   /** Zones only grow within reach of a road; say so when some of the new zone can't. */
   private warnUnreachableZones(tiles: readonly PlannedTile[]) {
-    const far = tiles.filter((t) => findEntrance(this.world, t.x, t.y, 1, 1, BALANCE.roadAccessRange) === -1).length;
+    const far = tiles.filter(
+      (t) => findEntrance(this.world, t.x, t.y, 1, 1, BALANCE.roadAccessRange) === -1,
+    ).length;
     if (far === 0) return;
     const all = far === tiles.length;
     this.notify(
@@ -498,7 +594,10 @@ export class Game {
   private afterSimChange() {
     this.bumpWorld();
     this.refreshDataView();
-    this.renderer.indicators.setTaxesWaiting(this.city.collectsTaxes && this.city.uncollected > 0, this.world);
+    this.renderer.indicators.setTaxesWaiting(
+      this.city.collectsTaxes && this.city.uncollected > 0,
+      this.world,
+    );
     this.renderer.indicators.sync(this.world);
     this.hintUtilities();
     if (this.inspected !== null && !this.world.buildings.has(this.inspected)) this.inspect(null);
@@ -516,6 +615,7 @@ export class Game {
 
   /** 0 = paused, 1–3 = 1×, 2×, 3×. */
   setSpeed(index: number) {
+    this.loop.resetTime();
     this.speedIndex = Math.max(0, Math.min(GAME_SPEEDS.length - 1, index));
     this.loop.speed = GAME_SPEEDS[this.speedIndex];
     this.sound.play('tool');
@@ -546,8 +646,13 @@ export class Game {
       const held = this.sim.budget.held;
       if (held) {
         // Taxes wait at the Town Hall (docs/specs/evolution.md, E5).
-        const where = townHall(this.world) ? 'Collect them at the Town Hall' : 'Build a Town Hall to collect them';
-        const lost = held.lost > 0 ? ` The chest is full: $${Math.round(held.lost).toLocaleString()} was lost.` : '';
+        const where = townHall(this.world)
+          ? 'Collect them at the Town Hall'
+          : 'Build a Town Hall to collect them';
+        const lost =
+          held.lost > 0
+            ? ` The chest is full: $${Math.round(held.lost).toLocaleString()} was lost.`
+            : '';
         this.notify(
           held.filling || held.lost > 0 ? 'error' : 'info',
           `${month}: upkeep $${r.expenses.toLocaleString()} paid. $${Math.round(held.waiting).toLocaleString()} in taxes waiting. ${where}.${lost}`,
@@ -560,7 +665,10 @@ export class Game {
           'budget',
         );
       }
-      this.renderer.indicators.setTaxesWaiting(this.city.collectsTaxes && this.city.uncollected > 0, this.world);
+      this.renderer.indicators.setTaxesWaiting(
+        this.city.collectsTaxes && this.city.uncollected > 0,
+        this.world,
+      );
     }
     this.emitCity();
     this.emitBudget();
@@ -571,18 +679,36 @@ export class Game {
   private showMilestones(out: DayOutcome) {
     if (out.stage !== null) {
       const def = STAGES[out.stage];
-      const unlocked = this.city.locked ? unlockedAt(out.stage).map((id) => buildingDef(id).name) : [];
+      const unlocked = this.city.locked
+        ? unlockedAt(out.stage).map((id) => buildingDef(id).name)
+        : [];
       this.sound.play('build');
-      this.notify('milestone', `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim(), `stage-${out.stage}`);
+      this.notify(
+        'milestone',
+        `Your city is now a ${def.name}!${unlocked.length ? ` New: ${unlocked.join(', ')}.` : ''} ${def.news}`.trim(),
+        `stage-${out.stage}`,
+      );
     }
     if (out.research) {
       this.sound.play('coin');
-      this.notify('milestone', `Research finished: ${out.research.name}. ${out.research.effect}.`, `research-${out.research.id}`);
+      this.notify(
+        'milestone',
+        `Research finished: ${out.research.name}. ${out.research.effect}.`,
+        `research-${out.research.id}`,
+      );
     }
     if (out.lifestyle === Lifestyle.Comfortable) {
-      this.notify('milestone', 'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.', 'lifestyle-1');
+      this.notify(
+        'milestone',
+        'Residents are moving up: the first homes are Comfortable. They pay more tax, and they want a hospital nearby.',
+        'lifestyle-1',
+      );
     } else if (out.lifestyle === Lifestyle.Prosperous) {
-      this.notify('milestone', 'The first homes are Prosperous! They pay the most tax, and they want a university.', 'lifestyle-2');
+      this.notify(
+        'milestone',
+        'The first homes are Prosperous! They pay the most tax, and they want a university.',
+        'lifestyle-2',
+      );
     }
   }
 
@@ -598,7 +724,8 @@ export class Game {
       const b = this.world.buildings.get(id);
       if (!b) continue;
       const { w, h } = BUILDINGS[b.def].size;
-      for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 3, Math.random() * 0.3);
+      for (let y = b.y; y < b.y + h; y++)
+        for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 3, Math.random() * 0.3);
     }
     for (const id of out.completed) {
       const b = this.world.buildings.get(id);
@@ -618,13 +745,16 @@ export class Game {
     if (out.burned.length > 0) {
       for (const b of out.burned) {
         const { w, h } = BUILDINGS[b.def].size;
-        for (let y = b.y; y < b.y + h; y++) for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 10, Math.random() * 0.4);
+        for (let y = b.y; y < b.y + h; y++)
+          for (let x = b.x; x < b.x + w; x++) fx.burst(x, y, 'dust', 10, Math.random() * 0.4);
       }
       this.sound.play('clear');
       const name = BUILDINGS[out.burned[0].def].name;
       this.notify(
         'error',
-        out.burned.length === 1 ? `A fire destroyed a ${name}. Build a Fire Station nearby.` : `${out.burned.length} buildings burned down. Build Fire Stations to cover the city.`,
+        out.burned.length === 1
+          ? `A fire destroyed a ${name}. Build a Fire Station nearby.`
+          : `${out.burned.length} buildings burned down. Build Fire Stations to cover the city.`,
         'fire',
       );
     }
@@ -641,8 +771,14 @@ export class Game {
           // Fractional tile coords put the pop at the footprint's centre.
           x: b.x + (w - 1) / 2,
           y: b.y + (h - 1) / 2,
-          texture: buildingTexture(this.renderer.textures, b.def, b.variant, this.renderer.rotation),
-          anchorY: (buildingHeadroom(b.def, b.variant) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
+          texture: buildingTexture(
+            this.renderer.textures,
+            b.def,
+            b.variant,
+            this.renderer.rotation,
+          ),
+          anchorY:
+            (buildingHeadroom(b.def, b.variant) + GROUND_PAD + ((w + h) * HALF_H) / 2) / frame.h,
         },
       ],
       delay,
@@ -738,7 +874,8 @@ export class Game {
       if (!n) continue;
       const color = happinessColor(n.happiness, b.abandoned);
       const { w: bw, h: bh } = BUILDINGS[b.def].size;
-      for (let y = b.y; y < b.y + bh; y++) for (let x = b.x; x < b.x + bw; x++) tiles.push({ tile: w.index(x, y), color });
+      for (let y = b.y; y < b.y + bh; y++)
+        for (let x = b.x; x < b.x + bw; x++) tiles.push({ tile: w.index(x, y), color });
     }
     return tiles;
   }
@@ -817,8 +954,16 @@ export class Game {
       power: u.power,
       water: u.water,
       hour: Math.floor(this.city.hour),
-      taxes: this.city.collectsTaxes ? { waiting: Math.round(this.city.uncollected), hasTownHall: townHall(this.world) !== null } : null,
-      materials: this.city.needsMaterials ? { ...this.sim.materials.report, stock: this.city.materials, storage: materialStorage(this.city) } : null,
+      taxes: this.city.collectsTaxes
+        ? { waiting: Math.round(this.city.uncollected), hasTownHall: townHall(this.world) !== null }
+        : null,
+      materials: this.city.needsMaterials
+        ? {
+            ...this.sim.materials.report,
+            stock: this.city.materials,
+            storage: materialStorage(this.city),
+          }
+        : null,
     });
   }
 
@@ -828,7 +973,11 @@ export class Game {
     if (r.waiting === 0 && this.city.needsMaterials) this.resolve('materials');
     if (r.waiting === 0 || this.city.day - this.materialsNoticeDay < BALANCE.daysPerMonth) return;
     this.materialsNoticeDay = this.city.day;
-    this.notify('error', 'Construction is waiting for materials: zone industry to make them (imports only cover a little each day)', 'materials');
+    this.notify(
+      'error',
+      'Construction is waiting for materials: zone industry to make them (imports only cover a little each day)',
+      'materials',
+    );
   }
 
   /**
@@ -840,10 +989,18 @@ export class Game {
     for (const k of ['r', 'c', 'o', 'i'] as const) {
       this.waitingDays[k] = waiting[k] > 0 ? this.waitingDays[k] + 1 : 0;
       if (waiting[k] === 0) this.resolve(`zones-${k}`);
-      if (this.waitingDays[k] < WAIT_NOTICE_DAYS || this.city.day - this.waitNoticeDay[k] < BALANCE.daysPerMonth) continue;
+      if (
+        this.waitingDays[k] < WAIT_NOTICE_DAYS ||
+        this.city.day - this.waitNoticeDay[k] < BALANCE.daysPerMonth
+      )
+        continue;
       this.waitNoticeDay[k] = this.city.day;
       const what = { r: 'home', c: 'shop', o: 'office', i: 'industry' }[k];
-      this.notify('info', `${waiting[k]} empty ${what} lots aren't growing: ${this.sim.growth.explain()[k]}`, `zones-${k}`);
+      this.notify(
+        'info',
+        `${waiting[k]} empty ${what} lots aren't growing: ${this.sim.growth.explain()[k]}`,
+        `zones-${k}`,
+      );
     }
   }
 
@@ -859,7 +1016,10 @@ export class Game {
     if (p.short === 0 || this.brownoutDay === clockDay) return;
     this.brownoutDay = clockDay;
     const hour = String(Math.floor(this.city.hour)).padStart(2, '0');
-    const cause = p.sources.solar === 0 && p.sources.wind < 1 && p.storage === 0 ? ' Solar makes nothing at night;' : '';
+    const cause =
+      p.sources.solar === 0 && p.sources.wind < 1 && p.storage === 0
+        ? ' Solar makes nothing at night;'
+        : '';
     this.notify(
       'error',
       `Brownout at ${hour}:00: ${p.short} building${p.short === 1 ? '' : 's'} without power.${cause} add Battery Banks or a steady Coal or Gas plant.`,
@@ -897,7 +1057,10 @@ export class Game {
       stage,
       stageName: STAGES[stage].name,
       locked: this.city.locked,
-      next: next === null ? null : { name: STAGES[next].name, requirements: stageRequirements(this.world, next) },
+      next:
+        next === null
+          ? null
+          : { name: STAGES[next].name, requirements: stageRequirements(this.world, next) },
       residents: lifestyleReport(this.city).residents,
       research: this.researchInfo(),
       techs: TECHS.slice(0, this.city.research.done).map((t) => t.id),
@@ -910,7 +1073,14 @@ export class Game {
     if (rate === 0 && r.done === 0 && r.points === 0) return null;
     const tech = currentTech(this.city);
     return {
-      current: tech ? { name: tech.name, effect: tech.effect, points: Math.floor(r.points), needed: tech.points } : null,
+      current: tech
+        ? {
+            name: tech.name,
+            effect: tech.effect,
+            points: Math.floor(r.points),
+            needed: tech.points,
+          }
+        : null,
       done: TECHS.slice(0, r.done).map((t) => t.name),
       rate,
     };
@@ -962,11 +1132,30 @@ export class Game {
   }
 
   /** Bulldoze a whole building (from the info panel). */
-  demolish(id: number) {
+  demolish(id: number, confirm = false) {
     const b = this.world.buildings.get(id);
     if (!b) return;
     const { w, h } = BUILDINGS[b.def].size;
-    const plan = planClear(this.world, rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }));
+    if (confirm) {
+      this.setTool('clear');
+      this.drag = {
+        start: { x: b.x, y: b.y },
+        current: { x: b.x + w - 1, y: b.y + h - 1 },
+        straight: false,
+      };
+      this.awaitingConfirm = true;
+      this.lastPointer = {
+        x: this.renderer.camera.screenW / 2,
+        y: this.renderer.camera.screenH / 2,
+      };
+      this.inspect(null);
+      this.updatePreview();
+      return;
+    }
+    const plan = planClear(
+      this.world,
+      rectTiles({ x: b.x, y: b.y }, { x: b.x + w - 1, y: b.y + h - 1 }),
+    );
     this.execute({ kind: 'clear', tool: 'clear', plan });
     this.inspect(null);
   }
@@ -979,7 +1168,10 @@ export class Game {
     const cost = energy?.repairCost;
     if (!energy || energy.source === 'battery' || !cost || b.condition >= 1) return;
     if (this.city.funds < cost) {
-      this.notify('error', `Repairing the ${BUILDINGS[b.def].name} costs $${cost.toLocaleString()}`);
+      this.notify(
+        'error',
+        `Repairing the ${BUILDINGS[b.def].name} costs $${cost.toLocaleString()}`,
+      );
       return;
     }
     this.city.funds -= cost;
@@ -1008,7 +1200,11 @@ export class Game {
   }
 
   /** Pop + particles rippling along the build order, with matching sound. */
-  private buildFeedback(p: ToolPlan, tiles: readonly PlannedTile[], debris: Map<number, BurstKind>) {
+  private buildFeedback(
+    p: ToolPlan,
+    tiles: readonly PlannedTile[],
+    debris: Map<number, BurstKind>,
+  ) {
     const n = tiles.length;
     if (n === 0) return;
     const fx = this.renderer.effects;
@@ -1029,7 +1225,9 @@ export class Game {
     });
 
     if (p.kind === 'place') {
-      const b = this.world.buildings.get(this.world.building[this.world.index(p.plan.origin.x, p.plan.origin.y)]);
+      const b = this.world.buildings.get(
+        this.world.building[this.world.index(p.plan.origin.x, p.plan.origin.y)],
+      );
       if (b) this.popBuilding(b, 0);
       tiles.forEach((t, k) => fx.burst(t.x, t.y, 'dust', 6, k * 0.03));
       this.sound.play('build', 0, 0.8);
@@ -1038,11 +1236,13 @@ export class Game {
 
     if (p.kind === 'zone') {
       tiles.forEach((t, k) => {
-        if (debris.has(this.world.index(t.x, t.y))) fx.burst(t.x, t.y, 'dust', perTile, k * stagger);
+        if (debris.has(this.world.index(t.x, t.y)))
+          fx.burst(t.x, t.y, 'dust', perTile, k * stagger);
       });
       if (debris.size > 0) this.sound.play('clear');
       const ticks = Math.min(6, n);
-      for (let k = 0; k < ticks; k++) this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
+      for (let k = 0; k < ticks; k++)
+        this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
       return;
     }
 
@@ -1068,14 +1268,18 @@ export class Game {
         })),
         stagger,
       );
-      tiles.forEach((t, k) => fx.burst(t.x, t.y, t.bridge ? 'splash' : 'dust', Math.ceil(perTile / 2), k * stagger));
+      tiles.forEach((t, k) =>
+        fx.burst(t.x, t.y, t.bridge ? 'splash' : 'dust', Math.ceil(perTile / 2), k * stagger),
+      );
       this.sound.play(tiles.some((t) => t.bridge) ? 'bridge' : 'build');
       // Ticks follow the ripple, rising in pitch.
       const ticks = Math.min(8, n);
-      for (let k = 1; k < ticks; k++) this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
+      for (let k = 1; k < ticks; k++)
+        this.sound.play('tick', (k / ticks) * n * stagger, 1 + (k / ticks) * 0.35);
     } else {
       tiles.forEach((t, k) => {
-        if (!debris.has(this.world.index(t.x, t.y))) fx.burst(t.x, t.y, 'dust', Math.ceil(perTile / 2), k * stagger);
+        if (!debris.has(this.world.index(t.x, t.y)))
+          fx.burst(t.x, t.y, 'dust', Math.ceil(perTile / 2), k * stagger);
       });
       this.sound.play('clear');
     }
@@ -1085,13 +1289,19 @@ export class Game {
     return this.sound.muted;
   }
 
-  setMuted(muted: boolean) {
-    this.sound.setMuted(muted);
+  setMuted(muted: boolean, persist = true) {
+    this.sound.setMuted(muted, persist);
     this.events.emit('muted', muted);
   }
 
   /** Right click / Esc: drop the drag if there is one, otherwise put the tool away. */
   cancel() {
+    if (this.drag) {
+      this.drag = null;
+      this.awaitingConfirm = false;
+      this.updatePreview();
+      return;
+    }
     if (this.carrying !== null) {
       // Put it back down where it was (nothing moved yet).
       this.carrying = null;
@@ -1107,33 +1317,74 @@ export class Game {
     }
   }
 
+  get hasConstructionAction(): boolean {
+    return this.drag !== null || this.carrying !== null || this.toolId !== 'select';
+  }
+
+  get hasDraft(): boolean {
+    return this.drag !== null || this.carrying !== null;
+  }
+
+  /** Suspend input safely without changing the selected construction tool. */
+  cancelInteraction(): void {
+    this.input.cancelInteraction();
+  }
+
+  private discardDraft(): void {
+    this.drag = null;
+    this.carrying = null;
+    this.awaitingConfirm = false;
+    this.updatePreview();
+  }
+
   private updatePreview() {
     const p = this.plan(this.drag, this.hovered);
-    const inspected = this.toolId === 'select' && this.inspected !== null ? this.world.buildings.get(this.inspected) : undefined;
+    const inspected =
+      this.toolId === 'select' && this.inspected !== null
+        ? this.world.buildings.get(this.inspected)
+        : undefined;
     if (inspected) {
       // Show both the footprint and the service/power reach of the inspected facility.
       const { w, h } = BUILDINGS[inspected.def].size;
       const tex = this.renderer.textures.selection;
-      this.renderer.toolPreview.show(
-        [
-          ...coveragePreviewTiles(this.world, this.renderer.textures, inspected.def, { x: inspected.x, y: inspected.y }),
-          ...rectTiles({ x: inspected.x, y: inspected.y }, { x: inspected.x + w - 1, y: inspected.y + h - 1 }).map((t) => ({
-            ...t,
-            texture: tex,
-            tint: 0x4fd1c5,
-            alpha: 0.55,
-          })),
-        ],
-      );
+      this.renderer.toolPreview.show([
+        ...coveragePreviewTiles(this.world, this.renderer.textures, inspected.def, {
+          x: inspected.x,
+          y: inspected.y,
+        }),
+        ...rectTiles(
+          { x: inspected.x, y: inspected.y },
+          { x: inspected.x + w - 1, y: inspected.y + h - 1 },
+        ).map((t) => ({
+          ...t,
+          texture: tex,
+          tint: 0x4fd1c5,
+          alpha: 0.55,
+        })),
+      ]);
     } else if (!p) this.renderer.toolPreview.clear();
-    else this.renderer.toolPreview.show(previewTiles(this.world, this.renderer.textures, p, this.renderer.view, this.pavementChoice));
+    else
+      this.renderer.toolPreview.show(
+        previewTiles(
+          this.world,
+          this.renderer.textures,
+          p,
+          this.renderer.view,
+          this.pavementChoice,
+        ),
+      );
     this.emitPreviewLabel();
   }
 
   private emitPreviewLabel() {
     // Drags always show a label; the Build tool also labels the hovered spot before you click.
-    const hoverLabel = this.toolId === 'build' || (this.toolId === 'move' && this.carrying !== null);
-    const p = this.drag ? this.plan(this.drag, null) : hoverLabel ? this.plan(null, this.hovered) : null;
+    const hoverLabel =
+      this.toolId === 'build' || (this.toolId === 'move' && this.carrying !== null);
+    const p = this.drag
+      ? this.plan(this.drag, null)
+      : hoverLabel
+        ? this.plan(null, this.hovered)
+        : null;
     if (!p || !this.lastPointer) {
       this.events.emit('toolPreview', null);
       return;
@@ -1141,8 +1392,14 @@ export class Game {
     this.events.emit('toolPreview', {
       tool: this.toolId,
       label:
-        p.kind === 'move' ? `Move ${BUILDINGS[p.plan.building].name}` : p.kind === 'place' ? BUILDINGS[p.plan.building].name : p.kind === 'zone' ? TOOL_LABEL[p.tool] : null,
-      blocked: (p.kind === 'place' || p.kind === 'move') && !p.plan.ok,
+        p.kind === 'move'
+          ? `Move ${BUILDINGS[p.plan.building].name}`
+          : p.kind === 'place'
+            ? BUILDINGS[p.plan.building].name
+            : p.kind === 'zone'
+              ? TOOL_LABEL[p.tool]
+              : null,
+      blocked: !toolPlanCanCommit(this.world, p, Number.POSITIVE_INFINITY),
       screen: this.lastPointer,
       cost: p.plan.cost,
       count: p.plan.count,
@@ -1154,9 +1411,13 @@ export class Game {
 
   private previewNote(p: ToolPlan): string | null {
     const stranded = strandedZoneTiles(this.world, p);
-    if (stranded > 0) return stranded === p.plan.count ? 'needs a road nearby to grow' : `${stranded} tile${stranded === 1 ? '' : 's'} need a road nearby`;
+    if (stranded > 0)
+      return stranded === p.plan.count
+        ? 'needs a road nearby to grow'
+        : `${stranded} tile${stranded === 1 ? '' : 's'} need a road nearby`;
     // Zoning where nobody wants to build yet is fine, but say so, or the empty lots look broken.
-    if (p.kind === 'zone' && demandFor(this.sim.growth.demand(), p.zone) <= 0) return 'no demand yet: grows once its bar rises';
+    if (p.kind === 'zone' && demandFor(this.sim.growth.demand(), p.zone) <= 0)
+      return 'no demand yet: grows once its bar rises';
     return null;
   }
 
@@ -1259,7 +1520,10 @@ export class Game {
     else if (code === 'KeyT') this.setTrafficView(this.dataView !== 'traffic');
     else if (code === 'KeyY') this.setHappinessView(this.dataView !== 'happiness');
     else if (code === 'KeyO') this.setAirView(this.dataView !== 'air');
-    else if (code === 'KeyL') this.setDayNight(DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length]);
+    else if (code === 'KeyL')
+      this.setDayNight(
+        DAY_NIGHT_MODES[(DAY_NIGHT_MODES.indexOf(this.dayNightMode) + 1) % DAY_NIGHT_MODES.length],
+      );
     else if (code === 'Period') this.rotate(1);
     else if (code === 'Comma') this.rotate(-1);
     else if (code === 'Space') this.togglePause();
@@ -1271,8 +1535,7 @@ export class Game {
     } else if (code === 'Escape') {
       if (this.inspected !== null && !this.drag) this.inspect(null);
       else this.cancel();
-    }
-    else {
+    } else {
       const tool = (Object.keys(TOOL_KEYS) as ToolId[]).find((t) => TOOL_KEYS[t] === code);
       if (tool) this.setTool(tool === this.toolId ? 'select' : tool);
     }
@@ -1306,5 +1569,7 @@ function builtCentre(world: World): TilePos {
     y += Math.floor(i / world.width);
     n++;
   }
-  return n === 0 ? { x: world.width / 2, y: world.height / 2 } : { x: Math.round(x / n), y: Math.round(y / n) };
+  return n === 0
+    ? { x: world.width / 2, y: world.height / 2 }
+    : { x: Math.round(x / n), y: Math.round(y / n) };
 }
