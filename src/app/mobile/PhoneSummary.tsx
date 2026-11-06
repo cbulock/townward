@@ -47,6 +47,15 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
+interface PhoneSummaryProps {
+  readonly cityName: string;
+  readonly panelOpen: boolean;
+  readonly menuOpen: boolean;
+  readonly onClosePanel: () => void;
+  readonly onBudget: () => void;
+  readonly onMenu: () => void;
+}
+
 export function PhoneSummary({
   cityName,
   panelOpen,
@@ -54,14 +63,7 @@ export function PhoneSummary({
   onClosePanel,
   onBudget,
   onMenu,
-}: {
-  cityName: string;
-  panelOpen: boolean;
-  menuOpen: boolean;
-  onClosePanel: () => void;
-  onBudget: () => void;
-  onMenu: () => void;
-}) {
+}: PhoneSummaryProps) {
   const game = useAtomValue(gameAtom);
   const city = useAtomValue(cityAtom);
   const funds = useAtomValue(fundsAtom);

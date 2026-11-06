@@ -7,15 +7,13 @@ import {
   type HudRow,
 } from './hudPreferences';
 
-export function HudCustomize({
-  selected,
-  onApply,
-  onCancel,
-}: {
-  selected: HudPreferences;
-  onApply: (stats: HudPreferences) => void;
-  onCancel: () => void;
-}) {
+interface HudCustomizeProps {
+  readonly selected: HudPreferences;
+  readonly onApply: (selected: HudPreferences) => void;
+  readonly onCancel: () => void;
+}
+
+export function HudCustomize({ selected, onApply, onCancel }: HudCustomizeProps) {
   const [draft, setDraft] = useState(selected);
   const [row, setRow] = useState<HudRow>('second');
   const other: HudRow = row === 'first' ? 'second' : 'first';

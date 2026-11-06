@@ -27,7 +27,7 @@ bun run typecheck && bun run lint
 
 ## Android
 
-See [Android build and acceptance](ANDROID.md) for the native app workflow.
+See the [Android feature spec](specs/android.md), [build and acceptance workflow](ANDROID.md) and [upstream contribution checklist](ANDROID-UPSTREAM.md).
 
 ## Index
 

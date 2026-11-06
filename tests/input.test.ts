@@ -2,12 +2,18 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { InputController, type InputCallbacks } from '../src/game/input/InputController';
 import { Camera } from '../src/render/Camera';
 
+// This test double implements the element methods InputController uses; it never reaches a DOM renderer.
 class Host extends EventTarget {
   style = { cursor: '' };
   setPointerCapture() {}
   getBoundingClientRect() {
     return { left: 0, top: 0 };
   }
+}
+
+function element(host: Host): HTMLElement {
+  // Safe here: Host supplies events, pointer capture, bounds and style; no other DOM APIs are used.
+  return host as unknown as HTMLElement;
 }
 
 function pointer(host: EventTarget, type: string, id = 1, x = 80, y = 90) {
@@ -42,7 +48,7 @@ it('identifies touch at press time so relocation can wait for confirmation', () 
     onCancel() {},
     onClick() {},
   };
-  const input = new InputController(host as unknown as HTMLElement, new Camera(), cb);
+  const input = new InputController(element(host), new Camera(), cb);
   const press = pointer(host, 'pointerdown');
   expect(source).toBe(true);
   expect(press.defaultPrevented).toBe(true);
@@ -68,7 +74,7 @@ it('viewport changes cancel the gesture and releasing afterwards cannot complete
     },
     onClick() {},
   };
-  const input = new InputController(host as unknown as HTMLElement, new Camera(), cb);
+  const input = new InputController(element(host), new Camera(), cb);
   pointer(host, 'pointerdown');
   win.dispatchEvent(new Event('resize'));
   pointer(host, 'pointerup');
@@ -81,7 +87,7 @@ it('pinching discards a pending placement even when the first finger is only pan
   vi.stubGlobal('window', new EventTarget());
   const host = new Host();
   let pending = false;
-  const input = new InputController(host as unknown as HTMLElement, new Camera(), {
+  const input = new InputController(element(host), new Camera(), {
     onPointer() {},
     onKey() {},
     onPrimaryDown: () => !pending,
@@ -114,7 +120,7 @@ it('pinch remains navigation-only until all fingers lift, then the selected tool
   camera.setScreenSize(360, 640);
   let finishes = 0;
   let hover = 0;
-  const input = new InputController(host as unknown as HTMLElement, camera, {
+  const input = new InputController(element(host), camera, {
     onPointer(p) {
       if (p) hover++;
     },
@@ -151,7 +157,7 @@ it('a second finger on the HUD joins the map gesture instead of activating a con
   const host = new Host();
   let interrupted = 0;
   let finishes = 0;
-  const input = new InputController(host as unknown as HTMLElement, new Camera(), {
+  const input = new InputController(element(host), new Camera(), {
     onPointer() {},
     onKey() {},
     onPrimaryDown: () => true,

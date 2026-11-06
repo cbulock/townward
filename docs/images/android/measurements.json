@@ -1,0 +1,70 @@
+{
+  "scenario": "developed /demo, seed 42, 128x128; 3s warmup, 10s RAF sampling; headless Chrome with --enable-unsafe-swiftshader; actual GPU renderer not recorded",
+  "results": [
+    {
+      "label": "before-portrait",
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "readyMs": 8734.8364,
+      "frames": null,
+      "errors": [],
+      "browser": "156.0.8078.80"
+    },
+    {
+      "label": "after-portrait",
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "readyMs": 7242.629399999998,
+      "frames": {
+        "frames": 1190,
+        "elapsedMs": 10005.699999952318,
+        "fps": 118.93220864164137,
+        "p50Ms": 8.300000000001091,
+        "p95Ms": 8.400000000001455,
+        "maxMs": 100.20000000000073
+      },
+      "errors": [],
+      "browser": "156.0.8078.80"
+    },
+    {
+      "label": "before-expanded",
+      "viewport": {
+        "width": 900,
+        "height": 900
+      },
+      "readyMs": 7533.925900000002,
+      "frames": {
+        "frames": 1191,
+        "elapsedMs": 10004.500000071526,
+        "fps": 119.04642910605078,
+        "p50Ms": 8.300000000001091,
+        "p95Ms": 8.400000000001455,
+        "maxMs": 91.70000000000073
+      },
+      "errors": [],
+      "browser": "156.0.8078.80"
+    },
+    {
+      "label": "after-expanded",
+      "viewport": {
+        "width": 900,
+        "height": 900
+      },
+      "readyMs": 7476.563600000001,
+      "frames": {
+        "frames": 1190,
+        "elapsedMs": 10001.399999976158,
+        "fps": 118.98334233235715,
+        "p50Ms": 8.300000000001091,
+        "p95Ms": 8.400000000001455,
+        "maxMs": 91.60000000000218
+      },
+      "errors": [],
+      "browser": "156.0.8078.80"
+    }
+  ]
+}

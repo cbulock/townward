@@ -67,18 +67,15 @@ function ToolIcon({ id }: { id: ToolId }) {
   );
 }
 
+interface MobileHudProps {
+  readonly cityName: string;
+  readonly onSave: () => void;
+  readonly onNewCity: () => void;
+  readonly beforeLogout: () => Promise<void>;
+}
+
 /** One sheet at a time, with a permanent map dock in both phone orientations. */
-export function MobileHud({
-  cityName,
-  onSave,
-  onNewCity,
-  beforeLogout,
-}: {
-  cityName: string;
-  onSave: () => void;
-  onNewCity: () => void;
-  beforeLogout: () => Promise<void>;
-}) {
+export function MobileHud({ cityName, onSave, onNewCity, beforeLogout }: MobileHudProps) {
   const game = useAtomValue(gameAtom);
   const city = useAtomValue(cityAtom);
   const active = useAtomValue(activeToolAtom);

@@ -13,8 +13,13 @@ const SHORT_LABELS: Readonly<Partial<Record<HudStatId, string>>> = {
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+interface HudStatProps {
+  readonly id: HudStatId;
+  readonly detailed?: boolean;
+}
+
 /** Both the pinned row and dashboard consume the same event-backed values. */
-export function HudStat({ id, detailed = false }: { id: HudStatId; detailed?: boolean }) {
+export function HudStat({ id, detailed = false }: HudStatProps) {
   const city = useAtomValue(cityAtom);
   const budget = useAtomValue(budgetAtom);
   const clock = useAtomValue(clockAtom);
