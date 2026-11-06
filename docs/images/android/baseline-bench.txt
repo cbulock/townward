@@ -1,0 +1,33 @@
+$ bun run sim:run --scenario demo --years 1 --budget
+$ bun scripts/sim-run.ts --scenario demo --years "1" --budget
+
+demo · riverValley seed 42 · 128×128 · 360 days
+build 6645 ms · run 34.8 s · 96.8 ms/day
+end: day 1020 · population 22,359 · 1,692 buildings · happiness 79% · funds $1,001,145,496
+evolution: City · comfortable 5,341 · prosperous 15,709 residents · uncollected garbage 827 t
+
+system.hook         avg ms  max ms   share  budget
+commute.day          62.47    80.2      65%  OVER 25 ms (2.5×)
+needs.day            15.69    47.1      16%  OVER 4 ms (3.9×)
+needs.change          7.97    44.1       8%  OVER 4 ms (2.0×)
+growth.day            2.01     9.6       2%  near 2 ms
+utilities.day         1.34     5.4       1%
+utilities.change      1.16     3.2       1%  near 1 ms
+garbage.day           0.96    11.2       1%
+utilities.hour        1.36     7.6       1%
+coverage.change       0.66     3.7       1%  ok (1 ms)
+access.change         0.62     2.6       1%  ok (1 ms)
+traffic.day           0.53     4.0       1%  ok (2 ms)
+traffic.change        0.53     5.4       1%  ok (2 ms)
+trains.day            0.38     5.9       0%
+trains.change         0.34     3.1       0%
+lifestyle.day         0.23     3.4       0%
+air.day               0.21     3.5       0%
+air.change            0.19     7.4       0%
+population.day        0.18     0.7       0%  ok (1 ms)
+fire.day              0.13     1.3       0%  ok (1 ms)
+budget.month          1.97     8.4       0%  OVER 1 ms (2.0×)
+research.day          0.05     0.7       0%
+materials.day         0.01     0.4       0%
+garbage.month         0.17     0.5       0%
+commute.change        0.00     0.1       0%  ok (25 ms)

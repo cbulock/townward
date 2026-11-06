@@ -64,12 +64,25 @@ const CATEGORY_LABEL: Readonly<Record<string, string>> = {
 const pct = (n: number) => Math.round(n * 100);
 
 /** The one thing to know first, with what to do about it (or that all is well). */
-function alertFor(info: InspectInfo): { tone: 'ok' | 'warn' | 'building'; title: string; body?: string } {
+function alertFor(info: InspectInfo): {
+  tone: 'ok' | 'warn' | 'building';
+  title: string;
+  body?: string;
+} {
   if (info.constructionDays > 0) {
-    return { tone: 'building', title: `Under construction · ${info.constructionDays} day${info.constructionDays === 1 ? '' : 's'} left` };
+    return {
+      tone: 'building',
+      title: `Under construction · ${info.constructionDays} day${info.constructionDays === 1 ? '' : 's'} left`,
+    };
   }
-  if (info.abandoned) return { tone: 'warn', title: 'Abandoned', body: 'Its people left after a long unhappy spell. Fix the needs below and they come back.' };
-  if (!info.hasRoad) return { tone: 'warn', title: 'No road access', body: 'Build a road within 3 tiles of it.' };
+  if (info.abandoned)
+    return {
+      tone: 'warn',
+      title: 'Abandoned',
+      body: 'Its people left after a long unhappy spell. Fix the needs below and they come back.',
+    };
+  if (!info.hasRoad)
+    return { tone: 'warn', title: 'No road access', body: 'Build a road within 3 tiles of it.' };
   if (info.powerIssue) {
     return {
       tone: 'warn',
@@ -78,19 +91,36 @@ function alertFor(info: InspectInfo): { tone: 'ok' | 'warn' | 'building'; title:
     };
   }
   if (info.needsUtilities && !info.watered) {
-    return { tone: 'warn', title: 'No water', body: 'No water tower with water to spare within 14 tiles: build one closer, or another if they are all used up.' };
+    return {
+      tone: 'warn',
+      title: 'No water',
+      body: 'No water tower with water to spare within 14 tiles: build one closer, or another if they are all used up.',
+    };
   }
   if (info.needs?.complaint) {
     const worst = [...info.needs.scores].sort((a, b) => a.score - b.score)[0];
-    return { tone: 'warn', title: `“${info.needs.complaint}”`, body: worst && worst.score < 0.5 ? NEED_HINT[worst.kind] : undefined };
+    return {
+      tone: 'warn',
+      title: `“${info.needs.complaint}”`,
+      body: worst && worst.score < 0.5 ? NEED_HINT[worst.kind] : undefined,
+    };
   }
   return { tone: 'ok', title: 'Running well' };
 }
 
 function Meter({ value, warn }: { value: number; warn?: boolean }) {
   return (
-    <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct(value)}>
-      <div className={`meter-fill ${warn ? 'is-short' : ''}`} style={{ width: `${pct(Math.max(0, Math.min(1, value)))}%` }} />
+    <div
+      className="meter"
+      role="meter"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct(value)}
+    >
+      <div
+        className={`meter-fill ${warn ? 'is-short' : ''}`}
+        style={{ width: `${pct(Math.max(0, Math.min(1, value)))}%` }}
+      />
     </div>
   );
 }
@@ -112,10 +142,15 @@ function StationSection({ station }: { station: StationInfo }) {
       <h3 className="info-section-title">{station.name}</h3>
       <div className="info-stats">
         <Stat label="Riders a day" value={station.riders.toLocaleString()} />
-        <Stat label="Trains" value={station.lines.reduce((n, l) => n + l.trains, 0).toLocaleString()} />
+        <Stat
+          label="Trains"
+          value={station.lines.reduce((n, l) => n + l.trains, 0).toLocaleString()}
+        />
       </div>
       {!station.onTrack ? (
-        <p className="info-note warn-text">The track beside it is gone: lay rail right next to the station.</p>
+        <p className="info-note warn-text">
+          The track beside it is gone: lay rail right next to the station.
+        </p>
       ) : station.lines.length === 0 ? (
         <p className="info-note">Not on a line yet: build another station on the same track.</p>
       ) : (
@@ -124,7 +159,8 @@ function StationSection({ station }: { station: StationInfo }) {
             <div className="rail-line-head">
               <span className="rail-line-badge">{k + 1}</span>
               <span>
-                {line.stops.length} stops · {line.trains} train{line.trains === 1 ? '' : 's'} each way
+                {line.stops.length} stops · {line.trains} train{line.trains === 1 ? '' : 's'} each
+                way
               </span>
             </div>
             <ol className="rail-stops">
@@ -139,7 +175,9 @@ function StationSection({ station }: { station: StationInfo }) {
           </div>
         ))
       )}
-      <p className="info-note">Homes and jobs within 8 tiles of a station take the train when it beats driving.</p>
+      <p className="info-note">
+        Homes and jobs within 8 tiles of a station take the train when it beats driving.
+      </p>
     </section>
   );
 }
@@ -158,12 +196,28 @@ export function InfoPanel() {
       <header className="info-header">
         <div>
           <h2 className="info-title">{info.name}</h2>
-          <span className={`info-chip chip-${info.category}`}>{CATEGORY_LABEL[info.category] ?? info.category}</span>
-          {info.level > 0 && <span className="info-level" title={`Level ${info.level}`}>{'★'.repeat(info.level)}</span>}
+          <span className={`info-chip chip-${info.category}`}>
+            {CATEGORY_LABEL[info.category] ?? info.category}
+          </span>
+          {info.level > 0 && (
+            <span className="info-level" title={`Level ${info.level}`}>
+              {'★'.repeat(info.level)}
+            </span>
+          )}
         </div>
-        <button type="button" className="icon-button" aria-label="Close" onClick={() => game?.inspect(null)}>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Close"
+          onClick={() => game?.inspect(null)}
+        >
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       </header>
@@ -177,7 +231,14 @@ export function InfoPanel() {
           title="Pick it up and set it down somewhere else (P) · costs 20% of its price"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           Move
         </button>
@@ -193,16 +254,33 @@ export function InfoPanel() {
           </button>
         )}
         {canRepair && (
-          <button type="button" className="secondary-button" onClick={() => game?.repairBuilding(info.id)} disabled={info.repairCost <= 0}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => game?.repairBuilding(info.id)}
+            disabled={info.repairCost <= 0}
+          >
             Repair · ${info.repairCost.toLocaleString()}
           </button>
         )}
-        <button type="button" className="danger-button" onClick={() => game?.demolish(info.id)}>
+        <button
+          type="button"
+          className="danger-button"
+          onClick={() =>
+            game?.demolish(
+              info.id,
+              import.meta.env.MODE === 'native' || window.matchMedia('(pointer: coarse)').matches,
+            )
+          }
+        >
           Demolish
         </button>
       </div>
 
-      <div className={`info-alert ${alert.tone}`} role={alert.tone === 'warn' ? 'alert' : undefined}>
+      <div
+        className={`info-alert ${alert.tone}`}
+        role={alert.tone === 'warn' ? 'alert' : undefined}
+      >
         <strong>{alert.title}</strong>
         {alert.body && <span>{alert.body}</span>}
         {info.powerIssue && (
@@ -219,7 +297,10 @@ export function InfoPanel() {
 
       <div className="info-stats">
         {info.capacity > 0 && (
-          <Stat label={info.occupantLabel} value={`${info.occupants.toLocaleString()} / ${info.capacity.toLocaleString()}`}>
+          <Stat
+            label={info.occupantLabel}
+            value={`${info.occupants.toLocaleString()} / ${info.capacity.toLocaleString()}`}
+          >
             <Meter value={info.capacity === 0 ? 0 : info.occupants / info.capacity} />
           </Stat>
         )}
@@ -229,8 +310,12 @@ export function InfoPanel() {
           </Stat>
         )}
         {info.lifestyle && <Stat label="Lifestyle" value={info.lifestyle.tier} />}
-        {info.commuteMinutes !== null && <Stat label="Commute" value={`${Math.round(info.commuteMinutes)} min`} />}
-        {info.garbage !== null && <Stat label="Garbage waiting" value={`${info.garbage.toFixed(1)} t`} />}
+        {info.commuteMinutes !== null && (
+          <Stat label="Commute" value={`${Math.round(info.commuteMinutes)} min`} />
+        )}
+        {info.garbage !== null && (
+          <Stat label="Garbage waiting" value={`${info.garbage.toFixed(1)} t`} />
+        )}
         <Stat label="Air quality" value={`AQI ${info.aqi} · ${aqiBand(info.aqi).label}`} />
       </div>
       {info.lifestyle && <p className="info-note">{info.lifestyle.note}</p>}
@@ -293,9 +378,16 @@ export function InfoPanel() {
           )}
           {info.provides?.kind === 'utility' && (info.provides.power || info.provides.water) ? (
             <div className="info-row">
-              <span>{info.provides.water && info.provides.coverage ? `Supplies buildings within ${info.provides.coverage} tiles with` : 'Supplies its road network with'}</span>
+              <span>
+                {info.provides.water && info.provides.coverage
+                  ? `Supplies buildings within ${info.provides.coverage} tiles with`
+                  : 'Supplies its road network with'}
+              </span>
               <strong>
-                {[info.provides.power && `${info.provides.power.toLocaleString()} power`, info.provides.water && `${info.provides.water.toLocaleString()} water`]
+                {[
+                  info.provides.power && `${info.provides.power.toLocaleString()} power`,
+                  info.provides.water && `${info.provides.water.toLocaleString()} water`,
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </strong>
@@ -310,14 +402,27 @@ export function InfoPanel() {
                 </strong>
               </div>
               {info.facility.holds !== null && info.facility.filled !== null && (
-                <Stat label="Landfill full" value={`${pct(info.facility.filled / info.facility.holds)}%`}>
-                  <Meter value={info.facility.filled / info.facility.holds} warn={info.facility.filled / info.facility.holds > 0.85} />
+                <Stat
+                  label="Landfill full"
+                  value={`${pct(info.facility.filled / info.facility.holds)}%`}
+                >
+                  <Meter
+                    value={info.facility.filled / info.facility.holds}
+                    warn={info.facility.filled / info.facility.holds > 0.85}
+                  />
                 </Stat>
               )}
             </>
           )}
           {info.condition !== null && (
-            <Stat label="Plant condition" value={info.repairDays > 0 ? `Failed · repair in ${info.repairDays}d` : `${pct(info.condition)}%`}>
+            <Stat
+              label="Plant condition"
+              value={
+                info.repairDays > 0
+                  ? `Failed · repair in ${info.repairDays}d`
+                  : `${pct(info.condition)}%`
+              }
+            >
               <Meter value={info.condition} warn={info.condition < 0.4} />
             </Stat>
           )}

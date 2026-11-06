@@ -38,6 +38,7 @@ function referrerHost(): string | undefined {
 }
 
 export function track(kind: EventKind, props?: EventProps) {
+  if (import.meta.env.MODE === 'native') return;
   if (doNotTrack()) return;
   const q = new URLSearchParams(location.search);
   const body: TrackRequest = {

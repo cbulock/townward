@@ -271,3 +271,16 @@ Planned in detail in [05-master-plan.md](05-master-plan.md) (accepted, D-063). E
 | 21a | Weather and terrain-based disasters (tsunami, floods, wildfire, tornado …) |
 | 21b | Living city: events, tourism, landmarks, seaport, airport |
 | 22 | Polish and modes: Sandbox/Career, tutorial (onboarding tour done early, D-081), balance |
+
+## Openpolis Android evaluation (2026-11-05)
+
+- [x] Capacitor Android shell and reproducible debug APK build.
+- [x] Native-only offline local play, bundled fonts/artwork/licenses, unlimited sessions.
+- [x] Portrait and landscape touch dock, scrollable sheets, expanded layout.
+- [x] Two-row phone summary, persistent customization of both rows without an item cap, expandable dashboard and clockwise Rotate.
+- [x] Web HUD visual parity on phones: shared SVGs, zone colors, scoped panel styling and 48px targets.
+- [x] Confirm/Cancel for touch construction, relocation, and inspector demolition.
+- [x] Background saves/pause and Android Back integration.
+- [x] Browser acceptance and Android debug assembly/lint.
+- [ ] Physical Fold: airplane-mode launch, process recovery, update retention, keyboard/insets, fold continuity.
+- [ ] Developed 128×128 city: physical-device frame times, startup/save timings, thermal endurance.

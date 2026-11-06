@@ -1,6 +1,7 @@
 import { useSetAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
-import { authDialogAtom } from '../atoms';
+import { authDialogAtom, authRefreshAtom } from '../atoms';
+import { useBackDismiss } from '../mobile/useBackDismiss';
 import { useAuth } from '../auth';
 
 interface AccountButtonProps {
@@ -17,7 +18,9 @@ interface AccountButtonProps {
 export function AccountButton({ beforeLogout, compact = false }: AccountButtonProps) {
   const { auth, logout } = useAuth();
   const openDialog = useSetAtom(authDialogAtom);
+  const refreshAuth = useSetAtom(authRefreshAtom);
   const [open, setOpen] = useState(false);
+  useBackDismiss(open, () => setOpen(false));
   const [leaving, setLeaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -40,8 +43,17 @@ export function AccountButton({ beforeLogout, compact = false }: AccountButtonPr
   if (auth.status === 'checking') return null;
   if (auth.status === 'guest') {
     if (!auth.online) {
+      if (import.meta.env.MODE === 'native')
+        return (
+          <button type="button" className="account-login" onClick={() => refreshAuth((n) => n + 1)}>
+            Connect account
+          </button>
+        );
       return (
-        <span className={`account-offline ${compact ? 'is-compact' : ''}`} title="The save server is offline; cities are saved on this device">
+        <span
+          className={`account-offline ${compact ? 'is-compact' : ''}`}
+          title="The save server is offline; cities are saved on this device"
+        >
           <i aria-hidden="true" />
           Offline
         </span>
@@ -49,7 +61,12 @@ export function AccountButton({ beforeLogout, compact = false }: AccountButtonPr
     }
     return (
       <div className={`account-guest ${compact ? 'is-compact' : ''}`}>
-        <button type="button" className="account-login" title="Log in to keep your cities in an account" onClick={() => openDialog('login')}>
+        <button
+          type="button"
+          className="account-login"
+          title="Log in to keep your cities in an account"
+          onClick={() => openDialog('login')}
+        >
           Log in
         </button>
         {!compact && (
@@ -79,7 +96,14 @@ export function AccountButton({ beforeLogout, compact = false }: AccountButtonPr
         </span>
         {!compact && <span className="account-trigger-email">{email}</span>}
         <svg className="account-chevron" viewBox="0 0 12 12" aria-hidden="true">
-          <path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M3 4.5l3 3 3-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
       {open && (
@@ -113,7 +137,14 @@ export function AccountButton({ beforeLogout, compact = false }: AccountButtonPr
             }}
           >
             <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H6M10.5 11 13.5 8l-3-3M13.5 8H6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H6M10.5 11 13.5 8l-3-3M13.5 8H6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             {leaving ? 'Saving and logging out…' : 'Log out'}
           </button>

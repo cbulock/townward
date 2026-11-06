@@ -1,17 +1,49 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CityInfo, DayNightMode } from '../../game/events';
-import { airViewAtom, budgetOpenAtom, happinessViewAtom, trafficViewAtom, cityAtom, clockAtom, dayNightAtom, fundsAtom, gameAtom, mutedAtom, rotationAtom } from '../atoms';
+import {
+  airViewAtom,
+  budgetOpenAtom,
+  happinessViewAtom,
+  trafficViewAtom,
+  cityAtom,
+  clockAtom,
+  dayNightAtom,
+  fundsAtom,
+  gameAtom,
+  mutedAtom,
+  rotationAtom,
+} from '../atoms';
 import { AccountButton } from '../account/AccountButton';
 import { tourStepAtom } from '../tour/tourState';
 import { SaveStatus } from './SaveStatus';
 import { StageChip } from './StageChip';
 import { AlertsButton } from './AlertsButton';
 import { aqiBand } from '../../sim/systems/air';
+import { useBackDismiss } from '../mobile/useBackDismiss';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
-const icon = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+const icon = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
 
 /** Number that briefly flashes when it changes (green up, red down). */
 function useFlash(value: number) {
@@ -27,7 +59,17 @@ function useFlash(value: number) {
   return flash;
 }
 
-function Stat({ title, glyph, children, flash }: { title: string; glyph: ReactNode; children: ReactNode; flash?: 'up' | 'down' | null }) {
+function Stat({
+  title,
+  glyph,
+  children,
+  flash,
+}: {
+  title: string;
+  glyph: ReactNode;
+  children: ReactNode;
+  flash?: 'up' | 'down' | null;
+}) {
   return (
     <span className={`stat ${flash ? `flash-${flash}` : ''}`} title={title}>
       <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
@@ -63,6 +105,7 @@ function Clock() {
   const mode = useAtomValue(dayNightAtom);
   const game = useAtomValue(gameAtom);
   const [open, setOpen] = useState(false);
+  useBackDismiss(open, () => setOpen(false));
   const wrap = useRef<HTMLSpanElement>(null);
   // Close the menu on any click outside it.
   useEffect(() => {
@@ -91,7 +134,13 @@ function Clock() {
         </svg>
         {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
         <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">
-          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path
+            d="M6 9l6 6 6-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
         </svg>
       </button>
       {open && (
@@ -130,10 +179,19 @@ function demandWord(d: number): string {
 }
 
 /** R/C/I demand: bars grow up from the midline when the city wants more, down when it has too much. */
-function DemandMeter({ demand, why }: { demand: CityInfo['demand'] | undefined; why: CityInfo['demandWhy'] | undefined }) {
+export function DemandMeter({
+  demand,
+  why,
+}: {
+  demand: CityInfo['demand'] | undefined;
+  why: CityInfo['demandWhy'] | undefined;
+}) {
   // One line per bar: how strong it is and why (master plan §6.4).
   const title = demand
-    ? DEMAND_BARS.map(([k, , name]) => `${name}: ${demandWord(demand[k])} (${Math.round(demand[k] * 100)}%)${why ? `. ${why[k]}` : ''}`).join('\n')
+    ? DEMAND_BARS.map(
+        ([k, , name]) =>
+          `${name}: ${demandWord(demand[k])} (${Math.round(demand[k] * 100)}%)${why ? `. ${why[k]}` : ''}`,
+      ).join('\n')
     : 'Zone demand';
   return (
     <span className="demand" title={title} aria-label={title} data-tour="demand">
@@ -235,14 +293,25 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
   const fundsFlash = useFlash(funds);
   const popFlash = useFlash(city?.population ?? 0);
 
-  const date = city ? `${MONTHS[city.date.month]} ${city.date.dayOfMonth}, Y${city.date.year}` : '—';
+  const date = city
+    ? `${MONTHS[city.date.month]} ${city.date.dayOfMonth}, Y${city.date.year}`
+    : '—';
   // Narrow windows and phones show at most one of these (CSS decides when folding applies);
   // small screens start with both folded so the bar fits.
-  const [fold, setFold] = useState<FoldId | null>(() => (window.matchMedia(FOLD_SHUT).matches ? null : 'city'));
+  const [fold, setFold] = useState<FoldId | null>(() =>
+    window.matchMedia(FOLD_SHUT).matches ? null : 'city',
+  );
+  useBackDismiss(fold !== null && window.matchMedia(FOLD_SHUT).matches, () => setFold(null));
 
   return (
     <div className="panel top-bar">
-      <button type="button" className="icon-button" title="Your cities" aria-label="Your cities" onClick={onNewCity}>
+      <button
+        type="button"
+        className="icon-button"
+        title="Your cities"
+        aria-label="Your cities"
+        onClick={onNewCity}
+      >
         <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
           <g {...icon}>
             <path d="M4 20V10l5-4 5 4v10M14 20v-7h6v7M2 20h20" />
@@ -253,16 +322,33 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
       <span className="city-name">{cityName}</span>
       <SaveStatus onSave={onSave} />
       <span className="top-divider" />
-      <Fold id="city" open={fold} onOpen={setFold} label="Show the date, clock and jobs" glyph={CALENDAR}>
+      <Fold
+        id="city"
+        open={fold}
+        onOpen={setFold}
+        label="Show the date, clock and jobs"
+        glyph={CALENDAR}
+      >
         <Stat title="Date" glyph={CALENDAR}>
           <span className="stat-value date">{date}</span>
           <Clock />
         </Stat>
       </Fold>
       <Stat
-        title={city ? `Population ${city.population.toLocaleString()} of ${city.housing.toLocaleString()} homes` : 'Population'}
+        title={
+          city
+            ? `Population ${city.population.toLocaleString()} of ${city.housing.toLocaleString()} homes`
+            : 'Population'
+        }
         flash={popFlash}
-        glyph={<g {...icon}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx="17" cy="9" r="2.4" /><path d="M16 14.2c2.8.2 5 2.6 5 5.8" /></g>}
+        glyph={
+          <g {...icon}>
+            <circle cx="9" cy="8" r="3" />
+            <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+            <circle cx="17" cy="9" r="2.4" />
+            <path d="M16 14.2c2.8.2 5 2.6 5 5.8" />
+          </g>
+        }
       >
         <span className="stat-value">{(city?.population ?? 0).toLocaleString()}</span>
       </Stat>
@@ -270,8 +356,17 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
       {/* Jobs folds with the date: one toggle, shown in the date's place. */}
       <Fold id="city" open={fold}>
         <Stat
-          title={city ? `${city.workers.toLocaleString()} workers in ${city.jobs.toLocaleString()} jobs · ${city.unemployed.toLocaleString()} unemployed` : 'Jobs'}
-          glyph={<g {...icon}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5h6v3M3 13h18" /></g>}
+          title={
+            city
+              ? `${city.workers.toLocaleString()} workers in ${city.jobs.toLocaleString()} jobs · ${city.unemployed.toLocaleString()} unemployed`
+              : 'Jobs'
+          }
+          glyph={
+            <g {...icon}>
+              <rect x="3" y="8" width="18" height="12" rx="2" />
+              <path d="M9 8V5h6v3M3 13h18" />
+            </g>
+          }
         >
           <span className="stat-value">
             {(city?.workers ?? 0).toLocaleString()}
@@ -289,7 +384,13 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
           <g {...icon}>
             <circle cx="12" cy="12" r="8.5" />
-            {happy >= 0.6 ? <path d="M8.5 14c1 1.5 2.2 2.2 3.5 2.2s2.5-.7 3.5-2.2" /> : happy >= 0.45 ? <path d="M8.5 15h7" /> : <path d="M8.5 16.2c1-1.5 2.2-2.2 3.5-2.2s2.5.7 3.5 2.2" />}
+            {happy >= 0.6 ? (
+              <path d="M8.5 14c1 1.5 2.2 2.2 3.5 2.2s2.5-.7 3.5-2.2" />
+            ) : happy >= 0.45 ? (
+              <path d="M8.5 15h7" />
+            ) : (
+              <path d="M8.5 16.2c1-1.5 2.2-2.2 3.5-2.2s2.5.7 3.5 2.2" />
+            )}
             <path d="M9.3 9.8h.01M14.7 9.8h.01" strokeWidth="2.6" />
           </g>
         </svg>
@@ -302,7 +403,11 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
         aria-pressed={airView}
         onClick={() => game?.setAirView(!airView)}
       >
-        <span className="air-dot" style={{ background: `#${band.color.toString(16).padStart(6, '0')}` }} aria-hidden="true" />
+        <span
+          className="air-dot"
+          style={{ background: `#${band.color.toString(16).padStart(6, '0')}` }}
+          aria-hidden="true"
+        />
         <span className="stat-dim">AQI</span>
         <span className="stat-value">{aqi}</span>
       </button>
@@ -328,21 +433,50 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
             onClick={() => game?.setSpeed(i)}
           >
             {i === 0 ? (
-              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                <path
+                  d="M8 5v14M16 5v14"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                />
+              </svg>
             ) : (
-              <svg viewBox="0 0 24 24" width={10 + i * 4} height="13" aria-hidden="true" preserveAspectRatio="none">
+              <svg
+                viewBox="0 0 24 24"
+                width={10 + i * 4}
+                height="13"
+                aria-hidden="true"
+                preserveAspectRatio="none"
+              >
                 {Array.from({ length: i }, (_, k) => (
-                  <path key={k} d={`M${4 + k * (16 / i)} 5l${14 / i} 7-${14 / i} 7z`} fill="currentColor" />
+                  <path
+                    key={k}
+                    d={`M${4 + k * (16 / i)} 5l${14 / i} 7-${14 / i} 7z`}
+                    fill="currentColor"
+                  />
                 ))}
               </svg>
             )}
           </button>
         ))}
       </div>
-      <Fold id="view" open={fold} onOpen={setFold} label="Show rotate, traffic view and sound" glyph={EYE}>
+      <Fold
+        id="view"
+        open={fold}
+        onOpen={setFold}
+        label="Show rotate, traffic view and sound"
+        glyph={EYE}
+      >
         <span className="top-divider" />
         <div className="rotate-group" role="group" aria-label="Rotate view">
-          <button type="button" className="icon-button" title="Rotate left (,)" aria-label="Rotate view left" onClick={() => game?.rotate(-1)}>
+          <button
+            type="button"
+            className="icon-button"
+            title="Rotate left (,)"
+            aria-label="Rotate view left"
+            onClick={() => game?.rotate(-1)}
+          >
             <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
               <g {...icon}>
                 <path d="M4 12a8 8 0 1 0 2.4-5.7" />
@@ -351,13 +485,24 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
             </svg>
           </button>
           {/* Compass: the arrow points to the map's north as seen from this side. */}
-          <span className="compass" title="North" style={{ transform: `rotate(${45 + rotation * 90}deg)` }} aria-hidden="true">
+          <span
+            className="compass"
+            title="North"
+            style={{ transform: `rotate(${45 + rotation * 90}deg)` }}
+            aria-hidden="true"
+          >
             <svg viewBox="0 0 24 24" width="18" height="18">
               <path d="M12 3l4 9h-8z" fill="#f87171" />
               <path d="M12 21l-4-9h8z" fill="currentColor" opacity="0.55" />
             </svg>
           </span>
-          <button type="button" className="icon-button" title="Rotate right (.)" aria-label="Rotate view right" onClick={() => game?.rotate(1)}>
+          <button
+            type="button"
+            className="icon-button"
+            title="Rotate right (.)"
+            aria-label="Rotate view right"
+            onClick={() => game?.rotate(1)}
+          >
             <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
               <g {...icon}>
                 <path d="M20 12a8 8 0 1 1-2.4-5.7" />
@@ -394,15 +539,32 @@ export function TopBar({ cityName, onNewCity, onSave, beforeLogout }: TopBarProp
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
             {muted ? (
-              <path d="M17 9l5 6M22 9l-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path
+                d="M17 9l5 6M22 9l-5 6"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
             ) : (
-              <path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path
+                d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
             )}
           </svg>
         </button>
       </Fold>
       <AlertsButton />
-      <button type="button" className="icon-button" title="Tour the basics" aria-label="Tour the basics" onClick={() => setTourStep(0)}>
+      <button
+        type="button"
+        className="icon-button"
+        title="Tour the basics"
+        aria-label="Tour the basics"
+        onClick={() => setTourStep(0)}
+      >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <g {...icon}>
             <circle cx="12" cy="12" r="8.5" />

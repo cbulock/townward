@@ -25,6 +25,10 @@ bun run test         # unit tests (server tests use in-process PGlite: no Docker
 bun run typecheck && bun run lint
 ```
 
+## Android
+
+See the [Android feature spec](specs/android.md), [build and acceptance workflow](ANDROID.md) and [upstream contribution checklist](ANDROID-UPSTREAM.md).
+
 ## Index
 
 | Doc | What it covers |

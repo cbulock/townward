@@ -1,5 +1,14 @@
 import { atom } from 'jotai';
-import type { BudgetInfo, CityInfo, DayNightMode, DebugStats, InspectInfo, Notice, ToolPreviewInfo } from '../game/events';
+import { NATIVE_APP } from './platform';
+import type {
+  BudgetInfo,
+  CityInfo,
+  DayNightMode,
+  DebugStats,
+  InspectInfo,
+  Notice,
+  ToolPreviewInfo,
+} from '../game/events';
 import type { Game } from '../game/Game';
 import type { ToolId } from '../game/tools';
 import type { SaveStatus } from '../save/CitySaver';
@@ -57,11 +66,18 @@ export type AuthState =
   | { readonly status: 'checking' }
   | { readonly status: 'guest'; readonly online: boolean }
   | { readonly status: 'user'; readonly user: ApiUser };
-export const authAtom = atom<AuthState>({ status: 'checking' });
+export const authAtom = atom<AuthState>(
+  NATIVE_APP ? { status: 'guest', online: false } : { status: 'checking' },
+);
+export const authRefreshAtom = atom(0);
 /** The log in / sign up dialog, if open. */
 export const authDialogAtom = atom<'login' | 'signup' | null>(null);
 /** Sign-in methods the server offers besides email (from /api/auth/me). */
-export const authProvidersAtom = atom<AuthProviders>({ github: false, emailCodes: false, turnstileSiteKey: null });
+export const authProvidersAtom = atom<AuthProviders>({
+  github: false,
+  emailCodes: false,
+  turnstileSiteKey: null,
+});
 /** A message for the dialog to show when it opens (e.g. why a GitHub sign-in failed). */
 export const authNoticeAtom = atom<string | null>(null);
 /** Save state of the open city; null when it isn't saved at all (the demo). */

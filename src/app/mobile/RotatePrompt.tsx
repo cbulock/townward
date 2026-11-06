@@ -37,7 +37,7 @@ export function RotatePrompt() {
       return false;
     }
   });
-  if (!portrait || dismissed) return null;
+  if (import.meta.env.MODE === 'native' || !portrait || dismissed) return null;
 
   const dismiss = () => {
     try {
